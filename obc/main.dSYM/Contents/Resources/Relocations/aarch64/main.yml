@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/obc/main'
+relocations:     []
+...

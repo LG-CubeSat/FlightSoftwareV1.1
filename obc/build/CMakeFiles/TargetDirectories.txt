@@ -1,0 +1,3 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/obc/build/CMakeFiles/main.dir
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/obc/build/CMakeFiles/edit_cache.dir
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/obc/build/CMakeFiles/rebuild_cache.dir
