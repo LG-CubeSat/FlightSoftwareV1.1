@@ -7,4 +7,6 @@ add_executable(main
     adcs/adcs.c
     communication/spi.c 
     system/system.c
+    
+    ${CMAKE_SOURCE_DIR}/../shared/protocol/packet.c
 )

@@ -8,6 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c" "CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o" "gcc" "CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o.d"
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/obc/adcs/adcs.c" "CMakeFiles/main.dir/adcs/adcs.c.o" "gcc" "CMakeFiles/main.dir/adcs/adcs.c.o.d"
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/obc/communication/spi.c" "CMakeFiles/main.dir/communication/spi.c.o" "gcc" "CMakeFiles/main.dir/communication/spi.c.o.d"
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/obc/main.c" "CMakeFiles/main.dir/main.c.o" "gcc" "CMakeFiles/main.dir/main.c.o.d"

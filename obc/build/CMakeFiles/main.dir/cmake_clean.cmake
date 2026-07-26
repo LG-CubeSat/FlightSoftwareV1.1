@@ -1,4 +1,6 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o"
+  "CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o.d"
   "CMakeFiles/main.dir/adcs/adcs.c.o"
   "CMakeFiles/main.dir/adcs/adcs.c.o.d"
   "CMakeFiles/main.dir/communication/spi.c.o"

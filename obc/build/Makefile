@@ -129,6 +129,30 @@ main/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
 .PHONY : main/fast
 
+Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.o: Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o
+.PHONY : Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.o
+
+# target to build an object file
+Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o
+.PHONY : Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o
+
+Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.i: Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.i
+.PHONY : Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.i
+
+# target to preprocess a source file
+Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.i
+.PHONY : Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.i
+
+Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.s: Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.s
+.PHONY : Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.s
+
+# target to generate assembly for a file
+Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.s
+.PHONY : Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.s
+
 adcs/adcs.o: adcs/adcs.c.o
 .PHONY : adcs/adcs.o
 
@@ -234,6 +258,9 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... main"
+	@echo "... Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.o"
+	@echo "... Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.i"
+	@echo "... Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.s"
 	@echo "... adcs/adcs.o"
 	@echo "... adcs/adcs.i"
 	@echo "... adcs/adcs.s"
