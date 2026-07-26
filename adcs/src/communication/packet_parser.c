@@ -29,9 +29,13 @@ void packet_parser_process(
     uint8_t payload_length = data[4];
     uint8_t crc = data[5];
 
-    printf("    Destination: 0x%02X\n", destination);
-    printf("    Sequence:    %d\n", seqeunce);
-    printf("    Command:     0x%2X\n", command);
-    printf("    Payload:     %d bytes\n", payload_length);
-    printf("    CRC:         0x%02X\n", crc);
+    printf("[PARSER] Valid command received.\n");
+    
+    if (!command_queue_push(command)) {
+        printf("[PARSER] ERROR: Could not queue command.\n");
+
+        return;
+    }
+
+    printf("[PARSER] Command added to queue.\n");
 }
