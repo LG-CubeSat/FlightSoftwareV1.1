@@ -3,6 +3,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o.d"
   "CMakeFiles/main.dir/src/commands/command_handler.c.o"
   "CMakeFiles/main.dir/src/commands/command_handler.c.o.d"
+  "CMakeFiles/main.dir/src/commands/command_queue.c.o"
+  "CMakeFiles/main.dir/src/commands/command_queue.c.o.d"
   "CMakeFiles/main.dir/src/communication/packet_parser.c.o"
   "CMakeFiles/main.dir/src/communication/packet_parser.c.o.d"
   "CMakeFiles/main.dir/src/communication/spi.c.o"

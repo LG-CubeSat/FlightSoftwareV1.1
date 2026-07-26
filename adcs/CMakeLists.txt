@@ -7,6 +7,7 @@ add_executable(main
     src/communication/packet_parser.c
     src/communication/spi.c
     src/commands/command_handler.c
+    src/commands/command_queue.c
     
     ${CMAKE_SOURCE_DIR}/../shared/protocol/packet.c
 )

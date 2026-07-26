@@ -48,4 +48,6 @@ CMakeFiles/main.dir/src/main.c.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/_types/_uint64_t.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/_types/_intmax_t.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/_types/_uintmax_t.h \
-  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/spi.h
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/spi.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command.h

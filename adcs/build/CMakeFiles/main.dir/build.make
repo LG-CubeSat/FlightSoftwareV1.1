@@ -128,10 +128,24 @@ CMakeFiles/main.dir/src/commands/command_handler.c.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/main.dir/src/commands/command_handler.c.s"
 	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_handler.c -o CMakeFiles/main.dir/src/commands/command_handler.c.s
 
+CMakeFiles/main.dir/src/commands/command_queue.c.o: CMakeFiles/main.dir/flags.make
+CMakeFiles/main.dir/src/commands/command_queue.c.o: /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.c
+CMakeFiles/main.dir/src/commands/command_queue.c.o: CMakeFiles/main.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building C object CMakeFiles/main.dir/src/commands/command_queue.c.o"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/main.dir/src/commands/command_queue.c.o -MF CMakeFiles/main.dir/src/commands/command_queue.c.o.d -o CMakeFiles/main.dir/src/commands/command_queue.c.o -c /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.c
+
+CMakeFiles/main.dir/src/commands/command_queue.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing C source to CMakeFiles/main.dir/src/commands/command_queue.c.i"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.c > CMakeFiles/main.dir/src/commands/command_queue.c.i
+
+CMakeFiles/main.dir/src/commands/command_queue.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/main.dir/src/commands/command_queue.c.s"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.c -o CMakeFiles/main.dir/src/commands/command_queue.c.s
+
 CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o: CMakeFiles/main.dir/flags.make
 CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o: /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c
 CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o: CMakeFiles/main.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building C object CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building C object CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o"
 	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o -MF CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o.d -o CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o -c /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c
 
 CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.i: cmake_force
@@ -148,6 +162,7 @@ main_OBJECTS = \
 "CMakeFiles/main.dir/src/communication/packet_parser.c.o" \
 "CMakeFiles/main.dir/src/communication/spi.c.o" \
 "CMakeFiles/main.dir/src/commands/command_handler.c.o" \
+"CMakeFiles/main.dir/src/commands/command_queue.c.o" \
 "CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o"
 
 # External object files for target main
@@ -157,10 +172,11 @@ main: CMakeFiles/main.dir/src/main.c.o
 main: CMakeFiles/main.dir/src/communication/packet_parser.c.o
 main: CMakeFiles/main.dir/src/communication/spi.c.o
 main: CMakeFiles/main.dir/src/commands/command_handler.c.o
+main: CMakeFiles/main.dir/src/commands/command_queue.c.o
 main: CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o
 main: CMakeFiles/main.dir/build.make
 main: CMakeFiles/main.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking C executable main"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking C executable main"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/main.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

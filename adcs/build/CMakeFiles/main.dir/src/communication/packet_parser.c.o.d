@@ -49,4 +49,6 @@ CMakeFiles/main.dir/src/communication/packet_parser.c.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/_types/_intmax_t.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/_types/_uintmax_t.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../../../shared/protocol/packet.h \
-  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../../../shared/protocol/commands.h
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../../../shared/protocol/commands.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../commands/command_queue.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../commands/command.h

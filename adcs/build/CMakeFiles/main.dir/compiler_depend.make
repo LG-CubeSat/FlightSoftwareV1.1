@@ -79,6 +79,8 @@ CMakeFiles/main.dir/src/communication/packet_parser.c.o: /Users/wesleywong/Docum
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include/stdint.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/commands.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/packet_parser.h
 
 CMakeFiles/main.dir/src/communication/spi.c.o: /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/spi.c \
@@ -180,6 +182,8 @@ CMakeFiles/main.dir/src/main.c.o: /Users/wesleywong/Documents/GitHub/FlightSoftw
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/sys/stdio.h \
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include/ptrcheck.h \
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include/stdint.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/packet_parser.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/spi.h
 
@@ -189,6 +193,10 @@ CMakeFiles/main.dir/src/main.c.o: /Users/wesleywong/Documents/GitHub/FlightSoftw
 /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/spi.h:
 
 /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/packet_parser.h:
+
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.h:
+
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/sys/stdio.h:
 

@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "packet_parser.h"
 #include "../../../shared/protocol/packet.h"
+#include "../commands/command_queue.h"
+#include "../commands/command.h"
 
 void packet_parser_initialize(void)
 {
@@ -21,13 +23,13 @@ void packet_parser_process(
         printf("[PARSER] Error: Invlaid sync byte. \n");
         return;
     }
-    printf("[PARSER] Valid packet recieved\n");
     
-    uint8_t destination = data[1];
-    uint8_t seqeunce = data[2];
-    uint8_t command = data[3];
-    uint8_t payload_length = data[4];
-    uint8_t crc = data[5];
+    CommandMessage command;
+
+    command.destination = data[1];
+    command.sequence = data[2];
+    command.command = data[3];
+    command.length = data[4];
 
     printf("[PARSER] Valid command received.\n");
     

@@ -9,7 +9,7 @@ typedef struct
     uint8_t destination;
     uint8_t sequence;
     uint8_t command;
-    uint8_t lengt;
+    uint8_t length;
 } CommandMessage;
 
 #endif

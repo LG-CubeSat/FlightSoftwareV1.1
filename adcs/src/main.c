@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "communication/packet_parser.h"
 #include "communication/spi.h"
+#include "commands/command_queue.h"
 
 int main(void)
 {
@@ -11,6 +12,8 @@ int main(void)
     spi_initialize();
 
     packet_parser_initialize();
+
+    command_queue_initialize();
 
     printf("Starting RTOS...\n");
 
