@@ -13,11 +13,11 @@ void adcs_initialize(void)
 
 void adcs_point_to_sun(void)
 {
-    Packet packet;
-    packet.sync = PACKET_SYNC;
-    packet.command = CMD_POINT_TO_SUN;
-    packet.length = 0;
-    packet.crc = 0;
+    Packet packet = packet_create(
+        DEVICE_ADCS, 
+        1, 
+        CMD_POINT_TO_SUN
+    );
 
     spi_transfer(
         (uint8_t *)&packet,
