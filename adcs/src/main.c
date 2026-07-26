@@ -2,6 +2,7 @@
 #include "communication/packet_parser.h"
 #include "communication/spi.h"
 #include "commands/command_queue.h"
+#include "commands/command_task.h"
 
 int main(void)
 {
@@ -14,6 +15,8 @@ int main(void)
     packet_parser_initialize();
 
     command_queue_initialize();
+
+    command_task_initialize();
 
     printf("Starting RTOS...\n");
 
@@ -35,6 +38,8 @@ int main(void)
         test_packet,
         sizeof(test_packet)
     );
+
+    command_task_run();
 
     return 0;
 }

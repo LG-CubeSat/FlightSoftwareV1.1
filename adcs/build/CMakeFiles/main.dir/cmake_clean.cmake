@@ -5,6 +5,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/main.dir/src/commands/command_handler.c.o.d"
   "CMakeFiles/main.dir/src/commands/command_queue.c.o"
   "CMakeFiles/main.dir/src/commands/command_queue.c.o.d"
+  "CMakeFiles/main.dir/src/commands/command_task.c.o"
+  "CMakeFiles/main.dir/src/commands/command_task.c.o.d"
   "CMakeFiles/main.dir/src/communication/packet_parser.c.o"
   "CMakeFiles/main.dir/src/communication/packet_parser.c.o.d"
   "CMakeFiles/main.dir/src/communication/spi.c.o"

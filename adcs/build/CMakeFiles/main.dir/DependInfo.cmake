@@ -11,6 +11,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c" "CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o" "gcc" "CMakeFiles/main.dir/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/shared/protocol/packet.c.o.d"
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_handler.c" "CMakeFiles/main.dir/src/commands/command_handler.c.o" "gcc" "CMakeFiles/main.dir/src/commands/command_handler.c.o.d"
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.c" "CMakeFiles/main.dir/src/commands/command_queue.c.o" "gcc" "CMakeFiles/main.dir/src/commands/command_queue.c.o.d"
+  "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_task.c" "CMakeFiles/main.dir/src/commands/command_task.c.o" "gcc" "CMakeFiles/main.dir/src/commands/command_task.c.o.d"
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/packet_parser.c" "CMakeFiles/main.dir/src/communication/packet_parser.c.o" "gcc" "CMakeFiles/main.dir/src/communication/packet_parser.c.o.d"
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/spi.c" "CMakeFiles/main.dir/src/communication/spi.c.o" "gcc" "CMakeFiles/main.dir/src/communication/spi.c.o.d"
   "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/main.c" "CMakeFiles/main.dir/src/main.c.o" "gcc" "CMakeFiles/main.dir/src/main.c.o.d"

@@ -201,6 +201,30 @@ src/commands/command_queue.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/commands/command_queue.c.s
 .PHONY : src/commands/command_queue.c.s
 
+src/commands/command_task.o: src/commands/command_task.c.o
+.PHONY : src/commands/command_task.o
+
+# target to build an object file
+src/commands/command_task.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/commands/command_task.c.o
+.PHONY : src/commands/command_task.c.o
+
+src/commands/command_task.i: src/commands/command_task.c.i
+.PHONY : src/commands/command_task.i
+
+# target to preprocess a source file
+src/commands/command_task.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/commands/command_task.c.i
+.PHONY : src/commands/command_task.c.i
+
+src/commands/command_task.s: src/commands/command_task.c.s
+.PHONY : src/commands/command_task.s
+
+# target to generate assembly for a file
+src/commands/command_task.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/commands/command_task.c.s
+.PHONY : src/commands/command_task.c.s
+
 src/communication/packet_parser.o: src/communication/packet_parser.c.o
 .PHONY : src/communication/packet_parser.o
 
@@ -291,6 +315,9 @@ help:
 	@echo "... src/commands/command_queue.o"
 	@echo "... src/commands/command_queue.i"
 	@echo "... src/commands/command_queue.s"
+	@echo "... src/commands/command_task.o"
+	@echo "... src/commands/command_task.i"
+	@echo "... src/commands/command_task.s"
 	@echo "... src/communication/packet_parser.o"
 	@echo "... src/communication/packet_parser.i"
 	@echo "... src/communication/packet_parser.s"
