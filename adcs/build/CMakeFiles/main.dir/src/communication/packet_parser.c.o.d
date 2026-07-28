@@ -51,4 +51,4 @@ CMakeFiles/main.dir/src/communication/packet_parser.c.o: \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../../../shared/protocol/packet.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../../../shared/protocol/commands.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../commands/command_queue.h \
-  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../commands/command.h
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/communication/../commands/commands.h

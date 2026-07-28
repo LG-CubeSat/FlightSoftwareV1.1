@@ -2,8 +2,16 @@
 
 #include "command_task.h"
 
-#include "command.h"
+#include "commands.h"
 #include "command_queue.h"
+#include "command_handler.h"
+
+/*
+Notes:
+- Uses the command queue and fetches a command
+- Sends command to the handler to be interpreted
+- Doesn't do anything with the command simply grabs it and sends it.
+*/
 
 void command_task_initialize(void)
 {
@@ -23,7 +31,5 @@ void command_task_run(void)
 
     printf("[COMMAND TASK] Processing command.\n");
 
-    printf("    Destination: 0x%02X\n", command.destination);
-    printf("    Sequence: %d\n", command.sequence);
-    printf("    Command: 0x%2X\n", command.command);
+    command_handler_process(&command);
 }

@@ -1,8 +1,10 @@
 #include <stdio.h>
+
 #include "communication/packet_parser.h"
 #include "communication/spi.h"
 #include "commands/command_queue.h"
 #include "commands/command_task.h"
+#include "commands/command_handler.h"
 
 int main(void)
 {
@@ -17,6 +19,8 @@ int main(void)
     command_queue_initialize();
 
     command_task_initialize();
+
+    command_handler_initialize();
 
     printf("Starting RTOS...\n");
 

@@ -40,7 +40,7 @@ CMakeFiles/main.dir/src/commands/command_queue.c.o: \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/secure/_stdio.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/secure/_common.h \
   /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command_queue.h \
-  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/command.h \
+  /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/adcs/src/commands/commands.h \
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/21/include/stdint.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/stdint.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk/usr/include/_types/_uint8_t.h \

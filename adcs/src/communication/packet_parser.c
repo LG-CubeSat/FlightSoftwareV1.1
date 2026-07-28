@@ -2,7 +2,7 @@
 #include "packet_parser.h"
 #include "../../../shared/protocol/packet.h"
 #include "../commands/command_queue.h"
-#include "../commands/command.h"
+#include "../commands/commands.h"
 
 void packet_parser_initialize(void)
 {

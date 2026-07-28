@@ -1,7 +1,7 @@
 #ifndef COMMAND_QUEUE_H
 #define COMMAND_QUEUE_H
 
-#include "command.h"
+#include "commands.h"
 
 void command_queue_initialize(void);
 

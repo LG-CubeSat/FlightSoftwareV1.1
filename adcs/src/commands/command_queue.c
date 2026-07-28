@@ -3,6 +3,13 @@
 
 #define COMMAND_QUEUE_SIZE 8
 
+/*
+Notes:
+- Uses a circular queue to effeciently store commands without shifting the entire queue
+- Uses FIFO (first in first out)
+- Simply stores commands allowing them to be grabbed or added
+*/
+
 static CommandMessage queue[COMMAND_QUEUE_SIZE];
 
 static int head;
