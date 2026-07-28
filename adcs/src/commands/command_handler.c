@@ -3,6 +3,7 @@
 #include "command_handler.h"
 #include "../../../shared/protocol/commands.h"
 #include "../control/adcs_state.h"
+#include "../control/adcs_target.h"
 
 /* 
 Notes: 
@@ -28,6 +29,10 @@ void command_handler_process(const CommandMessage *command)
                 "[COMMAND HANDLER] Request: Point to Sun.\n"
             );
 
+            adcs_target_set(
+                ADCS_TARGET_SUN
+            );
+
             adcs_state_request(
                 ADCS_STATE_POINTING
             );
@@ -35,6 +40,15 @@ void command_handler_process(const CommandMessage *command)
             break;
         case CMD_POINT_TO_EARTH:
             printf("[COMMAND HANDLER] Request: Point to Earth.\n");
+
+            adcs_target_set(
+                ADCS_TARGET_EARTH
+            );
+
+            adcs_state_request(
+                ADCS_STATE_POINTING
+            );
+
             break;
         case CMD_ENTER_SAFE_MODE:
             printf("[COMMAND HANDLER] Request: Enter Safe Mode.\n");
