@@ -28,7 +28,9 @@ void control_task_run(void)
 
     if (!control_queue_pop(&request))
     {
-        return;
+        // no event commands
+        // Control Logic (Deterministic)
+        printf("[CONTROL TASK] Running 50Hz Loop: State=%d\n");
     }
 
 
