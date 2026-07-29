@@ -1,9 +1,9 @@
 # Flight Software V1: Mission - November 1st Balloon Launch
 
-## 🚀 Mission Overview
+## Mission Overview
 This repository contains the flight software stack for the **November 1st Balloon Launch**. The goal is to deploy a high-reliability, hybrid architecture capable of maintaining deterministic control during flight and managing mission-critical autonomy.
 
-## 🏗️ Goal Architecture: The Hybrid CubeSat Stack
+## Goal Architecture: The Hybrid CubeSat Stack
 We are implementing a professional aerospace architecture modeled after modern CubeSat standards.
 
 ### 1. High-Level OBC (On-Board Computer) - Linux
@@ -20,19 +20,19 @@ We are implementing a professional aerospace architecture modeled after modern C
 *   All communication between the Ground, OBC, and MCU uses the **CCSDS Space Packet Protocol**.
 *   **Binary Reliability:** Packed structs, CRC-16 checksums, and APID-based routing.
 
-## 💻 Current Status: Software-in-the-Loop (SIL)
+## Current Status: Software-in-the-Loop (SIL)
 To ensure the highest reliability for the November 1st launch, we are using a **Simulator-First** approach.
 *   The software currently runs as a native macOS/Linux application.
 *   FreeRTOS is simulated using `pthreads` to maintain the 50Hz control heartbeat.
 *   This allows us to debug mission logic before committing to hardware.
 
-## 📂 Directory Structure
+## Directory Structure
 *   `/adcs`: The MCU flight code (Attitude Determination & Control).
 *   `/obc`: The Linux-based Mission Coordinator.
 *   `/shared`: Common CCSDS protocol definitions and binary serialization logic.
 *   `/docs`: System architecture, RTOS simulation guides, and hardware migration paths.
 
-## 🛠️ Getting Started (Simulator)
+## Getting Started (Simulator)
 To run the current ADCS heartbeat simulator:
 ```bash
 cd adcs
@@ -41,15 +41,3 @@ cmake ..
 make
 ./adcs_sim
 ```
-
-## 📅 The 10-Phase Roadmap
-1.  **Phase 1:** Project Scaffolding & Build System (COMPLETE)
-2.  **Phase 2:** Space Data Types & Serialization (CCSDS)
-3.  **Phase 3:** The Inter-Processor Bus (IPC Simulator)
-4.  **Phase 4:** Linux OBC - OSAL & Threading
-5.  **Phase 5:** Core Flight Services - CI & TO
-6.  **Phase 6:** FreeRTOS - Task Management (IN-PROGRESS)
-7.  **Phase 7:** MCU Deterministic Control Loops (ADCS/EPS)
-8.  **Phase 8:** The Time-Tagged Scheduler (TTS)
-9.  **Phase 9:** Event-Driven Autonomy (Limit Checker)
-10. **Phase 10:** System Integration & "Day in the Life"
