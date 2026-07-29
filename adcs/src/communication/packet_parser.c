@@ -4,6 +4,13 @@
 #include "../commands/command_queue.h"
 #include "../commands/commands.h"
 
+/*
+NOTES:
+SPI recieved command
+It gets broken down (parsed)
+Then sent to the command queue
+*/
+
 void packet_parser_initialize(void)
 {
     printf("[PARSER] Initialized.\n");

@@ -5,6 +5,7 @@
 
 /*
 Notes:
+- Receives a command from the parser
 - Uses a circular queue to effeciently store commands without shifting the entire queue
 - Uses FIFO (first in first out)
 - Simply stores commands allowing them to be grabbed or added

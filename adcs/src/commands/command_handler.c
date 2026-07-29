@@ -4,12 +4,13 @@
 #include "../../../shared/protocol/commands.h"
 #include "../control/adcs_state.h"
 #include "../control/adcs_target.h"
+#include "../control/control_request.h"
 
 /* 
 Notes: 
 Uses shared commands
 Does not directly command the ADCS
-Rather it sets a state.
+Rather it requests a change in state and target to the control queue.
 IT INTERPRETS THE COMMAND.
 */
 
@@ -20,8 +21,8 @@ void command_handler_initialize()
 
 void command_handler_process(const CommandMessage *command)
 {
-    printf("[COMMAND HANDLER] Received command 0x%2X.\n", command->command);
-
+    ControlRequest request;
+    
     switch (command->command)
     {
         case CMD_POINT_TO_SUN:
@@ -29,43 +30,43 @@ void command_handler_process(const CommandMessage *command)
                 "[COMMAND HANDLER] Request: Point to Sun.\n"
             );
 
-            adcs_target_set(
-                ADCS_TARGET_SUN
-            );
+            request.type = CONTROL_REQUEST_POINT;
+            request.target = ADCS_TARGET_SUN;
 
-            adcs_state_request(
-                ADCS_STATE_POINTING
-            );
+            control_queue_push(request);
 
             break;
+
         case CMD_POINT_TO_EARTH:
             printf("[COMMAND HANDLER] Request: Point to Earth.\n");
 
-            adcs_target_set(
-                ADCS_TARGET_EARTH
-            );
+            request.type = CONTROL_REQUEST_POINT;
+            request.target = ADCS_TARGET_EARTH;
 
-            adcs_state_request(
-                ADCS_STATE_POINTING
-            );
+            control_queue_push(request);
 
             break;
+
         case CMD_ENTER_SAFE_MODE:
             printf("[COMMAND HANDLER] Request: Enter Safe Mode.\n");
             
-            adcs_state_request(
-                ADCS_STATE_SAFE
-            );
+            request.type = CONTROL_REQUEST_ENTER_SAFE;
+            request.target = ADCS_TARGET_NONE;
+
+            control_queue_push(request);
 
             break;
+
         case CMD_EXIT_SAFE_MODE:
             printf("[COMMAND HANDLER] Request: Exit Safe Mode.\n");
 
-            adcs_state_request(
-                ADCS_STATE_IDLE
-            );
+            request.type = CONTROL_REQUEST_EXIT_SAFE;
+            request.target = ADCS_TARGET_NONE;
+
+            control_queue_push(request);
 
             break;
+
         case CMD_GET_ATTITUDE:
             printf("[COMMAND HANDLER] Request: Getting Altitude.\n");
             break;
