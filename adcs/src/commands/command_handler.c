@@ -2,8 +2,6 @@
 
 #include "command_handler.h"
 #include "../../../shared/protocol/commands.h"
-#include "../control/adcs_state.h"
-#include "../control/adcs_target.h"
 #include "../control/control_request.h"
 
 /* 
