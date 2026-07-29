@@ -3,6 +3,7 @@
 #include "command_handler.h"
 #include "../../../shared/protocol/commands.h"
 #include "../control/control_request.h"
+#include "../control/control_queue.h"
 
 /* 
 Notes: 

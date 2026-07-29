@@ -1,5 +1,8 @@
 #include <stdio.h>
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "command_task.h"
 
 #include "commands.h"
@@ -16,6 +19,20 @@ Notes:
 void command_task_initialize(void)
 {
     printf("[COMMAND TASK] Initialized.\n");
+}
+
+void command_task_loop(void *pvParameters)
+{
+    printf("[COMMAND TASK] Task Started (Blocking).\n");
+
+    for (;;)
+    {
+        command_task_run();
+        // Since command_queue_pop is non-blocking right now,
+        // we add a small delay to prevent 100% CPU usage.
+        // In a real system, the queue pop would block.
+        vTaskDelay(pdMS_TO_TICKS(10)); 
+    }
 }
 
 void command_task_run(void)

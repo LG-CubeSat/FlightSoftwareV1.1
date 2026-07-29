@@ -5,4 +5,6 @@ void control_task_initialize(void);
 
 void control_task_run(void);
 
+void control_task_loop(void *pvParameters);
+
 #endif

@@ -1,4 +1,5 @@
 #include <stdio.h>
+
 #include "system/system.h"
 #include "communication/spi.h"
 #include "adcs/adcs.h"

@@ -5,4 +5,6 @@ void command_task_initialize(void);
 
 void command_task_run(void);
 
+void command_task_loop(void *pvParameters);
+
 #endif

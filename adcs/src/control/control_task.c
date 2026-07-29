@@ -105,6 +105,6 @@ void control_task_run(void)
     // In a real satellite, this is where sensors are read and PID is run.
     static int cycle_count = 0;
     if (cycle_count++ % 50 == 0) { // Print once per second at 50Hz
-        printf("[CONTROL TASK] Heartbeat - State: %d\n", adcs_context_get_state());
+        printf("[CONTROL TASK] Heartbeat - State: %d\n", adcs_context_get().state);
     }
 }

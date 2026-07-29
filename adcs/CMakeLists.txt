@@ -16,7 +16,6 @@ set(SOURCES
     src/control/control_task.c
     src/control/control_queue.c
     src/control/adcs_context.c
-    src/control/adcs_state.c
     ../shared/protocol/packet.c
     
     # FreeRTOS Kernel
