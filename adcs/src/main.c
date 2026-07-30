@@ -14,10 +14,12 @@ int main(void)
 {
     printf("--- ADCS Flight Software simulator ----\n");
 
-    xTaskCreate(control_task_loop, "CONTROL", 1024, NULL, 2, NULL);
-    xTaskCreate(command_task_loop, "COMMAND", 1024, NULL, 1, NULL);
 
     printf("Starting FreeRTOS Scheudler...\n");
+
+    control_task_create_static();
+    command_task_create_static();
+
     vTaskStartScheduler();
 
     for(;;);
@@ -86,4 +88,18 @@ int main(void)
     // adcs_state_update();
 
     // return 0;
+}
+
+// The idle task is the lowest priority task that the CPU will run when nothing is required to do
+/* Required by FreeRTOS when configSUPPORT_STATIC_ALLOCATION is 1 */
+void vApplicationGetIdleTaskMemory( StaticTask_t **ppxIdleTaskTCBBuffer,
+                                    StackType_t **ppxIdleTaskStackBuffer,
+                                    uint32_t *pulIdleTaskStackSize )
+{
+    static StaticTask_t xIdleTaskTCB;
+    static StackType_t uxIdleTaskStack[ configMINIMAL_STACK_SIZE ];
+
+    *ppxIdleTaskTCBBuffer = &xIdleTaskTCB;
+    *ppxIdleTaskStackBuffer = uxIdleTaskStack;
+    *pulIdleTaskStackSize = configMINIMAL_STACK_SIZE;
 }
