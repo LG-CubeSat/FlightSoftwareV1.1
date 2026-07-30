@@ -53,3 +53,5 @@ static inline uint16_t ccsds_calculate_crc(const uint8_t *data, uint16_t length)
 
     return value;
 }
+
+#endif
