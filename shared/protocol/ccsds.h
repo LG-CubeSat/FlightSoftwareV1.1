@@ -21,6 +21,7 @@ typedef struct {
 typedef struct {
     CCSDS_PrimaryHeader header;
     uint8_t payload[MAX_PAYLOAD_SIZE];
+    uint16_t crc;
 } __attribute__((packed)) CCSDS_Packet_t;
 
 typedef enum {

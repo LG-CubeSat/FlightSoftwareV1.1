@@ -10,6 +10,7 @@ set(SOURCES
     src/main.c
     src/communication/packet_parser.c
     src/communication/spi.c
+    src/communication/spi_task.c
     src/commands/command_handler.c
     src/commands/command_queue.c
     src/commands/command_task.c
@@ -17,6 +18,7 @@ set(SOURCES
     src/control/control_queue.c
     src/control/adcs_context.c
     ../shared/protocol/packet.c
+    ../shared/ipc/v_bus.c
     
     # FreeRTOS Kernel
     FreeRTOS/source/tasks.c
@@ -42,6 +44,7 @@ include_directories(
     ../include
     FreeRTOS/include
     FreeRTOS
+    ../shared/ipc
 )
 
 # 4. Executable
