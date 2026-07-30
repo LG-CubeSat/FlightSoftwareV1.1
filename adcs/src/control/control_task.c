@@ -19,6 +19,9 @@ Notes
 - This will command the actuators
 */
 
+static StaticTask_t xControlTaskBuffer; // TCB (holds priortiy state etc)
+static StackType_t xControlStack[configMINIMAL_STACK_SIZE]; // local variable storage
+
 void control_task_initialize(void)
 {
     printf("[CONTROL TASK] Initialized.\n");
@@ -107,4 +110,18 @@ void control_task_run(void)
     if (cycle_count++ % 50 == 0) { // Print once per second at 50Hz
         printf("[CONTROL TASK] Heartbeat - State: %d\n", adcs_context_get().state);
     }
+}
+
+// task function to call in main
+TaskHandle_t control_task_create_static(void)
+{
+    return xTaskCreateStatic(
+        control_task_loop, // The function we wrote to earlier
+        "CONTROL", // name for debugging
+        configMINIMAL_STACK_SIZE,
+        NULL, // No parameters needed
+        2, // Priority (Higher than Command)
+        xControlStack, // The stack we just defined
+        &xControlTaskBuffer // The TCB we just defined
+    );
 }

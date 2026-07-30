@@ -24,9 +24,11 @@ set(SOURCES
     FreeRTOS/source/list.c
     FreeRTOS/source/timers.c
     FreeRTOS/source/event_groups.c
-    FreeRTOS/MemMang/heap_4.c
     
-    # FreeRTOS POSIX Port (We will create these next)
+    # Using Static Allocation - No Heap File Required
+    # FreeRTOS/MemMang/heap_1.c (REMOVED)
+    
+    # FreeRTOS POSIX Port
     FreeRTOS/port.c
 )
 
