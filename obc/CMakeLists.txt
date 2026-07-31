@@ -1,12 +1,29 @@
 cmake_minimum_required(VERSION 3.10)
+project(obc_simulator)
 
-project(main)
+set(CMAKE_C_STANDARD 11)
 
-add_executable(main 
+# Source Files
+set(SOURCES
     main.c
     adcs/adcs.c
-    communication/spi.c 
     system/system.c
-    
-    ${CMAKE_SOURCE_DIR}/../shared/protocol/packet.c
+    communication/spi.c
+    ../shared/ipc/v_bus.c
 )
+
+# Include Directories
+include_directories(
+    .
+    adcs
+    communication
+    systen
+    ../shared/ipc
+    ../shared/protocol
+)
+
+# Executable
+add_executable(obc_sim ${SOURCES})
+
+# Link Libraries
+target_link_libraries(obc_sim pthread)

@@ -8,15 +8,15 @@ add_definitions(-D_XOPEN_SOURCE=700) # Required for some POSIX functions
 # 2. Source Files
 set(SOURCES
     src/main.c
-    src/communication/packet_parser.c
     src/communication/spi.c
+    src/communication/spi_task.c
     src/commands/command_handler.c
     src/commands/command_queue.c
     src/commands/command_task.c
     src/control/control_task.c
     src/control/control_queue.c
     src/control/adcs_context.c
-    ../shared/protocol/packet.c
+    ../shared/ipc/v_bus.c
     
     # FreeRTOS Kernel
     FreeRTOS/source/tasks.c
@@ -24,9 +24,11 @@ set(SOURCES
     FreeRTOS/source/list.c
     FreeRTOS/source/timers.c
     FreeRTOS/source/event_groups.c
-    FreeRTOS/MemMang/heap_4.c
     
-    # FreeRTOS POSIX Port (We will create these next)
+    # Using Static Allocation - No Heap File Required
+    # FreeRTOS/MemMang/heap_1.c (REMOVED)
+    
+    # FreeRTOS POSIX Port
     FreeRTOS/port.c
 )
 
@@ -40,6 +42,7 @@ include_directories(
     ../include
     FreeRTOS/include
     FreeRTOS
+    ../shared/ipc
 )
 
 # 4. Executable

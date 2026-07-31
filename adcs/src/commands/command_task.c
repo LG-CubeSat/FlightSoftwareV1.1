@@ -16,6 +16,9 @@ Notes:
 - Doesn't do anything with the command simply grabs it and sends it.
 */
 
+static StaticTask_t xCommandTaskBuffer;
+static StackType_t xCommandStack[configMINIMAL_STACK_SIZE];
+
 void command_task_initialize(void)
 {
     printf("[COMMAND TASK] Initialized.\n");
@@ -49,4 +52,16 @@ void command_task_run(void)
     printf("[COMMAND TASK] Processing command.\n");
 
     command_handler_process(&command);
+}
+
+TaskHandle_t command_task_create_static(void) {
+    return xTaskCreateStatic(
+        command_task_loop,
+        "Command Task",
+        configMINIMAL_STACK_SIZE,
+        NULL,
+        1,
+        xCommandStack,
+        &xCommandTaskBuffer
+    );
 }

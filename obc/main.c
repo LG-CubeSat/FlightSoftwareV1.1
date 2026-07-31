@@ -3,6 +3,7 @@
 #include "system/system.h"
 #include "communication/spi.h"
 #include "adcs/adcs.h"
+#include "v_bus.h"
 
 int main(void)
 {
@@ -11,6 +12,8 @@ int main(void)
     system_initialize();
 
     adcs_initialize();
+
+    v_bus_initialize(1); // 1 means master
 
     printf("Sending command to ADCS: Point to Sun \n");
     adcs_point_to_sun();
