@@ -36,13 +36,17 @@ void adcs_context_set_state(
     AdcsState state
 );
 
+AdcsState adcs_context_get_state();
+
 void adcs_context_set_target(
     AdcsTarget target
 );
 
-float adcs_context_get_angle(void);
+AdcsTarget adcs_context_get_target();
 
-void adcs_context_set_angle(
+float adcs_context_get_current_angle(void);
+
+void adcs_context_set_current_angle(
     float angle
 );
 
