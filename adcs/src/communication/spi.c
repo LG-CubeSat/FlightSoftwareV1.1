@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include "spi.h"
-#include "packet_parser.h"
 #include "v_bus.h"
 
 void spi_initialize(void)
@@ -14,5 +13,4 @@ void spi_recieve(
 )
 {
     v_bus_receive(data, length);
-    packet_parser_process(data, length);
 }

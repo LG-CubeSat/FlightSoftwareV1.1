@@ -8,7 +8,6 @@ add_definitions(-D_XOPEN_SOURCE=700) # Required for some POSIX functions
 # 2. Source Files
 set(SOURCES
     src/main.c
-    src/communication/packet_parser.c
     src/communication/spi.c
     src/communication/spi_task.c
     src/commands/command_handler.c
@@ -17,7 +16,6 @@ set(SOURCES
     src/control/control_task.c
     src/control/control_queue.c
     src/control/adcs_context.c
-    ../shared/protocol/packet.c
     ../shared/ipc/v_bus.c
     
     # FreeRTOS Kernel
