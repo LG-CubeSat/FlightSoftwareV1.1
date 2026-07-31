@@ -22,6 +22,9 @@ typedef struct
     AdcsState state;
 
     AdcsTarget target;
+
+    float current_angle;
+    float target_angle;
 } AdcsContext;
 
 void adcs_context_initialize(void);
@@ -35,6 +38,18 @@ void adcs_context_set_state(
 
 void adcs_context_set_target(
     AdcsTarget target
+);
+
+float adcs_context_get_angle(void);
+
+void adcs_context_set_angle(
+    float angle
+);
+
+float adcs_context_get_target_angle(void);
+
+void adcs_context_set_target_angle(
+    float angle
 );
 
 #endif

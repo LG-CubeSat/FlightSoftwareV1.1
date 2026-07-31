@@ -106,6 +106,32 @@ void control_task_run(void)
     // Deterministic Control.
     // Must run every single time control task run is called
     // In a real satellite, this is where sensors are read and PID is run.
+
+    if (adcs_context_get_state() == ADCS_STATE_TRANSITIONING) {
+        static float prev_error = 0;
+        float Kp = 0.5f;
+        float Kd = 0.1f;
+
+        float current_angle = adcs_context_get_current_angle();
+        float target_angle = adcs_context_get_target_angle();
+
+        float error = target_angle - current_angle;
+        float derivative = error - prev_error;
+
+        // what we apply to each reaction magnatorquer
+        float output = (error * Kp) + (derivative * Kd);
+        
+        prev_error = error;
+
+        current_angle += output;
+        adcs_context_set_current_angle(current_angle);
+
+        if (fabs(current_angle - target_angle) < 0.1f) {
+            printf("[CONTROL] Target Reached! Switching to Pointing.\n");
+            adcs_context_set_state(ADCS_STATE_POINTING);
+        }
+    }
+
     static int cycle_count = 0;
     if (cycle_count++ % 50 == 0) { // Print once per second at 50Hz
         printf("[CONTROL TASK] Heartbeat - State: %d\n", adcs_context_get().state);
