@@ -4,6 +4,7 @@
 #include "../../../shared/protocol/commands.h"
 #include "../control/control_request.h"
 #include "../control/control_queue.h"
+#include "../control/adcs_context.h"
 
 /* 
 Notes: 

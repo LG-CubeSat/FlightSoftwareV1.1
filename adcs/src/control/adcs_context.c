@@ -4,15 +4,15 @@
 
 static AdcsContext context;
 
-void adcs_context_initialized(void)
+void adcs_context_initialize(void)
 {
     context.state = ADCS_STATE_SAFE;
 
     context.target = ADCS_TARGET_NONE;
+    context.current_angle = 0.0f;
+    context.target_angle = 0.0f;
 
-    printf(
-        "[ADCS CONTEXT] Initialized.\n"
-    );
+    printf("[ADCS CONTEXT] Initialized.\n");
 }
 
 AdcsContext adcs_context_get(void)

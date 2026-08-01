@@ -5,6 +5,7 @@
 #include "task.h"
 
 #include "spi_task.h"
+#include "../commands/commands.h"
 #include "../commands/command_queue.h"
 #include "../../../shared/ipc/v_bus.h"
 #include "../../../shared/protocol/ccsds.h"
@@ -31,15 +32,21 @@ void spi_task_run(void)
         // verify integrity
         if (calculated_crc == rx_packet.crc)
         {
+            // printf("[SPI] Packet Verified (CRC Match). APID: %d\n", 1);
+            
             printf("[SPI] Packet Verified (CRC Match). APID: %d\n", ccsds_get_apid(rx_packet.header.id));
             
+            printf("Reached breakpoint");
             CommandMessage cmd;
-            
+            printf("Command message");
             cmd.destination = (uint8_t)ccsds_get_apid(rx_packet.header.id);
+            printf("destination");
             cmd.sequence = (uint8_t)ccsds_swap16(rx_packet.header.sequence_control);
+            printf("Sequence");
             cmd.command = rx_packet.payload[0];
+            printf("command");
             cmd.length = (uint8_t)ccsds_swap16(rx_packet.header.length);
-
+            printf("length");
             command_queue_push(cmd);
 
             // map to internal command soon

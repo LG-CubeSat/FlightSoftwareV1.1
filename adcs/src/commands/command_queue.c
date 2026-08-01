@@ -13,14 +13,18 @@ Notes:
 - Simply stores commands allowing them to be grabbed or added
 */
 
-static StaticQueue_t xStaticQueue;
-
 static QueueHandle_t xCommandQueue;
-static uint8_t ucQueueStorageArea[COMMAND_QUEUE_SIZE * sizeof(CommandMessage)];
+
+static StaticQueue_t xStaticQueue;
+static uint8_t ucQueueStorageArea[COMMAND_QUEUE_SIZE * sizeof(CommandMessage)] __attribute__((aligned(8)));
 
 void command_queue_initialize(void) {
     xCommandQueue = xQueueCreateStatic(COMMAND_QUEUE_SIZE, sizeof(CommandMessage), ucQueueStorageArea, &xStaticQueue);
-    printf("[QUEUE] RTOS Queue Initialized.\n");
+    if (xCommandQueue == NULL) {
+        printf("[COMMAND QUEUE] ERROR: Failed to created command queue!\n");
+    } else {
+        printf("[COMMAND QUEUE] SUCCESS: RTOS Queue Initialized\n");
+    }
 }
 
 // add command to queue
@@ -28,7 +32,7 @@ int command_queue_push(
     CommandMessage command
 )
 {
-    xQueueSend()
+    return (int)xQueueSend(xCommandQueue, &command, 0);
 }
 
 // grab the next command, and remove from queue
@@ -36,5 +40,5 @@ int command_queue_pop(
     CommandMessage *command
 )
 {
-    
+    return (int)xQueueReceive(xCommandQueue, command, 0);
 }

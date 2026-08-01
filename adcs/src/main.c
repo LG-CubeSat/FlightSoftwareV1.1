@@ -8,6 +8,7 @@
 #include "commands/command_queue.h"
 #include "commands/command_task.h"
 #include "commands/command_handler.h"
+#include "control/control_queue.h"
 #include "control_task.h"
 
 int main(void)
@@ -17,7 +18,13 @@ int main(void)
 
     printf("Starting FreeRTOS Scheudler...\n");
 
+    adcs_context_initialize();
     spi_initialize(); // Connect to the Virtual Bus
+    
+    // initialize queues
+    command_queue_initialize();
+    control_queue_initialize();
+
     control_task_create_static();
     command_task_create_static();
     spi_task_create_static();

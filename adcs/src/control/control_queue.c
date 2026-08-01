@@ -1,50 +1,32 @@
 #include <stdio.h>
 
+#include "FreeRTOS.h"
+#include "queue.h"
+
 #include "control_queue.h"
+#include "control_request.h"
 
 #define CONTROL_QUEUE_SIZE 8 
 
-static ControlRequest queue[CONTROL_QUEUE_SIZE];
-
-static int head;
-static int tail;
-static int count;
+static QueueHandle_t xControlQueue;
+static StaticQueue_t xStaticQueue;
+static uint8_t ucQueueStorageArea[CONTROL_QUEUE_SIZE * sizeof(ControlRequest)] __attribute__((aligned(8)));
 
 void control_queue_initialize(void)
 {
-    head = 0;
-
-    tail = 0;
-
-    count = 0;
-
-    printf(
-        "[CONTROL QUEUE] Initialized.\n"
-    );
+    xControlQueue = xQueueCreateStatic(CONTROL_QUEUE_SIZE, sizeof(ControlRequest), ucQueueStorageArea, &xStaticQueue);
+    if (xControlQueue == NULL) {
+        printf("[CONTROL QUEUE] ERROR: Failed to create control queue.\n");
+    } else {
+        printf("[CONTROL QUEUE] RTOS Control Queue Initialized.\n");
+    }
 }
 
 int control_queue_push(
     ControlRequest request
 )
 {
-    if (count >= CONTROL_QUEUE_SIZE) {
-        printf("[CONTROL QUEUE] ERROR: Queue full.\n");
-    }
-
-    return 0;
-
-    queue[tail] = request;
-
-    tail++;
-
-    if (tail >= CONTROL_QUEUE_SIZE)
-    {
-        tail = 0;
-    }
-
-    count++;
-
-    return 1;
+    return (int)xQueueSend(xControlQueue, &request, 0);
 }
 
 
@@ -52,21 +34,5 @@ int control_queue_pop(
     ControlRequest *request
 )
 {
-    if (count == 0)
-    {
-        return 0;
-    }
-
-    *request = queue[head];
-
-    head++;
-
-    if (head >= CONTROL_QUEUE_SIZE)
-    {
-        head = 0;
-    }
-
-    count--;
-
-    return 1;
+    return (int)xQueueReceive(xControlQueue, request, 0);
 }
