@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -81,15 +82,9 @@ void control_task_run(void)
                 printf(
                     "[CONTROL TASK] Pointing request recieved\n"
                 );
-
-                adcs_context_set_target(
-                    request.target
-                );
-
-                adcs_context_set_state(
-                    ADCS_STATE_TRANSITIONING
-                );
-
+                
+                adcs_context_set_state(ADCS_STATE_TRANSITIONING);
+                
                 break;
 
             default:
@@ -133,8 +128,8 @@ void control_task_run(void)
     }
 
     static int cycle_count = 0;
-    if (cycle_count++ % 50 == 0) { // Print once per second at 50Hz
-        printf("[CONTROL TASK] Heartbeat - State: %d\n", adcs_context_get().state);
+    if (cycle_count++ % 50 == 0) { // Print once every 10 seconds at 50Hz
+        printf("[CONTROL TASK] Heartbeat - State: %d, Angle: %.2f\n", adcs_context_get().state, adcs_context_get_current_angle());
     }
 }
 

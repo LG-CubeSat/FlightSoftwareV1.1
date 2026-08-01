@@ -30,6 +30,7 @@ void command_handler_process(const CommandMessage *command)
                 "[COMMAND HANDLER] Request: Point to Sun.\n"
             );
 
+            adcs_context_set_target_angle(45.0f);
             request.type = CONTROL_REQUEST_POINT;
             request.target = ADCS_TARGET_SUN;
 
@@ -73,6 +74,7 @@ void command_handler_process(const CommandMessage *command)
         case CMD_GET_STATUS:
             printf("[COMMAND HANDLER] Request: Getting Status.\n");
             break;
+        
         default:
             printf("[COMMAND HANDLER] ERROR: Unknown Command.\n");
     }
