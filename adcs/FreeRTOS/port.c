@@ -6,38 +6,37 @@
 #include "task.h"
 
 /* 
- * ROBUST POSIX SIMULATOR PORT (v2)
- * Handles lock yielding to prevent starvation.
+ * PROFESSIONAL POSIX SIMULATOR PORT
+ * This port creates a real pthread for every FreeRTOS task.
+ * It uses a global mutex to simulate a single-core CPU.
  */
 
 static pthread_mutex_t xKernelLock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t xTickCond = PTHREAD_COND_INITIALIZER;
 
+// Structure to pass to the pthread
 typedef struct {
     TaskFunction_t pxCode;
     void *pvParameters;
 } ThreadArgs_t;
 
-// This function is called by the FreeRTOS kernel whenever it needs to "Switch"
-void vPortYield(void) {
-    pthread_mutex_unlock(&xKernelLock);
-    // Tiny sleep to allow the scheduler thread or other tasks to grab the lock
-    usleep(10); 
-    pthread_mutex_lock(&xKernelLock);
-}
-
+// The actual thread wrapper
 static void *prvTaskEntry(void *pvParameters) {
     ThreadArgs_t *pxArgs = (ThreadArgs_t *)pvParameters;
     
-    // Each task starts with the lock held
+    // Wait for the scheduler to start
     pthread_mutex_lock(&xKernelLock);
-    pxArgs->pxCode(pxArgs->pvParameters);
-    pthread_mutex_unlock(&xKernelLock);
     
-    free(pxArgs);
+    // Execute the FreeRTOS Task
+    pxArgs->pxCode(pxArgs->pvParameters);
+    
+    pthread_mutex_unlock(&xKernelLock);
     return NULL;
 }
 
 StackType_t *pxPortInitialiseStack(StackType_t *pxTopOfStack, TaskFunction_t pxCode, void *pvParameters) {
+    // In the simulator, we spawn the thread immediately when the stack is "initialized"
+    // (This is a hack for the simplified simulator)
     ThreadArgs_t *pxArgs = malloc(sizeof(ThreadArgs_t));
     pxArgs->pxCode = pxCode;
     pxArgs->pvParameters = pvParameters;
@@ -49,14 +48,19 @@ StackType_t *pxPortInitialiseStack(StackType_t *pxTopOfStack, TaskFunction_t pxC
 }
 
 BaseType_t xPortStartScheduler(void) {
-    printf("[SIMULATOR] Scheduler Started. Yielding to tasks...\n");
+    printf("[SIMULATOR] Scheduler Engine Started.\n");
     
     while(1) {
         pthread_mutex_lock(&xKernelLock);
-        xTaskIncrementTick();
+        
+        // Increment the RTOS tick
+        if (xTaskIncrementTick() != pdFALSE) {
+            // In a real port, we'd check for context switches here
+        }
+        
         pthread_mutex_unlock(&xKernelLock);
         
-        // Wait for 1 tick period (1ms if 1000Hz)
+        // Sleep for 1 tick (usually 1ms)
         usleep(1000000 / configTICK_RATE_HZ);
     }
     return pdTRUE;

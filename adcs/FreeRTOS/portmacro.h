@@ -33,8 +33,7 @@ typedef uint32_t         TickType_t;
 #define portEXIT_CRITICAL()
 #define portENABLE_INTERRUPTS()
 #define portDISABLE_INTERRUPTS()
-#define portYIELD()               vPortYield()
-extern void vPortYield(void);
+#define portYIELD()
 
 #ifdef __cplusplus
 }

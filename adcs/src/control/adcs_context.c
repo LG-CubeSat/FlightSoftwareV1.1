@@ -27,40 +27,11 @@ void adcs_context_set_state(
     context.state = state;
 }
 
-AdcsState adcs_context_get_state(void) {
-    return context.state;
-}
-
 void adcs_context_set_target(
     AdcsTarget target
 )
 {
     context.target = target;
-}
-
-AdcsTarget adcs_context_get_target(void)
-{
-    return context.target;
-}
-
-float adcs_context_get_current_angle(void)
-{
-    return context.current_angle;
-}
-
-void adcs_context_set_current_angle(float angle)
-{
-    context.current_angle = angle;
-}
-
-float adcs_context_get_target_angle(void)
-{
-    return context.target_angle;
-}
-
-void adcs_context_set_target_angle(float target_angle)
-{
-    context.target_angle = target_angle;
 }
 
 static const char *adcs_state_name(
