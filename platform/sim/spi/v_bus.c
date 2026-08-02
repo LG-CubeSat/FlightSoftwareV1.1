@@ -9,6 +9,16 @@
 
 static int bus_fd = -1;
 
+VBus_t create_v_bus(void)
+{
+    VBus_t v_bus;
+    v_bus.initialize = &v_bus_initialize;
+    v_bus.send = &v_bus_send;
+    v_bus.receive = &v_bus_receive;
+
+    return v_bus;
+}
+
 VBusStatus_t v_bus_initialize(int is_master)
 {
     struct sockaddr_un addr; // declare the adress card

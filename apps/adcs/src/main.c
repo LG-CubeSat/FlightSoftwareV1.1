@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "FreeRTOS.h"
 #include "task.h"
+#include "../../../platform/sim/include/v_bus.h"
 
 static void vControlTask(void *pvParameters)
 {
@@ -42,6 +43,11 @@ int main(void)
     printf("_____________\n");
     printf("ADCS POSIX FREERTOS TEST");
     printf("_____________\n");
+
+    printf("Setting up v_bus.");
+    
+    VBus_t v_bus = create_v_bus();
+    v_bus.initialize(1); // make master
 
     if (xTaskCreate(
             vControlTask,
