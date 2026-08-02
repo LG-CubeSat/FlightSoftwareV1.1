@@ -6,4 +6,4 @@ target_include_directories(adcs_sim PRIVATE
     ${CMAKE_SOURCE_DIR}/rtos/config
 )
 
-target_link_libraries(adcs_sim PRIVATE freertos_kernel pthread)
+target_link_libraries(adcs_sim PRIVATE freertos_kernel pthread platform)
