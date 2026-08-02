@@ -15,3 +15,11 @@ This contains the code that will be shared across the different computers such a
 
 **/docs**
 This contains documentation and information about the code. We will aim to udpate this continously.
+
+**/build**
+This is the main build folder for CMake.
+
+**Simulation**
+So how will we simulate. We have multiple CMake setups to allow us to run singular boards, such as the ADCS, or all together through a root CMake file.
+We will use POSIX for non-hardware simulation.
+Additionally, we are going to implement a V-BUS mock SPI implementation that will allow computers to communicate differently.
