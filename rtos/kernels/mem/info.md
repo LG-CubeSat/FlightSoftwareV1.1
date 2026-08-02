@@ -1,0 +1,1 @@
+We are not using any dynamic memory allocation. Currently, we will only use static.
