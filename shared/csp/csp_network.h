@@ -1,0 +1,7 @@
+/*
+Init libcsp
+Set node adress
+configuring routing
+initialize interface
+start csp
+*/
