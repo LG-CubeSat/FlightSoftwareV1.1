@@ -23,7 +23,7 @@ VBusStatus_t v_bus_initialize(int is_master)
 {
     struct sockaddr_un addr; // declare the adress card
 
-    bus_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    bus_fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (bus_fd < 0) {
         return V_BUS_ERROR;
     }
