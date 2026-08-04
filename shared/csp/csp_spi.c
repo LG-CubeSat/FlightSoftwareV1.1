@@ -12,7 +12,8 @@ recieve csp packets from vbus
 #include "../../platform/sim/include/v_bus.h"
 #include "../../libs/libcsp/include/csp/csp_types.h"
 
-static int csp_if_spi_tx(csp_iface_t * iface, csp_packet_t * packet) {
+static int csp_if_spi_tx(csp_iface_t * iface, csp_packet_t * packet) 
+{
     csp_if_spi_conf_t * ifconf = iface->driver_data; // create a interface config
 
     // TODO: check if full
@@ -79,7 +80,8 @@ static int csp_if_spi_rx_work(
     return CSP_ERR_NONE;
 }
 
-static void * csp_if_spi_rx_loop(void * param) {
+static void * csp_if_spi_rx_loop(void * param) 
+{
     csp_iface_t *iface = param;
     
     while(1)
@@ -88,4 +90,22 @@ static void * csp_if_spi_rx_loop(void * param) {
     }
 
     return NULL;
+}
+
+void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf)
+{
+    pthread_attr_t attributes;
+    int ret;
+
+    iface->driver_data = ifconf; // setting that ifconf that we use above
+
+    ret = pthread_create(&ifconf->rx_thread, &attributes, csp_if_spi_rx_loop, iface)
+    if (ret != 0) {
+        csp_print("csp_if_spi_init: pthread_create failed: %s: %d\n", strerror(ret), ret);
+    }
+
+    // register the interface
+    iface->name = "SPI";
+    iface->nexthop = csp_if_spi_tx;
+    csp_iflist_add(iface);
 }
