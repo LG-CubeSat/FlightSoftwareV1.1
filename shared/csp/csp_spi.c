@@ -78,3 +78,14 @@ static int csp_if_spi_rx_work(
 
     return CSP_ERR_NONE;
 }
+
+static void * csp_if_spi_rx_loop(void * param) {
+    csp_iface_t *iface = param;
+    
+    while(1)
+    {
+        csp_if_spi_rx_work(iface);
+    }
+
+    return NULL;
+}
