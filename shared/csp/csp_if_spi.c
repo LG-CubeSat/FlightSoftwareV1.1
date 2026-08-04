@@ -3,31 +3,38 @@ Connect libcsp to vbus
 transmit csp packets through vbus
 recieve csp packets from vbus
 */
-#include "csp_spi.h"
+#include "csp_if_spi.h"
 
 #include <_time.h>
 #include <csp/csp_debug.h>
 #include <string.h>
 
-#include "../../platform/sim/include/v_bus.h"
 #include "../../libs/libcsp/include/csp/csp_types.h"
 
-static int csp_if_spi_tx(csp_iface_t * iface, csp_packet_t * packet) 
+static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packet, int from_me) 
 {
+    (void)via;
+    (void)from_me;
+
     csp_if_spi_conf_t * ifconf = iface->driver_data; // create a interface config
 
     // TODO: check if full
 
-    cspi_id_prepend(packet); // give an id to the packet
+    csp_id_prepend(packet); // give an id to the packet
 
     // send packet through the transport
-    ifconf->transport->send(
+    int ret = ifconf->transport->send(
         packet->frame_begin,
         packet->frame_length
     );
 
     // free up buffer space
     csp_buffer_free(packet);
+
+    if (ret < 0) {
+        iface->tx_error++;
+        return CSP_ERR_TX;
+    }
 
     return CSP_ERR_NONE; // we successfully sent a packet
 }
@@ -42,16 +49,28 @@ static int csp_if_spi_rx_work(
     csp_packet_t *packet = csp_buffer_get(0); // this is space in buffer we grab
     if (packet == NULL)
     {
-        return CSP_ERR_NOMEN; // check we actually got a packet in buffer
+        return CSP_ERR_NOMEM; // check we actually got a packet in buffer
     }
 
     int header_size = csp_id_setup_rx(packet);
     
     // compute the bytes needed 
-    int len = iconf->transport->receive(
+    int len = ifconf->transport->receive(
         packet->frame_begin,
         sizeof(packet->data) + header_size
     );
+
+    // len is not a real number
+    if (len < 0) {
+        csp_buffer_free(packet);
+        return CSP_ERR_INVAL;
+    }
+
+    // len is too short to be real (less then minimum header...)
+    if (len < header_size) {
+        csp_buffer_free(packet);
+        return CSP_ERR_INVAL;
+    }
 
     // set the frame length
     packet->frame_length = len;
@@ -61,7 +80,7 @@ static int csp_if_spi_rx_work(
     {
         // if strip fails...
         csp_buffer_free(packet);
-        return CSP_ERR_INVAL
+        return CSP_ERR_INVAL;
     }
 
     /* 
@@ -86,7 +105,14 @@ static void * csp_if_spi_rx_loop(void * param)
     
     while(1)
     {
-        csp_if_spi_rx_work(iface);
+        int ret = csp_if_spi_rx_work(iface);
+
+        if (ret == CSP_ERR_NOMEM) {
+            usleep(10000); // if recieve is blocking
+        }
+        else if (ret != CSP_ERR_NONE) {
+            iface->rx_error++;
+        }
     }
 
     return NULL;
@@ -99,10 +125,12 @@ void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf)
 
     iface->driver_data = ifconf; // setting that ifconf that we use above
 
-    ret = pthread_create(&ifconf->rx_thread, &attributes, csp_if_spi_rx_loop, iface)
+    ret = pthread_create(&ifconf->rx_thread, NULL, csp_if_spi_rx_loop, iface)
     if (ret != 0) {
         csp_print("csp_if_spi_init: pthread_create failed: %s: %d\n", strerror(ret), ret);
     }
+
+    // note: we let the csp_network initialize the transport
 
     // register the interface
     iface->name = "SPI";

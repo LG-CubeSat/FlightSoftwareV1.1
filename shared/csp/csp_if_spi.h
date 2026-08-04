@@ -1,5 +1,5 @@
-#ifndef CSP_VBUS_H
-#define CSP_VBUS_H
+#ifndef CSP_IF_SPI_H
+#define CSP_IF_SPI_H
 
 #include <csp/csp.h>
 
@@ -21,16 +21,12 @@ typedef struct {
     );
 } CSP_Transport_t;
 
-typedef {
+typedef struct {
     // Transport abstraction
     CSP_Transport_t *transport;
 
     // RX Thread
     pthread_t rx_thread;
-
-    // auxillary
-    uint8_t chip_select
-    uint32_t speed;
 
 } csp_if_spi_conf_t;
 
