@@ -1,0 +1,3 @@
+/*
+Rotates satellite toward sun
+*/

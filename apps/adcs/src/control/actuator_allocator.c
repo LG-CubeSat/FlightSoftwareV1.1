@@ -1,0 +1,6 @@
+/*
+Important
+Converts the torques that the controllers output
+Into dipole of magnatorquers
+Magnetic Contrl equations here
+*/

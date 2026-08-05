@@ -1,0 +1,4 @@
+/*
+Main entry point
+Calls the proper controller
+*/
