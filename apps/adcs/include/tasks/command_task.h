@@ -1,0 +1,5 @@
+/*
+Command Task
+Continously waits for ground messages or messages from other boards
+Decodes them and updates manager
+*/
