@@ -5,9 +5,10 @@ recieve csp packets from vbus
 */
 #include "csp_if_spi.h"
 
-#include <_time.h>
 #include <csp/csp_debug.h>
+#include <csp/csp_id.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "../../libs/libcsp/include/csp/csp_types.h"
 
@@ -125,7 +126,7 @@ void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf)
 
     iface->driver_data = ifconf; // setting that ifconf that we use above
 
-    ret = pthread_create(&ifconf->rx_thread, NULL, csp_if_spi_rx_loop, iface)
+    ret = pthread_create(&ifconf->rx_thread, NULL, csp_if_spi_rx_loop, iface);
     if (ret != 0) {
         csp_print("csp_if_spi_init: pthread_create failed: %s: %d\n", strerror(ret), ret);
     }

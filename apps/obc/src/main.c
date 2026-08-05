@@ -7,10 +7,14 @@
 
 int main(void)
 {
-    printf("OBC On...");
+    printf("OBC On...\n");
+    fflush(stdout);
     VBus_t v_bus;
     v_bus = create_v_bus();
-    v_bus.initialize(1);
+    if (v_bus.initialize(1) != V_BUS_OK) {
+        fprintf(stderr, "OBC: v_bus initialize failed\n");
+        return 1;
+    }
 
     uint8_t buffer[MAX_BUFFER_SIZE];
 
