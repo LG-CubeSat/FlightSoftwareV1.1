@@ -63,13 +63,18 @@ int main(void)
 {
     printf("\n");
     printf("_____________\n");
-    printf("ADCS POSIX FREERTOS TEST");
+    printf("ADCS POSIX FREERTOS TEST\n");
     printf("_____________\n");
+    fflush(stdout);
 
-    printf("Setting up v_bus.");
-    
+    printf("Setting up v_bus.\n");
+    fflush(stdout);
+
     VBus_t v_bus = create_v_bus();
-    v_bus.initialize(0);
+    if (v_bus.initialize(0) != V_BUS_OK) {
+        fprintf(stderr, "ADCS: v_bus initialize failed\n");
+        return 1;
+    }
 
     if (xTaskCreate(
             vControlTask,

@@ -12,7 +12,10 @@ else()
     message(STATUS "Simulation Mode is Enabled.")
 endif()
 
+# added on
 add_subdirectory(rtos)
+add_subdirectory(libs/libcsp)
+
 add_subdirectory(drivers)
 add_subdirectory(shared)
 add_subdirectory(sys)

@@ -1,0 +1,3 @@
+[submodule "libs/libcsp"]
+	path = libs/libcsp
+	url = https://github.com/libcsp/libcsp
