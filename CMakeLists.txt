@@ -21,3 +21,10 @@ add_subdirectory(apps/obc)
 
 # toggle for the platform code
 add_subdirectory(platform)
+
+option(BUILD_TESTS "Build simple sanity/integration tests" ON)
+
+if (BUILD_TESTS AND NOT HW_MODE)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
