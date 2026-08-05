@@ -16,16 +16,12 @@ Decodes them and updates manager
 
 #include "FreeRTOS.h"
 #include "task.h"
-#include "queue.h"
-#include "event_groups.h"
 
 // TODO.. add includes for actually integrating into other tasks
 
 #define CONTROL_TASK_PRIORITY (3)
 #define CONTROL_TASK_STACK_SIZE (1024)
 #define CONTROL_TASK_PERIOD_MS (20)
-#define CONTROL_TASK_QUEUE_LENGTH (8)
-#define CONTROL_TASK_ITEM_SIZE sizeof(uint32_t)
 
 static StackType_t xControlTaskStack[CONTROL_TASK_STACK_SIZE];
 static StaticTask_t xControlTaskBuffer;
