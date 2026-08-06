@@ -16,26 +16,41 @@ Decodes them and updates manager
 
 #define COMMAND_TASK_PRIORITY (3)
 #define COMMAND_TASK_STACK_SIZE (1024)
-#define COMMAND_TASK_PERIOD_MS (20)
-#define COMMAND_TASK_QUEUE_LENGTH (8)
-#define COMMAND_TASK_ITEM_SIZE sizeof(uint32_t)
+#define COMMAND_QUEUE_LENGTH (8)
 
 static StackType_t xCommandTaskStack[COMMAND_TASK_STACK_SIZE];
 static StaticTask_t xCommandTaskBuffer;
-static StaticQueue_t xCommandStaticQueue;
-static uint8_t commandQueueStorageArea[COMMAND_TASK_QUEUE_LENGTH * COMMAND_TASK_ITEM_SIZE];
+
+static StaticQueue_t xCommandQueueBuffer;
+static uint8_t xCommandQueueStorage[
+    COMMAND_QUEUE_LENGTH * sizeof(CommandMessage_t)
+];
 
 static TaskHandle_t xCommandHandle = NULL;
 static QueueHandle_t xCommandQueue = NULL;
+
+int command_task_send(csp_packet_t *command)
+{
+    if (xCommandQueue == NULL)
+    {
+        return 0; // failed
+    }
+
+    return xQueueSend(
+        xCommandQueue,
+        command,
+        0
+    ) == pdPASS;
+}
 
 void command_task_init(void)
 {
     // initalize the queue
     xCommandQueue = xQueueCreateStatic(
-        COMMAND_TASK_QUEUE_LENGTH,
-        COMMAND_TASK_ITEM_SIZE,
-        commandQueueStorageArea,
-        &xCommandStaticQueue
+        COMMAND_QUEUE_LENGTH,
+        sizeof(CommandMessage_t),
+        xCommandQueueStorage,
+        &xCommandQueueBuffer
     );
 
     if (xCommandQueue == NULL)
@@ -62,40 +77,25 @@ void command_task_init(void)
     }
 }
 
-int command_task_send(csp_packet_t *command)
-{
-    if (xCommandQueue == NULL)
-    {
-        return 0; // failed
-    }
-
-    return xQueueSend(
-        xCommandQueue,
-        command,
-        0
-    ) == pdPASS;
-}
-
 // superloop of the task
 void command_task(void *pvParameters)
 {
     (void) pvParameters;
 
-    /* 
-    TODO: instead of recieving a packet we should recieve an internal command id not packet
-    This means using a custom packet class because technically the packet should be parsed way earlier by telem
-    */
-    csp_packet_t command;
+    CommandMessage_t message;
 
     for (;;)
     {
         if (xQueueReceive(
             xCommandQueue,
-            &command,
+            &message,
             portMAX_DELAY))
         {
-            // Decode command
-            command_process(&command); // place holder for making command actually do something
+            // decode command
+
+            // update managers
+
+            // send responses
         }
     }
 }

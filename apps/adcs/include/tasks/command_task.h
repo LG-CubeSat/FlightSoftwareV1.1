@@ -11,10 +11,17 @@ Decodes them and updates manager
 #include "task.h"
 #include "../../../../libs/libcsp/include/csp/csp_types.h"
 
+// TODO: expand
+typedef struct
+{
+    uint32_t command;
+    uint32_t parameter;
+} CommandMessage_t;
+
 void command_task_init(void);
 
 void command_task(void *pvParameters);
 
-int command_task_send(csp_packet_t *command)
+int command_task_send(csp_packet_t *command);
 
 #endif

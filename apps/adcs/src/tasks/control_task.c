@@ -40,6 +40,11 @@ void control_task_init(void)
         xControlTaskStack,
         &xControlTaskBuffer
     );
+
+    if (xControlHandle == NULL)
+    {
+        printf("[CONTROL] Failed to initialize.\n");
+    }
 }
 
 // superloop of the task
