@@ -1,126 +1,57 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <csp/csp.h>
+#include <pthread.h>
+#include <netinet/in.h>
+
 #include "FreeRTOS.h"
 #include "task.h"
-#include "../../../platform/sim/include/v_bus.h"
 
-#define RECV_BUFFER_SIZE 128
+#include "tasks/command_task.h"
+#include "tasks/control_task.h"
+#include "tasks/estimation_task.h"
+#include "tasks/housekeeping_task.h"
+#include "tasks/sensor_task.h"
+#include "tasks/telemetry_task.h"
 
-static void vControlTask(void *pvParameters)
-{
-    (void)pvParameters;
-    while(1)
-    {
-        printf("[CONTROL] Running control loop/\n");
-
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-}
-
-static void vCommandTask(void *pvParameters)
-{
-    VBus_t *p_v_bus = (VBus_t *)pvParameters;
-
-    uint8_t rx_buffer[RECV_BUFFER_SIZE];
-
-    while(1)
-    {
-        int bytes_received = p_v_bus->receive(rx_buffer, RECV_BUFFER_SIZE);
-        if (bytes_received > 0)
-        {
-            printf("[COMMAND] Received %d bytes: %.s\n", bytes_received, rx_buffer);
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-}
-
-static void vTelemetryTask(void *pvParameters)
-{
-    VBus_t *p_v_bus = (VBus_t *)pvParameters;
-
-    while(1)
-    {
-        const char message[] = "Hello World from ADCS";
-        const uint8_t *tx_data = (uint8_t *)message;
-
-        size_t length = strlen(message);
-
-        int sent_bytes = p_v_bus->send(tx_data, (uint16_t)length);
-
-        if (sent_bytes == (int)length)
-        {
-            printf("[TELEM] Send %d bytes to OBC\n", sent_bytes);
-        }
-
-
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-}
+#include "../../../shared/csp/csp_if_spi.c"
 
 int main(void)
 {
     printf("\n");
     printf("_____________\n");
-    printf("ADCS POSIX FREERTOS TEST\n");
+    printf("ADCS Initializing\n");
     printf("_____________\n");
     fflush(stdout);
 
     printf("Setting up v_bus.\n");
     fflush(stdout);
 
-    VBus_t v_bus = create_v_bus();
-    if (v_bus.initialize(0) != V_BUS_OK) {
-        fprintf(stderr, "ADCS: v_bus initialize failed\n");
-        return 1;
-    }
+    printf("[ADCS] Initializing CSP");
+    csp_iface_t iface;
+    csp_if_spi_conf_t if_conf;
 
-    if (xTaskCreate(
-            vControlTask,
-            "Control",
-            configMINIMAL_STACK_SIZE,
-            NULL,
-            3,
-            NULL
-        ) != pdPASS)
-    {
-        printf("ERROR: Failed to create Control task\n");
-        return 1;
-    }
+    csp_if_spi_init(&iface, &if_conf);
 
-    if (xTaskCreate(
-            vCommandTask,
-            "Command",
-            configMINIMAL_STACK_SIZE,
-            (void *)&v_bus,
-            1,
-            NULL
-        ) != pdPASS)
-    {
-        printf("ERROR: Failed to create Command task\n");
-        return 1;
-    }
+    // Initialize tasks
+    command_task_init();
 
-    if (xTaskCreate(
-            vTelemetryTask,
-            "Telemetry",
-            configMINIMAL_STACK_SIZE,
-            (void *)&v_bus,
-            1,
-            NULL
-        ) != pdPASS)
-    {
-        printf("ERROR: Failed to create Telemetry task\n");
-        return 1;
-    }
+    control_task_init();
 
-    printf("All tasks created successfully.\n");
-    printf("Starting FreeRTOS scheduler...\n\n");
+    estimation_task_init();
+
+    housekeeping_task_init();
+
+    sensor_task_init();
+
+    telemetry_task_init();
+    
+    printf("[ADCS] Starting FreeRTOS scheduler...\n\n");
 
     vTaskStartScheduler();
 
-    printf("ERROR: Scheduler stopped!\n");
+    printf("[ADCS] ERROR: Scheduler stopped!\n");
 
     return 1;
 }
