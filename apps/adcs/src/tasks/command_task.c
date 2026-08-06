@@ -14,7 +14,7 @@ Decodes them and updates manager
 
 // TODO.. add includes for actually integrating into other tasks
 
-#define COMMAND_TASK_PRIORITY (3)
+#define COMMAND_TASK_PRIORITY (2)
 #define COMMAND_TASK_STACK_SIZE (1024)
 #define COMMAND_QUEUE_LENGTH (8)
 

@@ -10,9 +10,9 @@ Sends out data using CSP
 #include "FreeRTOS.h"
 #include "task.h"
 
-#define TELEMETRY_TASK_PRIORITY (3)
+#define TELEMETRY_TASK_PRIORITY (1)
 #define TELEMETRY_TASK_STACK_SIZE (1024)
-#define TELEMETRY_TASK_PERIOD_MS (20)
+#define TELEMETRY_TASK_PERIOD_MS (1000)
 
 static StackType_t xTelemetryTaskStack[TELEMETRY_TASK_STACK_SIZE];
 static StaticTask_t xTelemetryTaskBuffer;

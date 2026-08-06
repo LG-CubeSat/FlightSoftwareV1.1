@@ -10,9 +10,9 @@ Read imu, read magnetometers, read sun sensors, read camera status, publish sens
 #include "FreeRTOS.h"
 #include "task.h"
 
-#define SENSOR_TASK_PRIORITY (4)
+#define SENSOR_TASK_PRIORITY (3)
 #define SENSOR_TASK_STACK_SIZE (1024)
-#define SENSOR_TASK_PERIOD_MS (20)
+#define SENSOR_TASK_PERIOD_MS (100)
 
 static StackType_t xSensorTaskStack[SENSOR_TASK_STACK_SIZE];
 static StaticTask_t xSensorTaskBuffer;

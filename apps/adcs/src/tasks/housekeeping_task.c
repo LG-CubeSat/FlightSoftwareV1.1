@@ -11,7 +11,7 @@ Stack usage, CPU usage, Temp, Task heartbeat
 
 #define HOUSEKEEPING_TASK_PRIORTIY (1)
 #define HOUSEKEEPING_TASK_STACK_SIZE (1024)
-#define HOUSEKEEPING_TASK_PERIOD_MS (20)
+#define HOUSEKEEPING_TASK_PERIOD_MS (1000)
 
 static StackType_t xHousekeepingTaskStack[HOUSEKEEPING_TASK_STACK_SIZE];
 static StaticTask_t xHousekeepingTaskBuffer;

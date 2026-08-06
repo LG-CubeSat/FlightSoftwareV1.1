@@ -19,9 +19,9 @@ Decodes them and updates manager
 
 // TODO.. add includes for actually integrating into other tasks
 
-#define CONTROL_TASK_PRIORITY (3)
+#define CONTROL_TASK_PRIORITY (4)
 #define CONTROL_TASK_STACK_SIZE (1024)
-#define CONTROL_TASK_PERIOD_MS (20)
+#define CONTROL_TASK_PERIOD_MS (50)
 
 static StackType_t xControlTaskStack[CONTROL_TASK_STACK_SIZE];
 static StaticTask_t xControlTaskBuffer;
