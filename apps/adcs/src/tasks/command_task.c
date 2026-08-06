@@ -82,10 +82,6 @@ void command_task(void *pvParameters)
 {
     (void) pvParameters;
 
-    /* 
-    TODO: instead of recieving a packet we should recieve an internal command id not packet
-    This means using a custom packet class because technically the packet should be parsed way earlier by telem
-    */
     CommandMessage_t message;
 
     for (;;)
