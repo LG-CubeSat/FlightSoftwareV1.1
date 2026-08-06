@@ -40,6 +40,11 @@ void control_task_init(void)
         xControlTaskStack,
         &xControlTaskBuffer
     );
+
+    if (xControlHandle == NULL)
+    {
+        
+    }
 }
 
 // superloop of the task
