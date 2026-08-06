@@ -43,7 +43,7 @@ void control_task_init(void)
 
     if (xControlHandle == NULL)
     {
-        
+        printf("[CONTROL] Failed to initialize.\n");
     }
 }
 
