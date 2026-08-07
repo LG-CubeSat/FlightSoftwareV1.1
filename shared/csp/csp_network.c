@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#include "../../platform/sim/include/v_bus.h"
+#include "v_bus.h"
 
 static csp_iface_t csp_spi_iface;
 static csp_if_spi_conf_t csp_spi_conf;
