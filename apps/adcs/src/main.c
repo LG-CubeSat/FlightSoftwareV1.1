@@ -1,10 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <csp/csp.h>
-#include <pthread.h>
-#include <netinet/in.h>
-
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -15,7 +11,10 @@
 #include "tasks/sensor_task.h"
 #include "tasks/telemetry_task.h"
 
-#include "../../../shared/csp/csp_if_spi.c"
+#include "communication/command_handler.h"
+
+#include "csp_network.h"
+#include "csp_commands.h"
 
 int main(void)
 {
@@ -25,14 +24,9 @@ int main(void)
     printf("_____________\n");
     fflush(stdout);
 
-    printf("Setting up v_bus.\n");
-    fflush(stdout);
+    csp_network_init(ADCS_ADDRESS, /* is_master = */ 0);
 
-    printf("[ADCS] Initializing CSP");
-    csp_iface_t iface;
-    csp_if_spi_conf_t if_conf;
-
-    csp_if_spi_init(&iface, &if_conf);
+    command_handler_init();
 
     // Initialize tasks
     command_task_init();
@@ -48,6 +42,7 @@ int main(void)
     telemetry_task_init();
     
     printf("[ADCS] Starting FreeRTOS scheduler...\n\n");
+    fflush(stdout);
 
     vTaskStartScheduler();
 
