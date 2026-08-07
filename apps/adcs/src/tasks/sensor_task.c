@@ -10,9 +10,11 @@ Read imu, read magnetometers, read sun sensors, read camera status, publish sens
 #include "FreeRTOS.h"
 #include "task.h"
 
-#define SENSOR_TASK_PRIORITY (4)
+#include <stdio.h>
+
+#define SENSOR_TASK_PRIORITY (3)
 #define SENSOR_TASK_STACK_SIZE (1024)
-#define SENSOR_TASK_PERIOD_MS (20)
+#define SENSOR_TASK_PERIOD_MS (100)
 
 static StackType_t xSensorTaskStack[SENSOR_TASK_STACK_SIZE];
 static StaticTask_t xSensorTaskBuffer;
@@ -46,6 +48,14 @@ void sensor_task(void *pvParameters)
     for (;;)
     {
         // do stuff
+
+        uint32_t notified_value;
+        if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
+        {
+            int32_t target_position = (int32_t)notified_value;
+            printf("[SENSOR] Sampling sensors for move to position: %d\n", target_position);
+            fflush(stdout);
+        }
 
         xTaskDelayUntil(
             &lastWakeTime,

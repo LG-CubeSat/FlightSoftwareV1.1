@@ -4,14 +4,16 @@ Maintains basic homeostasis
 Stack usage, CPU usage, Temp, Task heartbeat
 */
 
-#include "../../include/tasks/control_task.h"
+#include "../../include/tasks/housekeeping_task.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include <stdio.h>
+
 #define HOUSEKEEPING_TASK_PRIORTIY (1)
 #define HOUSEKEEPING_TASK_STACK_SIZE (1024)
-#define HOUSEKEEPING_TASK_PERIOD_MS (20)
+#define HOUSEKEEPING_TASK_PERIOD_MS (1000)
 
 static StackType_t xHousekeepingTaskStack[HOUSEKEEPING_TASK_STACK_SIZE];
 static StaticTask_t xHousekeepingTaskBuffer;

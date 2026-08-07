@@ -136,5 +136,5 @@ void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf)
     // register the interface
     iface->name = "SPI";
     iface->nexthop = csp_if_spi_tx;
-    csp_iflist_add(iface);
+    csp_iflist_add(iface);    
 }

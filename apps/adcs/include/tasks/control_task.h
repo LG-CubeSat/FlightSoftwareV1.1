@@ -12,6 +12,8 @@ Runs correct controller, commands magnetorquers
 #include "FreeRTOS.h"
 #include "task.h"
 
+extern TaskHandle_t xControlHandle;
+
 void control_task_init(void);
 
 void control_task(void *pvParameters);

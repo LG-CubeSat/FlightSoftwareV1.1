@@ -5,11 +5,10 @@ Decodes them and updates manager
 */
 
 #ifndef COMMAND_TASK_H
-#define CONTROL_TASK_H
+#define COMMAND_TASK_H
 
 #include "FreeRTOS.h"
 #include "task.h"
-#include "../../../../libs/libcsp/include/csp/csp_types.h"
 
 // TODO: expand
 typedef struct
@@ -22,6 +21,6 @@ void command_task_init(void);
 
 void command_task(void *pvParameters);
 
-int command_task_send(csp_packet_t *command);
+int command_task_send(const CommandMessage_t *message);
 
 #endif

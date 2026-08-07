@@ -11,9 +11,11 @@ publishes the current attitude
 #include "FreeRTOS.h"
 #include "task.h"
 
-#define ESTIMATION_TASK_PRIORITY (5)
+#include <stdio.h>
+
+#define ESTIMATION_TASK_PRIORITY (3)
 #define ESTIMATION_TASK_STACK_SIZE (1024)
-#define ESTIMATION_TASK_PERIOD_MS (20)
+#define ESTIMATION_TASK_PERIOD_MS (100)
 
 static StackType_t xEstimationTaskStack[ESTIMATION_TASK_STACK_SIZE];
 static StaticTask_t xEstimationTaskBuffer;
@@ -47,6 +49,14 @@ void estimation_task(void *pvParameters)
     for (;;)
     {
         // do stuff
+
+        uint32_t notified_value;
+        if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
+        {
+            int32_t target_position = (int32_t)notified_value;
+            printf("[ESTIMATION] Updating attitude estimate for target position: %d\n", target_position);
+            fflush(stdout);
+        }
 
         xTaskDelayUntil(
             &lastWakeTime,
