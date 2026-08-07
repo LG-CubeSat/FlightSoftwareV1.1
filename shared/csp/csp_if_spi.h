@@ -30,6 +30,6 @@ typedef struct {
 
 } csp_if_spi_conf_t;
 
-void csp_vbus_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf);
+void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf);
 
 #endif
