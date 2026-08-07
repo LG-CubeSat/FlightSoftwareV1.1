@@ -12,6 +12,8 @@ publishes the current attitude
 #include "FreeRTOS.h"
 #include "task.h"
 
+extern TaskHandle_t xEstimationHandle;
+
 void estimation_task_init(void);
 
 void estimation_task(void *pvParameters);

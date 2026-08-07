@@ -17,6 +17,8 @@ Decodes them and updates manager
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include <stdio.h>
+
 // TODO.. add includes for actually integrating into other tasks
 
 #define CONTROL_TASK_PRIORITY (4)
@@ -57,6 +59,14 @@ void control_task(void *pvParameters)
     for (;;)
     {
         // do some stuff
+
+        uint32_t notified_value;
+        if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
+        {
+            int32_t target_position = (int32_t)notified_value;
+            printf("[CONTROL] Slewing toward target position: %d\n", target_position);
+            fflush(stdout);
+        }
 
         xTaskDelayUntil(
             &lastWakeTime,
