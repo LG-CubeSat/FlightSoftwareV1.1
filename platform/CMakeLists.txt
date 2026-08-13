@@ -1,11 +1,11 @@
 if (HW_MODE)
     add_library(platform STATIC
-        real/spi/spi_driver.c
+        real/drivers/comms_i2c.c
         )
     target_compile_definitions(platform PRIVATE HW_MODE)
 else()
     add_library(platform STATIC
-        sim/spi/v_bus.c
+        sim/drivers/comms_i2c.c
     )
     target_compile_definitions(platform PRIVATE SIM_MODE)
 endif()

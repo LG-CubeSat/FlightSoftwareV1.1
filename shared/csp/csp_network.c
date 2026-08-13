@@ -12,12 +12,12 @@
 static csp_iface_t csp_spi_iface;
 static csp_if_spi_conf_t csp_spi_conf;
 static CSP_Transport_t csp_spi_transport;
-static VBus_t csp_v_bus;
+static CommsBus_t csp_comms_bus;
 
 /*
- * csp_if_spi.c never calls transport->initialize() -- v_bus is initialized
- * directly below, before the interface is registered, so this only needs
- * to satisfy the CSP_Transport_t struct.
+ * csp_if_spi.c never calls transport->initialize() -- the comms bus is
+ * initialized directly below, before the interface is registered, so this
+ * only needs to satisfy the CSP_Transport_t struct.
  */
 static int csp_transport_initialize_noop(void)
 {
@@ -40,17 +40,17 @@ static void * csp_router_thread(void * param)
 
 void csp_network_init(uint16_t my_address, int is_master)
 {
-    csp_v_bus = create_v_bus();
+    csp_comms_bus = create_comms_bus();
 
-    if (csp_v_bus.initialize(is_master) != V_BUS_OK) {
-        fprintf(stderr, "[CSP] v_bus initialize failed\n");
+    if (csp_comms_bus.initialize(is_master) != COMMS_BUS_OK) {
+        fprintf(stderr, "[CSP] comms bus initialize failed\n");
         fflush(stderr);
         return;
     }
 
     csp_spi_transport.initialize = csp_transport_initialize_noop;
-    csp_spi_transport.send = csp_v_bus.send;
-    csp_spi_transport.receive = csp_v_bus.receive;
+    csp_spi_transport.send = csp_comms_bus.send;
+    csp_spi_transport.receive = csp_comms_bus.receive;
 
     csp_spi_conf.transport = &csp_spi_transport;
 

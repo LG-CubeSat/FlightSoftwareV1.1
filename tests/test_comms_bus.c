@@ -1,9 +1,9 @@
 /*
- * Sanity test for the v-bus transport used between the OBC and ADCS
- * processes. Exercises the real platform/sim/spi/v_bus.c implementation
- * over an actual Unix domain socket (not a mock), so it catches real
- * regressions in that code -- e.g. a socket type the host OS doesn't
- * support, a framing bug, a hang on connect/accept.
+ * Sanity test for the comms bus transport used between the OBC and ADCS
+ * processes. Exercises the real platform/sim/drivers/comms_i2c.c
+ * implementation over an actual Unix domain socket (not a mock), so it
+ * catches real regressions in that code -- e.g. a socket type the host OS
+ * doesn't support, a framing bug, a hang on connect/accept.
  *
  * Forks two processes that play the OBC (master) and ADCS (slave) roles,
  * exchange a known message in both directions, and verify the bytes match.
@@ -11,9 +11,9 @@
  * is broken.
  *
  * Run directly:
- *   ./build/tests/v_bus_test
+ *   ./build/tests/comms_bus_test
  * Or via CTest:
- *   ctest --test-dir build -R v_bus_test --output-on-failure
+ *   ctest --test-dir build -R comms_bus_test --output-on-failure
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,9 +36,9 @@ static void fail(const char *who, const char *what) {
 static void run_master(void) {
     alarm(TEST_TIMEOUT_SEC);
 
-    VBus_t bus = create_v_bus();
-    if (bus.initialize(1) != V_BUS_OK) {
-        fail("OBC", "v_bus_initialize failed");
+    CommsBus_t bus = create_comms_bus();
+    if (bus.initialize(1) != COMMS_BUS_OK) {
+        fail("OBC", "comms_bus_initialize failed");
     }
 
     int sent = bus.send((const uint8_t *)OBC_TO_ADCS_MSG, (uint16_t)strlen(OBC_TO_ADCS_MSG));
@@ -61,9 +61,9 @@ static void run_master(void) {
 static void run_slave(void) {
     alarm(TEST_TIMEOUT_SEC);
 
-    VBus_t bus = create_v_bus();
-    if (bus.initialize(0) != V_BUS_OK) {
-        fail("ADCS", "v_bus_initialize failed");
+    CommsBus_t bus = create_comms_bus();
+    if (bus.initialize(0) != COMMS_BUS_OK) {
+        fail("ADCS", "comms_bus_initialize failed");
     }
 
     uint8_t buf[128] = {0};
@@ -85,9 +85,10 @@ static void run_slave(void) {
 
 int main(void) {
     /* Clear any stale socket left behind by a previous crashed run. Note:
-     * this uses the same hardcoded /tmp/v_bus.sock path as production code,
-     * so don't run this test at the same time as a real obc_sim/adcs_sim. */
-    unlink("/tmp/v_bus.sock");
+     * this uses the same hardcoded /tmp/comms_i2c.sock path as production
+     * code, so don't run this test at the same time as a real
+     * obc_sim/adcs_sim. */
+    unlink("/tmp/comms_i2c.sock");
 
     pid_t slave_pid = fork();
     if (slave_pid < 0) {
@@ -117,10 +118,10 @@ int main(void) {
     int master_ok = WIFEXITED(master_status) && WEXITSTATUS(master_status) == 0;
 
     if (slave_ok && master_ok) {
-        printf("v_bus_test: PASS\n");
+        printf("comms_bus_test: PASS\n");
         return 0;
     }
 
-    fprintf(stderr, "v_bus_test: FAIL (slave_ok=%d master_ok=%d)\n", slave_ok, master_ok);
+    fprintf(stderr, "comms_bus_test: FAIL (slave_ok=%d master_ok=%d)\n", slave_ok, master_ok);
     return 1;
 }

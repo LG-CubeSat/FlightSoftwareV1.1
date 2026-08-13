@@ -2,7 +2,7 @@
 
 ## Top-Level Layout
 
-**Location:** `platform/sim/include/v_bus.h` (sim) / `platform/real/spi/spi_driver.h` (HW)
+**Location:** `platform/sim/include/v_bus.h` (sim) / `platform/real/spi/ver.h` (HW)
 
 ### Header (`v_bus.h`)
 
