@@ -21,7 +21,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-#include "v_bus.h"
+#include "comms_bus.h"
 
 #define OBC_TO_ADCS_MSG "PING from OBC"
 #define ADCS_TO_OBC_MSG "PONG from ADCS"

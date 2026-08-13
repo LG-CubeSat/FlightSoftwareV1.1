@@ -12,12 +12,12 @@ endif()
 
 if (HW_MODE)
     target_include_directories(platform PUBLIC
-        ${CMAKE_SOURCE_DIR}/platform/include
+        ${CMAKE_SOURCE_DIR}/shared/interfaces
         ${CMAKE_CURRENT_SOURCE_DIR}/real/include
     )
 else()
     target_include_directories(platform PUBLIC
-        ${CMAKE_SOURCE_DIR}/platform/include
+        ${CMAKE_SOURCE_DIR}/shared/interfaces
         ${CMAKE_CURRENT_SOURCE_DIR}/sim/include
     )
 endif()

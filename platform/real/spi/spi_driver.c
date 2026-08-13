@@ -13,7 +13,7 @@ implementation below; until then this compiles to an honest stub that
 returns V_BUS_ERROR, so `-DHW_MODE=ON` configures and builds cleanly today
 instead of failing outright, without pretending to drive real hardware.
 */
-#include "v_bus.h"
+#include "comms_bus.h"
 
 #include <stdio.h>
 
