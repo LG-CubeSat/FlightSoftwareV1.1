@@ -6,27 +6,28 @@ All inter-processor communication uses **CSP (CubeSat Space Protocol)** with CRC
 
 ---
 
-## 1. v-bus / SPI (Inter-Processor Bus)
+## 1. comms_bus (Inter-Processor Bus)
 
-**Location:** `platform/sim/include/v_bus.h` (sim) / `platform/real/spi/spi_driver.h` (HW)
+**Location:** `shared/interfaces/comms_bus.h` (contract, medium-agnostic) /
+`platform/sim/drivers/comms_i2c.c` (sim) / `platform/real/drivers/comms_i2c.c` (HW)
 
-### Header (`v_bus.h`)
+### Header (`comms_bus.h`)
 
 ```c
-#ifndef V_BUS_H
-#define V_BUS_H
+#ifndef COMMS_BUS_H
+#define COMMS_BUS_H
 
 #include <stdint.h>
 
 typedef enum {
-    V_BUS_OK = 0,
-    V_BUS_ERROR = -1,
-    V_BUS_TIMEOUT = -2
-} VBusStatus_t;
+    COMMS_BUS_OK = 0,
+    COMMS_BUS_ERROR = -1,
+    COMMS_BUS_TIMEOUT = -2
+} CommsBusStatus_t;
 
-VBusStatus_t v_bus_initialize(int is_master);
-int v_bus_send(const uint8_t *data, uint16_t length);
-int v_bus_receive(uint8_t *buffer, uint16_t max_length);
+CommsBusStatus_t comms_bus_initialize(int is_master);
+int comms_bus_send(const uint8_t *data, uint16_t length);
+int comms_bus_receive(uint8_t *buffer, uint16_t max_length);
 
 #endif
 ```
@@ -35,19 +36,19 @@ int v_bus_receive(uint8_t *buffer, uint16_t max_length);
 
 | Function | Direction | Blocking | Description |
 |---|---|---|---|
-| `v_bus_initialize(int is_master)` | Setup | Yes | `is_master=1` for OBC (SPI master), `is_master=0` for MCU (SPI slave). In HW mode, initializes the STM32 SPI peripheral. In SIM mode, sets up Unix Domain Socket server/client. |
-| `v_bus_send(const uint8_t *data, uint16_t length)` | OBC→MCU or MCU→OBC | No | Sends `length` bytes over SPI/v-bus. Returns number of bytes sent or negative on error. |
-| `v_bus_receive(uint8_t *buffer, uint16_t max_length)` | OBC→MCU or MCU→OBC | Yes | Blocks until data arrives or timeout. Returns bytes received or negative on error. |
+| `comms_bus_initialize(int is_master)` | Setup | Yes | `is_master=1` for OBC (bus master), `is_master=0` for MCU (bus slave). In SIM mode, sets up Unix Domain Socket server/client. In HW mode, the real backend still runs the SPI-era STM32 HAL sequence under the hood (see `platform/real/drivers/comms_i2c.c`) — swapping that for a real I2C HAL sequence is separate, not-yet-done work (`roadmap.md` 1.6-1.8, Phase 6), so don't read the file name as a claim that real I2C is wired up yet. |
+| `comms_bus_send(const uint8_t *data, uint16_t length)` | OBC→MCU or MCU→OBC | No | Sends `length` bytes over the bus. Returns number of bytes sent or negative on error. |
+| `comms_bus_receive(uint8_t *buffer, uint16_t max_length)` | OBC→MCU or MCU→OBC | Yes | Blocks until data arrives or timeout. Returns bytes received or negative on error. |
 
 ### Sim Implementation Details
-- Uses Unix Domain Socket (`/tmp/v_bus.sock`).
+- Uses Unix Domain Socket (`/tmp/comms_i2c.sock`).
 - OBC is the server (binds, listens, accepts).
 - MCU is the client (connects).
 - Message framing: length-prefix + payload (avoids stream ambiguity).
 
 ### HW Implementation Details
-- Uses STM32 SPI peripheral with DMA for high-throughput, deterministic transfers.
-- Same API as SIM — application code does not change between modes.
+- Today: an honest stub (returns `COMMS_BUS_ERROR`) unless `STM32_HAL_AVAILABLE` is defined, in which case it runs SPI HAL calls left over from before the I2C-only bus decision — not real I2C yet.
+- Same API as SIM — application code does not change between modes, regardless of which medium is actually wired up underneath.
 
 ---
 
@@ -162,7 +163,7 @@ tts_command_t *tts_pop_mature(uint64_t current_utc_ms);
 
 ### Dependencies
 - Consumes: Commands from CI, system RTC
-- Produces: Mature commands dispatched to MCU via v-bus (SPI)
+- Produces: Mature commands dispatched to MCU via comms_bus
 
 ---
 
@@ -230,7 +231,7 @@ ipc_status_t ipc_router_process_packet(const csp_packet_t *packet);
 
 | Function | Description |
 |---|---|
-| `ipc_router_initialize` | Initializes v-bus (SPI) client, creates all subsystem queues (`adcs_command_queue`, `eps_command_queue`, `comms_command_queue`, `telemetry_queue`), starts the router task. |
+| `ipc_router_initialize` | Initializes comms_bus client, creates all subsystem queues (`adcs_command_queue`, `eps_command_queue`, `comms_command_queue`, `telemetry_queue`), starts the router task. |
 | `ipc_router_process_packet` | Parses CSP header, validates CRC-32 via `crc32_validate()`, routes payload to the correct subsystem queue based on destination port. |
 
 ### Queue Management Logic
@@ -273,21 +274,23 @@ if (xQueueSend(*target_queue, packet->payload, 0) != pdTRUE) {
 return IPC_OK;
 ```
 
-**v-bus ISR handler (HW mode) — queue signaling:**
+**comms_bus ISR handler (HW mode) — queue signaling:**
 ```c
+/* Still an SPI peripheral ISR under the hood -- see comms_bus.h's note on
+ * platform/real/drivers/comms_i2c.c not being real I2C yet. */
 void SPI1_IRQHandler(void) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     if (SPI_GetITStatus(SPI1, SPI_IT_RXNE) != RESET) {
         uint8_t byte = SPI_ReceiveData8(SPI1);
-        xQueueSendFromISR(v_bus_rx_queue, &byte, &xHigherPriorityTaskWoken);
+        xQueueSendFromISR(comms_bus_rx_queue, &byte, &xHigherPriorityTaskWoken);
     }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 ```
 
-**v-bus receive (SIM mode) — queue signaling:**
+**comms_bus receive (SIM mode) — queue signaling:**
 ```c
-int v_bus_receive(uint8_t *buffer, uint16_t max_length) {
+int comms_bus_receive(uint8_t *buffer, uint16_t max_length) {
     // Blocks with timeout, then signals IPC Router task
     ssize_t n = read(bus_fd, buffer, max_length);
     if (n > 0) {
@@ -309,7 +312,7 @@ int v_bus_receive(uint8_t *buffer, uint16_t max_length) {
 | 22 | COMMS Telemetry | `telemetry_queue` | 10 |
 
 ### Dependencies
-- Consumes: Raw bytes from v-bus (SPI), CRC-32 handler
+- Consumes: Raw bytes from comms_bus, CRC-32 handler
 - Produces: Routed payloads to subsystem queues
 - Invokes: `crc32_validate()` handler, `xQueueSend()` for queue management
 
@@ -386,12 +389,12 @@ void adcs_task_entry(void *pvParameters) {
 
 **Key logic:**
 - Uses `xQueueReceive` with a 10ms timeout so the task doesn't block forever waiting for a command. It continues its 50Hz control loop regardless.
-- Telemetry is sent every 200ms (5Hz telemetry rate) to avoid flooding the v-bus.
+- Telemetry is sent every 200ms (5Hz telemetry rate) to avoid flooding the comms_bus.
 - `vTaskDelayUntil` ensures deterministic 50Hz timing, compensating for execution time.
 
 ### Dependencies
 - Consumes: Setpoints from `adcs_command_queue`, IMU mock data
-- Produces: Telemetry via `telemetry_queue` (picked up by v-bus ISR handler)
+- Produces: Telemetry via `telemetry_queue` (picked up by comms_bus ISR handler)
 - Invokes: `adcs_apply_setpoint()` PID handler, `crc32_compute()` for outgoing telemetry
 
 ---
@@ -466,7 +469,7 @@ void eps_task_entry(void *pvParameters) {
 
 ### Dependencies
 - Consumes: Mock battery/solar data, commands from `eps_command_queue`
-- Produces: Housekeeping telemetry via `telemetry_queue` (picked up by v-bus ISR handler)
+- Produces: Housekeeping telemetry via `telemetry_queue` (picked up by comms_bus ISR handler)
 - Invokes: `mock_adc_read_*()` handlers, `crc32_compute()` for outgoing telemetry
 
 ---
@@ -503,7 +506,7 @@ void watchdog_task_entry(void *pvParameters) {
     const uint32_t WD_TIMEOUT_MS = 1000;
 
     while (1) {
-        // Block waiting for heartbeat from OBC (via v-bus)
+        // Block waiting for heartbeat from OBC (via comms_bus)
         uint32_t hb;
         if (xQueueReceive(wd_heartbeat_queue, &hb, pdMS_TO_TICKS(1100)) == pdTRUE) {
             // Heartbeat received within timeout — reset watchdog
