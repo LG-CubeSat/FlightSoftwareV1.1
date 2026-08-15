@@ -12,9 +12,8 @@ recieve csp packets from vbus
 
 #include "../../libs/libcsp/include/csp/csp_types.h"
 
-static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packet, int from_me) 
+static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packet, int from_me)
 {
-    (void)via;
     (void)from_me;
 
     csp_if_spi_conf_t * ifconf = iface->driver_data; // create a interface config
@@ -23,8 +22,10 @@ static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packe
 
     csp_id_prepend(packet); // give an id to the packet
 
-    // send packet through the transport
+    // send packet through the transport -- 'via' is the CSP node this packet
+    // is headed to, which becomes the physical bus destination address
     int ret = ifconf->transport->send(
+        (uint8_t)via,
         packet->frame_begin,
         packet->frame_length
     );
@@ -54,9 +55,13 @@ static int csp_if_spi_rx_work(
     }
 
     int header_size = csp_id_setup_rx(packet);
-    
-    // compute the bytes needed 
+
+    // compute the bytes needed -- src_addr is who the bus says sent this
+    // frame; not used for CSP routing (CSP's own header carries that), only
+    // needed to satisfy the addressed comms_bus contract
+    uint8_t src_addr;
     int len = ifconf->transport->receive(
+        &src_addr,
         packet->frame_begin,
         sizeof(packet->data) + header_size
     );

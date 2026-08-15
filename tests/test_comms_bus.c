@@ -33,21 +33,25 @@ static void fail(const char *who, const char *what) {
     _exit(1);
 }
 
+#define OBC_ADDR  1
+#define ADCS_ADDR 2
+
 static void run_master(void) {
     alarm(TEST_TIMEOUT_SEC);
 
     CommsBus_t bus = create_comms_bus();
-    if (bus.initialize(1) != COMMS_BUS_OK) {
+    if (bus.initialize(OBC_ADDR, 1) != COMMS_BUS_OK) {
         fail("OBC", "comms_bus_initialize failed");
     }
 
-    int sent = bus.send((const uint8_t *)OBC_TO_ADCS_MSG, (uint16_t)strlen(OBC_TO_ADCS_MSG));
+    int sent = bus.send(ADCS_ADDR, (const uint8_t *)OBC_TO_ADCS_MSG, (uint16_t)strlen(OBC_TO_ADCS_MSG));
     if (sent != (int)strlen(OBC_TO_ADCS_MSG)) {
         fail("OBC", "send() did not return the expected length");
     }
 
     uint8_t buf[128] = {0};
-    int received = bus.receive(buf, sizeof(buf));
+    uint8_t src_addr = 0;
+    int received = bus.receive(&src_addr, buf, sizeof(buf));
     if (received != (int)strlen(ADCS_TO_OBC_MSG) ||
         memcmp(buf, ADCS_TO_OBC_MSG, (size_t)received) != 0) {
         fail("OBC", "did not receive the expected reply from ADCS");
@@ -62,18 +66,19 @@ static void run_slave(void) {
     alarm(TEST_TIMEOUT_SEC);
 
     CommsBus_t bus = create_comms_bus();
-    if (bus.initialize(0) != COMMS_BUS_OK) {
+    if (bus.initialize(ADCS_ADDR, 0) != COMMS_BUS_OK) {
         fail("ADCS", "comms_bus_initialize failed");
     }
 
     uint8_t buf[128] = {0};
-    int received = bus.receive(buf, sizeof(buf));
+    uint8_t src_addr = 0;
+    int received = bus.receive(&src_addr, buf, sizeof(buf));
     if (received != (int)strlen(OBC_TO_ADCS_MSG) ||
         memcmp(buf, OBC_TO_ADCS_MSG, (size_t)received) != 0) {
         fail("ADCS", "did not receive the expected message from OBC");
     }
 
-    int sent = bus.send((const uint8_t *)ADCS_TO_OBC_MSG, (uint16_t)strlen(ADCS_TO_OBC_MSG));
+    int sent = bus.send(OBC_ADDR, (const uint8_t *)ADCS_TO_OBC_MSG, (uint16_t)strlen(ADCS_TO_OBC_MSG));
     if (sent != (int)strlen(ADCS_TO_OBC_MSG)) {
         fail("ADCS", "send() did not return the expected length");
     }
