@@ -10,8 +10,11 @@
 
 #define SOCKET_PATH "/tmp/comms_i2c.sock"
 #define BACKLOG 10
+#define MAX_CONNECTIONS 5
 
 static int bus_fd = -1;
+static int connections_fd[MAX_CONNECTIONS];
+static int connection_count = 0;
 
 CommsBus_t create_comms_bus(void)
 {
@@ -42,6 +45,9 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
     strncpy(addr.sun_path, SOCKET_PATH, sizeof(addr.sun_path) - 1);
 
     if (is_master) {
+        // set connections array to all -1
+        memset(connections_fd, -1, sizeof(connections_fd));
+
         // OBC logic
         unlink(SOCKET_PATH); // clear old socket file
 
@@ -86,9 +92,10 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
             // connection, so restore that here.
             int conn_flags = fcntl(connection_fd, F_GETFL, 0);
             fcntl(connection_fd, F_SETFL, conn_flags & ~O_NONBLOCK);
-
-            bus_fd = connection_fd; // use the actual connection for future sends
-            printf("[COMMS BUS] Master accepted connection from Slave.\n");
+            
+            connections_fd[connection_count] = connection_fd; // use the actual connection for future sends
+            connection_count++;
+            printf("[COMMS BUS] Master accepted connection from Slave. Connection Count: %d\n", connection_count);
             fflush(stdout);
 
             break;
@@ -121,7 +128,11 @@ int comms_check_new_connections(int bus_fd)
             return COMMS_BUS_ERROR;
         }
     }
-    printf("[COMMS BUS] Successfully accepted new client\n");
+    // add new connection
+    connections_fd[connection_count] = connection_fd;
+    connection_fd++;
+
+    printf("[COMMS BUS] Master accepted connection from Slave. Connection Count: %d\n", connection_count);
     return COMMS_BUS_OK;
 }
 
