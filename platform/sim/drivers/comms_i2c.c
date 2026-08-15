@@ -20,7 +20,7 @@ CommsBus_t create_comms_bus(void)
     return bus;
 }
 
-CommsBusStatus_t comms_bus_initialize(int is_master)
+CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
 {
     struct sockaddr_un addr; // declare the adress card
 
@@ -80,7 +80,7 @@ CommsBusStatus_t comms_bus_initialize(int is_master)
     return COMMS_BUS_OK;
 }
 
-int comms_bus_send(const uint8_t *data, uint16_t length)
+int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 {
     if (bus_fd < 0) return -1;
     // write() sends 'length' bytes from 'data' through the socket 'bus_fd'
@@ -95,7 +95,7 @@ int comms_bus_send(const uint8_t *data, uint16_t length)
     return ret;
 }
 
-int comms_bus_receive(uint8_t *buffer, uint16_t max_length)
+int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length)
 {
     if (bus_fd < 0) return -1;
     // read() blocks until the data arrives and fills 'buffer' up to 'max_length'

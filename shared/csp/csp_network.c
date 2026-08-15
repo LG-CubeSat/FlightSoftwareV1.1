@@ -42,7 +42,7 @@ void csp_network_init(uint16_t my_address, int is_master)
 {
     csp_comms_bus = create_comms_bus();
 
-    if (csp_comms_bus.initialize(is_master) != COMMS_BUS_OK) {
+    if (csp_comms_bus.initialize(my_address, is_master) != COMMS_BUS_OK) {
         fprintf(stderr, "[CSP] comms bus initialize failed\n");
         fflush(stderr);
         return;
