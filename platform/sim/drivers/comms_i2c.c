@@ -148,6 +148,25 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
     return COMMS_BUS_OK;
 }
 
+// parses frames into sendable bytes. Uses big edian.
+static int frame_serialize(const Frame *frame, uint8_t *out_buf, size_t out_buf_size)
+{   
+    // We are doing +4 because dest_addr, src_addr, and frame (2 bytes) means a four byte header
+    if (frame->length + 4 > out_buf_size) {
+        printf("[COMMS BUS] Payload size of %d exceeds limit of %d", frame->length, out_buf_size);
+        return -1;
+    } 
+
+    out_buf[0] = frame->dest_addr; // set the destination
+    out_buf[1] = frame->src_addr; // set where it came from
+    memcpy(&out_buf[3], &frame->payload, frame->length); // set the actual message/payload
+
+    uint16_t net_length = htons(frame->length); // convert to big edian
+    memcpy(&out_buf[2], &net_length, frame->length); // set the length
+
+    return 4 + frame->length; // used in the write
+}
+
 int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 {
     if (bus_fd < 0) return -1;
@@ -171,7 +190,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 
     int ret;
     do {
-        ret = (int)write(bus_fd, data, length);
+        ret = (int)write(bus_fd, wire_buf, wire_len);
     } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
     if (ret < 0) {
         fprintf(stderr, "[COMMS BUS] write() failed: %s\n", strerror(errno));
