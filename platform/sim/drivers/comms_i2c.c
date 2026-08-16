@@ -20,6 +20,8 @@ static int bus_fd = -1;
 static int connections_fd[MAX_CONNECTIONS];
 static int connection_count = 0;
 
+pthread_mutex_t connection_lock;
+
 CommsBus_t create_comms_bus(void)
 {
     CommsBus_t bus;
@@ -54,11 +56,19 @@ static void * loop_accept_new_connections(void * param)
         int conn_flags = fcntl(connection_fd, F_GETFL, 0);
         fcntl(connection_fd, F_SETFL, conn_flags & ~O_NONBLOCK);
         
+        pthread_mutex_lock(&connection_lock);
+
         connections_fd[connection_count] = connection_fd; // use the actual connection for future sends
         connection_count++;
+
+        pthread_mutex_unlock(&connection_lock);
+        
         printf("[COMMS BUS] Master accepted connection from Slave. Connection Count: %d\n", connection_count);
         fflush(stdout);
     }
+    
+    // clean up mutex recoruses
+    pthread_mutex_destroy(&connection_lock);
 
     return NULL;
 }
