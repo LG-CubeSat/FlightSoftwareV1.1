@@ -42,11 +42,11 @@ static void * loop_accept_new_connections(void * param)
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 // no connections
                 printf("[COMMS BUS] No clients waiting. Continuing...\n");
-                continue;
             } else {
                 fprintf(stderr, "[COMMS BUS] accept() failed: %s\n", strerror(errno));
                 fflush(stderr);
             }
+            continue;
         }
 
         // The accepted connection can inherit O_NONBLOCK from the
