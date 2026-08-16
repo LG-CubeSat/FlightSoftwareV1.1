@@ -1,3 +1,5 @@
+#include "comms_i2c.h"
+
 #include "comms_bus.h"
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -7,6 +9,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <errno.h>
+
+#include <pthread.h>
 
 #define SOCKET_PATH "/tmp/comms_i2c.sock"
 #define BACKLOG 10
@@ -24,6 +28,38 @@ CommsBus_t create_comms_bus(void)
     bus.receive = &comms_bus_receive;
 
     return bus;
+}
+
+static void * loop_accept_new_connections(void * param)
+{
+    (void) param;
+    while (1) {
+        int connection_fd = accept(bus_fd, NULL, NULL); // Wait for ADCS
+        if (connection_fd < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // no connections
+                printf("[COMMS BUS] No clients waiting. Continuing...\n");
+                continue;
+            } else {
+                fprintf(stderr, "[COMMS BUS] accept() failed: %s\n", strerror(errno));
+                fflush(stderr);
+            }
+        }
+
+        // The accepted connection can inherit O_NONBLOCK from the
+        // listening socket on this platform -- only the listener should
+        // be non-blocking; comms_bus_send/receive assume a blocking
+        // connection, so restore that here.
+        int conn_flags = fcntl(connection_fd, F_GETFL, 0);
+        fcntl(connection_fd, F_SETFL, conn_flags & ~O_NONBLOCK);
+        
+        connections_fd[connection_count] = connection_fd; // use the actual connection for future sends
+        connection_count++;
+        printf("[COMMS BUS] Master accepted connection from Slave. Connection Count: %d\n", connection_count);
+        fflush(stdout);
+    }
+
+    return NULL;
 }
 
 CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
@@ -68,32 +104,9 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
         int flags = fcntl(bus_fd, F_GETFL, 0);
         fcntl(bus_fd, F_SETFL, flags | O_NONBLOCK);
 
-        while (1)
-        {
-            int connection_fd = accept(bus_fd, NULL, NULL); // Wait for ADCS
-            if (connection_fd < 0) {
-                if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                    // no connections
-                    printf("[COMMS BUS] No clients waiting. Continuing...\n");
-                    continue;
-                } else {
-                    fprintf(stderr, "[COMMS BUS] accept() failed: %s\n", strerror(errno));
-                    fflush(stderr);
-                }
-            }
+        pthread_t connection_thread;
+        int ret = pthread_create(&connection_thread, NULL, load_accept_new_connections, NULL);
 
-            // The accepted connection can inherit O_NONBLOCK from the
-            // listening socket on this platform -- only the listener should
-            // be non-blocking; comms_bus_send/receive assume a blocking
-            // connection, so restore that here.
-            int conn_flags = fcntl(connection_fd, F_GETFL, 0);
-            fcntl(connection_fd, F_SETFL, conn_flags & ~O_NONBLOCK);
-            
-            connections_fd[connection_count] = connection_fd; // use the actual connection for future sends
-            connection_count++;
-            printf("[COMMS BUS] Master accepted connection from Slave. Connection Count: %d\n", connection_count);
-            fflush(stdout);
-        }
     } else {
         // slave logic (ADCS)
         printf("[COMMS BUS] Slave connecting..\n");
