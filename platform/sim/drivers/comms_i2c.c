@@ -1,5 +1,3 @@
-#include "comms_i2c.h"
-
 #include "comms_bus.h"
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -62,7 +60,7 @@ static void * loop_accept_new_connections(void * param)
         connection_count++;
 
         pthread_mutex_unlock(&connection_lock);
-        
+
         printf("[COMMS BUS] Master accepted connection from Slave. Connection Count: %d\n", connection_count);
         fflush(stdout);
     }
@@ -139,27 +137,6 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
         fflush(stdout);
     }
 
-    return COMMS_BUS_OK;
-}
-
-int comms_check_new_connections(int bus_fd)
-{
-    int connection_fd = accept(bus_fd, NULL, NULL); // Wait for ADCS
-    if (connection_fd < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            // no connections
-            printf("[COMMS BUS] No clients waiting. Continuing...\n");
-        } else {
-            fprintf(stderr, "[COMMS BUS] accept() failed: %s\n", strerror(errno));
-            fflush(stderr);
-            return COMMS_BUS_ERROR;
-        }
-    }
-    // add new connection
-    connections_fd[connection_count] = connection_fd;
-    connection_fd++;
-
-    printf("[COMMS BUS] Master accepted connection from Slave. Connection Count: %d\n", connection_count);
     return COMMS_BUS_OK;
 }
 
