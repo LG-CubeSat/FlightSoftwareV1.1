@@ -113,16 +113,16 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
         int flags = fcntl(bus_fd, F_GETFL, 0);
         fcntl(bus_fd, F_SETFL, flags | O_NONBLOCK);
 
+        if (pthread_mutex_init(&connection_lock, NULL) != 0) {
+            printf("[COMMS BUS] Mutex initialization failed.\n");
+            return COMMS_BUS_ERROR;
+        }
+
         pthread_t connection_thread;
         int ret = pthread_create(&connection_thread, NULL, loop_accept_new_connections, NULL);
         if (ret != 0) {
             fprintf(stderr, "[COMMS BUS] Failed to create connection pthread: %d\n", ret);
             fflush(stderr);
-            return COMMS_BUS_ERROR;
-        }
-
-        if (pthread_mutex_init(&connection_lock, NULL) != 0) {
-            printf("[COMMS BUS] Mutex initialization failed.\n");
             return COMMS_BUS_ERROR;
         }
     } else {
