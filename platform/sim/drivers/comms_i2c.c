@@ -9,6 +9,7 @@
 #include <errno.h>
 
 #include <pthread.h>
+#include "frame.h"
 
 #define SOCKET_PATH "/tmp/comms_i2c.sock"
 #define BACKLOG 10
@@ -153,6 +154,22 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
     // write() sends 'length' bytes from 'data' through the socket 'bus_fd'
     int ret;
     do {
+        // creating a frame
+        Frame frame;
+        frame.dest_addr = dest_addr;
+        frame.src_addr = my_bus_address;
+
+        if (length > MAX_FRAME_PAYLOAD) {
+            printf("[COMMS BUS] Frame creation failed because payload length of %d exceeded limit of %d", 
+                length, 
+                MAX_FRAME_PAYLOAD
+            );
+            return -1;
+        }
+        
+        frame.length = length;
+        memcpy(frame.payload, data, sizeof(frame.payload));
+
         ret = (int)write(bus_fd, data, length);
     } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
     if (ret < 0) {
