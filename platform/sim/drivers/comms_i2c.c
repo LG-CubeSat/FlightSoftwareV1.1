@@ -33,6 +33,7 @@ CommsBus_t create_comms_bus(void)
 static void * loop_accept_new_connections(void * param)
 {
     (void) param;
+
     while (1) {
         int connection_fd = accept(bus_fd, NULL, NULL); // Wait for ADCS
         if (connection_fd < 0) {
@@ -105,8 +106,12 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
         fcntl(bus_fd, F_SETFL, flags | O_NONBLOCK);
 
         pthread_t connection_thread;
-        int ret = pthread_create(&connection_thread, NULL, load_accept_new_connections, NULL);
-
+        int ret = pthread_create(&connection_thread, NULL, loop_accept_new_connections, NULL);
+        if (ret != 0) {
+            fprintf(stderr, "[COMMS BUS] Failed to create connection pthread: %d\n", ret);
+            fflush(stderr);
+            return COMMS_BUS_ERROR;
+        }
     } else {
         // slave logic (ADCS)
         printf("[COMMS BUS] Slave connecting..\n");
