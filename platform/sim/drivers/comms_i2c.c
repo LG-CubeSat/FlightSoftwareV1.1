@@ -186,7 +186,10 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
     }
     
     frame.length = length;
-    memcpy(frame.payload, data, sizeof(frame.payload));
+    memcpy(frame.payload, data, length); // set the frame's payload
+
+    uint8_t wire_buf[4 + MAX_FRAME_PAYLOAD];
+    int wire_len = frame_serialize(&frame, wire_buf, sizeof(wire_buf));
 
     int ret;
     do {
