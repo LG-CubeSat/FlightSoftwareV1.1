@@ -79,12 +79,8 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
                 } else {
                     fprintf(stderr, "[COMMS BUS] accept() failed: %s\n", strerror(errno));
                     fflush(stderr);
-                    return COMMS_BUS_ERROR;
                 }
             }
-
-            // if connection accepts
-            close(bus_fd); // we don't need to listen anymore
 
             // The accepted connection can inherit O_NONBLOCK from the
             // listening socket on this platform -- only the listener should
@@ -97,8 +93,6 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
             connection_count++;
             printf("[COMMS BUS] Master accepted connection from Slave. Connection Count: %d\n", connection_count);
             fflush(stdout);
-
-            break;
         }
     } else {
         // slave logic (ADCS)
