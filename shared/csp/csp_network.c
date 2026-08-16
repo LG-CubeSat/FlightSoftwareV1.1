@@ -19,7 +19,7 @@ static CommsBus_t csp_comms_bus;
  * initialized directly below, before the interface is registered, so this
  * only needs to satisfy the CSP_Transport_t struct.
  */
-static int csp_transport_initialize_noop(void)
+static int csp_transport_initialize_loop(void)
 {
     return 0;
 }
@@ -48,7 +48,7 @@ void csp_network_init(uint16_t my_address, int is_master)
         return;
     }
 
-    csp_spi_transport.initialize = csp_transport_initialize_noop;
+    csp_spi_transport.initialize = csp_transport_initialize_loop;
     csp_spi_transport.send = csp_comms_bus.send;
     csp_spi_transport.receive = csp_comms_bus.receive;
 
