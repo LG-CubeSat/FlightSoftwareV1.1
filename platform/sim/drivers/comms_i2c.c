@@ -122,6 +122,11 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
             fflush(stderr);
             return COMMS_BUS_ERROR;
         }
+
+        if (pthread_mutex_init(&connection_lock, NULL) != 0) {
+            printf("[COMMS BUS] Mutex initialization failed.\n");
+            return COMMS_BUS_ERROR;
+        }
     } else {
         // slave logic (ADCS)
         printf("[COMMS BUS] Slave connecting..\n");
