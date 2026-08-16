@@ -14,6 +14,9 @@
 #define BACKLOG 10
 #define MAX_CONNECTIONS 5
 
+static uint8_t my_bus_address;
+static uint8_t bus_is_master;
+
 static int bus_fd = -1;
 static int connections_fd[MAX_CONNECTIONS];
 static int connection_count = 0;
@@ -73,6 +76,10 @@ static void * loop_accept_new_connections(void * param)
 
 CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
 {
+    // store static variables
+    my_bus_address = my_address;
+    bus_is_master = is_master;
+
     struct sockaddr_un addr; // declare the adress card
 
     /* SOCK_STREAM: SOCK_SEQPACKET is not implemented for AF_UNIX on macOS
