@@ -159,10 +159,11 @@ static int frame_serialize(const Frame *frame, uint8_t *out_buf, size_t out_buf_
 
     out_buf[0] = frame->dest_addr; // set the destination
     out_buf[1] = frame->src_addr; // set where it came from
-    memcpy(&out_buf[3], &frame->payload, frame->length); // set the actual message/payload
 
     uint16_t net_length = htons(frame->length); // convert to big edian
-    memcpy(&out_buf[2], &net_length, frame->length); // set the length
+    memcpy(&out_buf[2], &net_length, sizeof(net_length)); // set the length -- always 2 bytes, not frame->length
+
+    memcpy(&out_buf[4], frame->payload, frame->length); // set the actual message/payload -- starts after the 4-byte header
 
     return 4 + frame->length; // used in the write
 }
@@ -192,12 +193,28 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
     int wire_len = frame_serialize(&frame, wire_buf, sizeof(wire_buf));
 
     int ret;
-    do {
-        ret = (int)write(bus_fd, wire_buf, wire_len);
-    } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
-    if (ret < 0) {
-        fprintf(stderr, "[COMMS BUS] write() failed: %s\n", strerror(errno));
-        fflush(stderr);
+    if (bus_is_master) {
+        for (int i=0; i < connection_count; i++) {
+            if (connections_fd[i] == -1) {
+                break; // check if no more connections
+            }
+
+            do {
+                ret = (int)write(connections_fd[i], wire_buf, wire_len);
+            } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
+            if (ret < 0) {
+                fprintf(stderr, "[COMMS BUS] write() failed: %s\n", strerror(errno));
+                fflush(stderr);
+            }
+        }
+    } else {
+        do {
+            ret = (int)write(bus_fd, wire_buf, wire_len);
+        } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
+        if (ret < 0) {
+            fprintf(stderr, "[COMMS BUS] write() failed: %s\n", strerror(errno));
+            fflush(stderr);
+        }
     }
     return ret;
 }
