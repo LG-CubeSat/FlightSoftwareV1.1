@@ -24,6 +24,23 @@ static int connection_count = 0;
 
 pthread_mutex_t connection_lock;
 
+/*
+ * SOCK_STREAM doesn't preserve message boundaries -- one read() can return
+ * a partial frame, several frames concatenated together, or anything in
+ * between. Each connection needs its own leftover buffer so bytes read
+ * past the end of "this" frame aren't lost before the next receive() call.
+ * Slot 0 is the slave's single connection; for the master, index by
+ * position in connections_fd[].
+ */
+#define LEFTOVER_BUF_SIZE (2 * (4 + MAX_FRAME_PAYLOAD))
+typedef struct {
+    uint8_t buf[LEFTOVER_BUF_SIZE];
+    int len; // valid bytes currently sitting in buf, not yet consumed into a frame
+} leftover_t;
+
+static leftover_t slave_leftover;
+static leftover_t master_leftover[MAX_CONNECTIONS];
+
 CommsBus_t create_comms_bus(void)
 {
     CommsBus_t bus;
@@ -42,8 +59,12 @@ static void * loop_accept_new_connections(void * param)
         int connection_fd = accept(bus_fd, NULL, NULL); // Wait for ADCS
         if (connection_fd < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // no connections
-                printf("[COMMS BUS] No clients waiting. Continuing...\n");
+                // No connection waiting yet -- sleep briefly instead of
+                // busy-spinning. A tight loop here starves other threads
+                // (the main thread's send/receive, the slave process) of
+                // CPU time on constrained hosts, which can delay the real
+                // connection from ever completing.
+                usleep(5000); // 5ms
             } else {
                 fprintf(stderr, "[COMMS BUS] accept() failed: %s\n", strerror(errno));
                 fflush(stderr);
@@ -192,6 +213,56 @@ static int frame_deserialize(const uint8_t *wire_buf, int wire_len, Frame *frame
     return 4 + frame_out->length;
 }
 
+// Reassembles exactly one frame from 'fd', buffering across read() calls
+// as needed -- a stream socket can hand back a partial frame, several
+// frames concatenated together, or anything in between. Blocks until one
+// full frame is available or a hard error/disconnect occurs. Any bytes
+// belonging to the *next* frame are kept in 'lo' for the following call,
+// not discarded.
+static int receive_one_frame(int fd, leftover_t *lo, Frame *frame_out)
+{
+    while (1) {
+        if (lo->len >= 4) {
+            uint16_t net_length;
+            memcpy(&net_length, &lo->buf[2], sizeof(net_length));
+            int needed = 4 + ntohs(net_length);
+
+            if (needed > LEFTOVER_BUF_SIZE) {
+                fprintf(stderr, "[COMMS BUS] frame claims %d bytes, exceeds buffer -- dropping connection\n", needed);
+                fflush(stderr);
+                return -1;
+            }
+
+            if (lo->len >= needed) {
+                if (frame_deserialize(lo->buf, lo->len, frame_out) < 0) {
+                    return -1;
+                }
+                // Shift any bytes belonging to the next frame down to the
+                // front so they aren't lost before the next call.
+                int remaining = lo->len - needed;
+                memmove(lo->buf, lo->buf + needed, remaining);
+                lo->len = remaining;
+                return frame_out->length;
+            }
+        }
+
+        int ret;
+        do {
+            ret = (int)read(fd, lo->buf + lo->len, LEFTOVER_BUF_SIZE - lo->len);
+        } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
+
+        if (ret < 0) {
+            fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
+            fflush(stderr);
+            return -1;
+        }
+        if (ret == 0) {
+            return -1; // peer closed the connection
+        }
+        lo->len += ret;
+    }
+}
+
 int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 {
     if (bus_fd < 0) return -1;
@@ -218,13 +289,33 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 
     int ret = -1;
     if (bus_is_master) {
-        for (int i=0; i < connection_count; i++) {
-            if (connections_fd[i] == -1) {
+        // comms_bus_initialize() returns as soon as the accept thread is
+        // spawned, before that thread has necessarily accepted anyone --
+        // give it a brief window to catch up rather than silently sending
+        // to nobody. Mirrors the slave's own connect() retry loop below.
+        int wait_attempts = 0;
+        while (connection_count == 0 && wait_attempts < 50) {
+            usleep(20000); // 20ms
+            wait_attempts++;
+        }
+
+        // Snapshot under the lock, then release before doing any blocking
+        // I/O -- holding the lock across write() would block the accept
+        // thread from registering new connections for as long as any one
+        // write takes.
+        pthread_mutex_lock(&connection_lock);
+        int snapshot_count = connection_count;
+        int snapshot_fds[MAX_CONNECTIONS];
+        memcpy(snapshot_fds, connections_fd, sizeof(snapshot_fds));
+        pthread_mutex_unlock(&connection_lock);
+
+        for (int i=0; i < snapshot_count; i++) {
+            if (snapshot_fds[i] == -1) {
                 break; // check if no more connections
             }
 
             do {
-                ret = (int)write(connections_fd[i], wire_buf, wire_len);
+                ret = (int)write(snapshot_fds[i], wire_buf, wire_len);
             } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
             if (ret < 0) {
                 fprintf(stderr, "[COMMS BUS] write() failed: %s\n", strerror(errno));
@@ -240,35 +331,43 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
             fflush(stderr);
         }
     }
-    return ret;
+
+    // Report success in terms of the caller's own payload length, not the
+    // wire length -- framing (the 4-byte header) is an internal detail of
+    // this layer and shouldn't leak into what "bytes sent" means to callers.
+    if (ret == wire_len) {
+        return length;
+    }
+    return -1;
 }
 
 int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length)
 {
-    int ret = -1;
+    (void)max_length; // frame.payload is already bounded to MAX_FRAME_PAYLOAD by frame_deserialize
     int found = 0;
     Frame frame;
-    uint8_t deserialize_buffer[MAX_FRAME_PAYLOAD + 4];
 
     if (bus_is_master) {
 
-        for (int i=0; i < connection_count; i++) {
-            if (connections_fd[i] == -1) {
+        // Same snapshot-then-release pattern as comms_bus_send -- don't
+        // hold connection_lock across a blocking read().
+        pthread_mutex_lock(&connection_lock);
+        int snapshot_count = connection_count;
+        int snapshot_fds[MAX_CONNECTIONS];
+        memcpy(snapshot_fds, connections_fd, sizeof(snapshot_fds));
+        pthread_mutex_unlock(&connection_lock);
+
+        for (int i=0; i < snapshot_count; i++) {
+            if (snapshot_fds[i] == -1) {
                 printf("[COMMS BUS] failed to receive as no connections exist.\n");
                 break;
             }
-            do {
-                ret = (int)read(connections_fd[i], deserialize_buffer, sizeof(deserialize_buffer));
-            } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
-            if (ret < 0) {
-                fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
-                fflush(stderr);
-                continue; // this connection's read failed -- don't try to deserialize garbage
-            }
 
-            // turn into frame
-            if (frame_deserialize(deserialize_buffer, ret, &frame) < 0) {
-                continue; // malformed frame -- try the next connection
+            // Indexed by connection slot, not fd -- connections_fd only
+            // ever appends, so slot i is always the same physical
+            // connection across calls, matching master_leftover[i].
+            if (receive_one_frame(snapshot_fds[i], &master_leftover[i], &frame) < 0) {
+                continue; // this connection's read failed -- try the next
             }
             if (frame.dest_addr != my_bus_address) {
                 continue; // not addressed to us -- discard, per the broadcast/filter design
@@ -278,17 +377,8 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
         }
     } else {
         if (bus_fd < 0) return -1;
-        // read() blocks until the data arrives and fills 'deserialize_buffer'
-        do {
-            ret = (int)read(bus_fd, deserialize_buffer, sizeof(deserialize_buffer));
-        } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
-        if (ret < 0) {
-            fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
-            fflush(stderr);
+        if (receive_one_frame(bus_fd, &slave_leftover, &frame) < 0) {
             return -1;
-        }
-        if (frame_deserialize(deserialize_buffer, ret, &frame) < 0) {
-            return -1; // malformed frame
         }
         if (frame.dest_addr != my_bus_address) {
             return 0; // not for us
