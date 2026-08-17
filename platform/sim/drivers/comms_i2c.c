@@ -245,15 +245,33 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 
 int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length)
 {
-    if (bus_fd < 0) return -1;
-    // read() blocks until the data arrives and fills 'buffer' up to 'max_length'
     int ret;
-    do {
-        ret = (int)read(bus_fd, buffer, max_length);
-    } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
-    if (ret < 0) {
-        fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
-        fflush(stderr);
+    if (bus_is_master) {
+        
+        for (int i=0; i < connection_count; i++) {
+            if (connections_fd[i] == -1) {
+                printf("[COMMS BUS] failed to receive as no connections exist.\n");
+                break;
+            }
+            do {
+                ret = (int)read(connections_fd[i], buffer, max_length);
+            } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
+            if (ret < 0) {
+                fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
+                fflush(stderr);
+            }
+        }
+    } else {
+        if (bus_fd < 0) return -1;
+            // read() blocks until the data arrives and fills 'buffer' up to 'max_length'
+            do {
+                ret = (int)read(bus_fd, buffer, max_length);
+            } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
+            if (ret < 0) {
+                fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
+                fflush(stderr);
+        }
     }
+    
     return ret;
 }
