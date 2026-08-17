@@ -216,7 +216,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
     uint8_t wire_buf[4 + MAX_FRAME_PAYLOAD];
     int wire_len = frame_serialize(&frame, wire_buf, sizeof(wire_buf));
 
-    int ret;
+    int ret = -1;
     if (bus_is_master) {
         for (int i=0; i < connection_count; i++) {
             if (connections_fd[i] == -1) {
@@ -245,33 +245,64 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 
 int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length)
 {
-    int ret;
+    int ret = -1;
+    int found = 0;
+    Frame frame;
+    uint8_t deserialize_buffer[MAX_FRAME_PAYLOAD + 4];
+
     if (bus_is_master) {
-        
+
         for (int i=0; i < connection_count; i++) {
             if (connections_fd[i] == -1) {
                 printf("[COMMS BUS] failed to receive as no connections exist.\n");
                 break;
             }
             do {
-                ret = (int)read(connections_fd[i], buffer, max_length);
+                ret = (int)read(connections_fd[i], deserialize_buffer, sizeof(deserialize_buffer));
             } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
             if (ret < 0) {
                 fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
                 fflush(stderr);
+                continue; // this connection's read failed -- don't try to deserialize garbage
             }
+
+            // turn into frame
+            if (frame_deserialize(deserialize_buffer, ret, &frame) < 0) {
+                continue; // malformed frame -- try the next connection
+            }
+            if (frame.dest_addr != my_bus_address) {
+                continue; // not addressed to us -- discard, per the broadcast/filter design
+            }
+            found = 1;
+            break;
         }
     } else {
         if (bus_fd < 0) return -1;
-            // read() blocks until the data arrives and fills 'buffer' up to 'max_length'
-            do {
-                ret = (int)read(bus_fd, buffer, max_length);
-            } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
-            if (ret < 0) {
-                fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
-                fflush(stderr);
+        // read() blocks until the data arrives and fills 'deserialize_buffer'
+        do {
+            ret = (int)read(bus_fd, deserialize_buffer, sizeof(deserialize_buffer));
+        } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
+        if (ret < 0) {
+            fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
+            fflush(stderr);
+            return -1;
         }
+        if (frame_deserialize(deserialize_buffer, ret, &frame) < 0) {
+            return -1; // malformed frame
+        }
+        if (frame.dest_addr != my_bus_address) {
+            return 0; // not for us
+        }
+        found = 1;
     }
-    
-    return ret;
+
+    if (!found) {
+        return -1;
+    }
+
+    if (src_addr_out != NULL) {
+        *src_addr_out = frame.src_addr;
+    }
+    memcpy(buffer, frame.payload, frame.length);
+    return frame.length;
 }
