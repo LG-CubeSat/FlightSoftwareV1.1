@@ -21,3 +21,7 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/sim/include
     )
 endif()
+
+# frame_serialize/frame_deserialize are medium-agnostic (shared/interfaces/frame.c)
+# -- both the sim and real backends encode/decode the same wire format.
+target_link_libraries(platform PUBLIC frame_codec)
