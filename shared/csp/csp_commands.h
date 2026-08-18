@@ -40,7 +40,7 @@ typedef struct {
     uint8_t ack_command_id;
     uint32_t ack_seq;
     command_ack_status_t status;
-} command_akc_t;
+} command_ack_t;
 
 /* OBC -> ADCS, port ADCS_CMD_PORT */
 typedef struct {
