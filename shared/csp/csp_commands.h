@@ -30,6 +30,11 @@ typedef enum {
     CMD_MOVE_TO_POSITION = 1
 } command_id_t;
 
+typedef enum {
+    ACK = 1,
+    NACK = 0
+} command_ack_t;
+
 /* OBC -> ADCS, port ADCS_CMD_PORT */
 typedef struct {
     command_envelope_t envelope;
