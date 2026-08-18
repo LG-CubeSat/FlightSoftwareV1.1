@@ -30,10 +30,17 @@ typedef enum {
     CMD_MOVE_TO_POSITION = 1
 } command_id_t;
 
+// what the status of ack is
 typedef enum {
-    ACK = 1,
-    NACK = 0
-} command_ack_t;
+    ACK = 0,
+    NACK = 1
+} command_ack_status_t;
+
+typedef struct {
+    uint8_t ack_command_id;
+    uint32_t ack_seq;
+    command_ack_status_t status;
+} command_akc_t;
 
 /* OBC -> ADCS, port ADCS_CMD_PORT */
 typedef struct {
