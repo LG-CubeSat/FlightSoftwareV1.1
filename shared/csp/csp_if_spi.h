@@ -11,11 +11,13 @@ typedef struct {
     int (*initialize)(void);
 
     int (*send)(
+        uint8_t dest_addr,
         const uint8_t *data,
         uint16_t length
     );
 
     int (*receive)(
+        uint8_t *src_addr_out,
         uint8_t *buffer,
         uint16_t max_length
     );

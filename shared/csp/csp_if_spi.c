@@ -12,19 +12,26 @@ recieve csp packets from vbus
 
 #include "../../libs/libcsp/include/csp/csp_types.h"
 
-static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packet, int from_me) 
+static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packet, int from_me)
 {
-    (void)via;
     (void)from_me;
+    (void)via; // CSP_NO_VIA_ADDRESS with no routing table configured -- not a real address, see packet->id.dst below
 
     csp_if_spi_conf_t * ifconf = iface->driver_data; // create a interface config
 
     // TODO: check if full
 
+    // Capture the packet's own destination before csp_id_prepend() packs
+    // the header into the wire bytes -- 'via' is CSP_NO_VIA_ADDRESS here
+    // (no routing table means CSP never computes a real next-hop), so the
+    // packet's own CPU-readable destination field is the real address.
+    uint8_t dest_addr = (uint8_t)packet->id.dst;
+
     csp_id_prepend(packet); // give an id to the packet
 
     // send packet through the transport
     int ret = ifconf->transport->send(
+        dest_addr,
         packet->frame_begin,
         packet->frame_length
     );
@@ -54,9 +61,13 @@ static int csp_if_spi_rx_work(
     }
 
     int header_size = csp_id_setup_rx(packet);
-    
-    // compute the bytes needed 
+
+    // compute the bytes needed -- src_addr is who the bus says sent this
+    // frame; not used for CSP routing (CSP's own header carries that), only
+    // needed to satisfy the addressed comms_bus contract
+    uint8_t src_addr;
     int len = ifconf->transport->receive(
+        &src_addr,
         packet->frame_begin,
         sizeof(packet->data) + header_size
     );

@@ -1,10 +1,10 @@
 /*
  * Integration test for the full position-command flow:
- *   OBC -> CSP -> v_bus -> ADCS command_handler -> Command task
+ *   OBC -> CSP -> comms_bus -> ADCS command_handler -> Command task
  *        -> (Control, Estimation, Sensor, Telemetry tasks; NOT Housekeeping)
- *        -> Telemetry -> CSP -> v_bus -> OBC
+ *        -> Telemetry -> CSP -> comms_bus -> OBC
  *
- * Unlike test_v_bus.c, this doesn't link the code under test directly --
+ * Unlike test_comms_bus.c, this doesn't link the code under test directly --
  * the logic under test is spread across the full FreeRTOS scheduler inside
  * adcs_sim, not a couple of synchronous functions. Instead this spawns the
  * real compiled obc_sim/adcs_sim binaries as child processes, captures
@@ -149,9 +149,9 @@ static pid_t spawn_logged(const char * path, const char * log_path, int set_peri
 int main(void) {
     alarm(TEST_TIMEOUT_SEC);
 
-    /* Same hardcoded /tmp/v_bus.sock as production code -- don't run this
-     * test at the same time as a real obc_sim/adcs_sim. */
-    unlink("/tmp/v_bus.sock");
+    /* Same hardcoded /tmp/comms_i2c.sock as production code -- don't run
+     * this test at the same time as a real obc_sim/adcs_sim. */
+    unlink("/tmp/comms_i2c.sock");
     unlink(OBC_LOG);
     unlink(ADCS_LOG);
 
@@ -161,7 +161,7 @@ int main(void) {
         return 1;
     }
 
-    usleep(500000); /* give the OBC (v_bus master) a head start on bind()/listen() */
+    usleep(500000); /* give the OBC (comms bus master) a head start on bind()/listen() */
 
     pid_t adcs_pid = spawn_logged(ADCS_SIM_PATH, ADCS_LOG, 0);
     if (adcs_pid < 0) {
