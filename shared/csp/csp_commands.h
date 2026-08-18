@@ -34,4 +34,10 @@ typedef struct {
     int32_t current_position;
 } position_telemetry_t;
 
+typedef struct {
+    uint8_t command_id;
+    uint32_t seq;
+} command_envelope_t;
+
+
 #endif
