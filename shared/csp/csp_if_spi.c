@@ -1,7 +1,7 @@
 /*
-Connect libcsp to vbus
-transmit csp packets through vbus
-recieve csp packets from vbus
+Bridges libcsp to the underlying comms_bus transport (see comms_bus.h) --
+sends/receives csp packets through whichever CSP_Transport_t was configured
+(SIM or real), without this layer ever knowing or caring which one it is.
 */
 #include "csp_if_spi.h"
 
@@ -145,7 +145,7 @@ void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf)
     // note: we let the csp_network initialize the transport
 
     // register the interface
-    iface->name = "SPI";
+    iface->name = "COMMS";
     iface->nexthop = csp_if_spi_tx;
     csp_iflist_add(iface);    
 }
