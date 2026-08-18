@@ -27,6 +27,7 @@ typedef enum {
 /* OBC -> ADCS, port ADCS_CMD_PORT */
 typedef struct {
     int32_t target_position;
+    command_envelope_t envelope;
 } position_command_t;
 
 /* ADCS -> OBC, port ADCS_TELEM_PORT */
