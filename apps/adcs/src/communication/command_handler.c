@@ -45,11 +45,21 @@ static void * command_handler_rx_loop(void * param)
                 printf("[COMMAND HANDLER] Position command received: target=%d\n", cmd.target_position);
                 fflush(stdout);
 
-                CommandMessage_t msg = {
-                    .command = CMD_MOVE_TO_POSITION,
-                    .parameter = (uint32_t)cmd.target_position
-                };
-                command_task_send(&msg);
+                command_ack_t reply;
+                reply.ack_command_id = cmd.envelope.command_id;
+                reply.ack_seq = cmd.envelope.seq;
+
+                if (reply.ack_command_id == CMD_MOVE_TO_POSITION) {
+                    reply.status = ACK;
+
+                    CommandMessage_t msg = {
+                        .command = CMD_MOVE_TO_POSITION,
+                        .parameter = (uint32_t)cmd.target_position
+                    };
+                    command_task_send(&msg);
+                } else {
+                    reply.status = NACK; // don't send a command because we don't recognize the command.
+                }
             }
 
             csp_buffer_free(packet);
