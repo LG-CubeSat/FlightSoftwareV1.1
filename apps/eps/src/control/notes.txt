@@ -1,0 +1,2 @@
+Contains utilities for doing stuff. Eg: math.
+See: /apps/adcs/src/control (or include)
