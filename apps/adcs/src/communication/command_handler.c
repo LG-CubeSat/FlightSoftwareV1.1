@@ -46,6 +46,7 @@ static void * command_handler_rx_loop(void * param)
                 fflush(stdout);
 
                 command_ack_t reply;
+
                 reply.ack_command_id = cmd.envelope.command_id;
                 reply.ack_seq = cmd.envelope.seq;
 
@@ -59,6 +60,16 @@ static void * command_handler_rx_loop(void * param)
                     command_task_send(&msg);
                 } else {
                     reply.status = NACK; // don't send a command because we don't recognize the command.
+                }
+                csp_packet_t * ack_packet = csp_buffer_get(0);
+
+                if (ack_packet == NULL) {
+                    printf("[COMMAND HANDLER] Faiuled to get packet buffer when sending ACK Replay of %d.\n", reply.status);
+                } else {
+                    memcpy(ack_packet->data, &reply, sizeof(reply));
+                    ack_packet->length = sizeof(reply);
+
+                    csp_send(conn, ack_packet);
                 }
             }
 
