@@ -29,7 +29,7 @@ static StaticQueue_t xCommandQueueBuffer;
 static uint8_t xCommandQueueStorage[
     COMMAND_QUEUE_LENGTH * sizeof(CommandMessage_t)
 ];
-
+// hi
 static TaskHandle_t xCommandHandle = NULL;
 static QueueHandle_t xCommandQueue = NULL;
 
