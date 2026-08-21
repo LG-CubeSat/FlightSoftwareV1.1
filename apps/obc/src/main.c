@@ -119,9 +119,10 @@ int main(void)
                         // NACK is 1, because it represents wire being pulled high
                         if (command_ack.status == NACK) {
                             printf("[OBC] Received NACK - Sequence: %d, Command ID: %d\n", seq, command_ack.ack_command_id);
+                        } else {
+                            printf("[OBC] Received ACK - Sequence: %d, Command ID: %d\n", seq, command_ack.ack_command_id);
                         }
 
-                        printf("[OBC] Received ACK - Sequence: %d, Command ID: %d\n", seq, command_ack.ack_command_id);
                         fflush(stdout);
                     }
                     csp_buffer_free(packet); // don't forget this whenever you use packet
