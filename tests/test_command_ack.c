@@ -179,13 +179,13 @@ int main(void) {
 
     /* OBC side: every command sent should get an ACK back, repeatedly. */
     int sent = check_min_count("OBC sends position command", obc_log, "[OBC] Sending position command:", MIN_CYCLES);
-    int acked = check_min_count("OBC receives ACK for its commands", obc_log, "[OBC] Received ACK for", MIN_CYCLES - 1);
+    int acked = check_min_count("OBC receives ACK for its commands", obc_log, "[OBC] Received ACK - Sequence:", MIN_CYCLES - 1);
 
     /* OBC only ever sends CMD_MOVE_TO_POSITION, which ADCS always
      * recognizes -- a NACK here would mean the envelope isn't being
      * populated/decoded correctly (e.g. the zero-init regression this
      * feature hit during development). */
-    check_not_contains("No NACKs during normal traffic", obc_log, "[OBC] Received NACK for");
+    check_not_contains("No NACKs during normal traffic", obc_log, "[OBC] Received NACK - Sequence:");
 
     /* ADCS must be able to get a buffer for every reply it sends. */
     check_not_contains("ADCS never fails to get an ACK reply buffer", adcs_log, "Faiuled to get packet buffer");
