@@ -17,11 +17,12 @@ ADCS telemetry = 20).
 #define CAMERA           5
 #define COMMS            6
 
+// MAKE SURE TO USE PORTS OUTLINED IN README. DONT MAKE THEM UP!
 #define ADCS_CMD_PORT    10
 #define ADCS_TELEM_PORT  20
 
-#define EPS_CMD_PORT 30
-#define EPS_TELEM_PORT 40
+#define EPS_CMD_PORT 11
+#define EPS_TELEM_PORT 21
 
 typedef enum {
     CMD_MOVE_TO_POSITION = 1
