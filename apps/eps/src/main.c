@@ -4,14 +4,10 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#include "tasks/command_task.h"
-#include "tasks/control_task.h"
-#include "tasks/estimation_task.h"
 #include "tasks/housekeeping_task.h"
 #include "tasks/sensor_task.h"
 #include "tasks/telemetry_task.h"
-
-#include "communication/command_handler.h"
+#include "tasks/estimation_task.h"
 
 #include "csp_network.h"
 #include "csp_commands.h"
@@ -26,13 +22,7 @@ int main(void)
 
     csp_network_init(EPS_ADDRESS, /* is_master = */ 0);
 
-    command_handler_init();
-
     // Initialize tasks
-    command_task_init();
-
-    control_task_init();
-
     estimation_task_init();
 
     housekeeping_task_init();

@@ -12,13 +12,16 @@ ADCS telemetry = 20).
 
 #define OBC_ADDRESS      1
 #define ADCS_ADDRESS     2
-#define EPS              3
+#define EPS_ADDRESS      3
 #define THERMALS         4
 #define CAMERA           5
 #define COMMS            6
 
 #define ADCS_CMD_PORT    10
 #define ADCS_TELEM_PORT  20
+
+#define EPS_CMD_PORT 30
+#define EPS_TELEM_PORT 40
 
 typedef enum {
     CMD_MOVE_TO_POSITION = 1

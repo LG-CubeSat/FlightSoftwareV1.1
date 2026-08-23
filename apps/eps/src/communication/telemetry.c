@@ -1,6 +1,3 @@
 /*
-Packages the quaternions, rates, magnetic fields, temps, current mode
-This data gets packaged into the correct format
-
-TODO: ADAPT TO eps
+ * Telemetries all the info about battery and volatges to wherever it needs to go
 */

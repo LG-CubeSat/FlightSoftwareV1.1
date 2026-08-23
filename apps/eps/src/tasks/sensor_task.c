@@ -2,7 +2,7 @@
 Sensor Task
 fastest task of all (100-200hz)
 Loops
-Read imu, read magnetometers, read sun sensors, read camera status, publish sensor packet
+Read battery state, and current flow (if possible), and then give estimation task that info or sum.
 */
 
 #include "../../include/tasks/sensor_task.h"
@@ -48,15 +48,6 @@ void sensor_task(void *pvParameters)
     for (;;)
     {
         // do stuff
-
-        uint32_t notified_value;
-        if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
-        {
-            int32_t target_position = (int32_t)notified_value;
-            printf("[SENSOR] Sampling sensors for move to position: %d\n", target_position);
-            fflush(stdout);
-        }
-
         xTaskDelayUntil(
             &lastWakeTime,
             pdMS_TO_TICKS(SENSOR_TASK_PERIOD_MS)

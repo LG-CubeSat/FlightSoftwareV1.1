@@ -26,32 +26,6 @@ static StaticTask_t xTelemetryTaskBuffer;
 
 TaskHandle_t xTelemetryHandle = NULL;
 
-// reports the current position back to the OBC over CSP
-static void telemetry_send_position(int32_t current_position)
-{
-    csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, OBC_ADDRESS, ADCS_TELEM_PORT, 1000, CSP_O_NONE);
-    if (conn == NULL) {
-        printf("[TELEMETRY] Failed to connect to OBC\n");
-        fflush(stdout);
-        return;
-    }
-
-    csp_packet_t * packet = csp_buffer_get(0);
-    if (packet == NULL) {
-        printf("[TELEMETRY] Failed to get CSP buffer\n");
-        fflush(stdout);
-        csp_close(conn);
-        return;
-    }
-
-    position_telemetry_t telem = { .current_position = current_position };
-    memcpy(packet->data, &telem, sizeof(telem));
-    packet->length = sizeof(telem);
-
-    csp_send(conn, packet);
-    csp_close(conn);
-}
-
 void telemetry_task_init(void)
 {
     xTelemetryHandle = xTaskCreateStatic(
@@ -77,17 +51,7 @@ void telemetry_task(void *pvParameters)
 
     for (;;)
     {
-        // do some stuff
-
-        uint32_t notified_value;
-        if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
-        {
-            int32_t target_position = (int32_t)notified_value;
-            printf("[TELEMETRY] Reporting new position to OBC: %d\n", target_position);
-            fflush(stdout);
-            telemetry_send_position(target_position);
-        }
-
+        // Report stuff via CSP
         xTaskDelayUntil(
             &lastWakeTime,
             pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS)

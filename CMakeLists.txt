@@ -26,6 +26,7 @@ add_subdirectory(shared)
 add_subdirectory(sys)
 add_subdirectory(apps/adcs)
 add_subdirectory(apps/obc)
+add_subdirectory(apps/eps)
 
 # toggle for the platform code
 add_subdirectory(platform)

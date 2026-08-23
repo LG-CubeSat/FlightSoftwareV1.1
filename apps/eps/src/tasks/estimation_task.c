@@ -1,9 +1,7 @@
 /*
 Estimation Task
-Runs 50-100 HZ
-waits for sensor packet
-runs the kalman filter
-publishes the current attitude
+Tases information from sensor and stuff, then does math on it to calculate all needed statistics.
+I'm pretty sure the fault manager will handle what to do when there is a mistake.
 */
 
 #include "../../include/tasks/estimation_task.h"
