@@ -1,0 +1,167 @@
+Start testing: Aug 22 17:44 PDT
+----------------------------------------------------------
+1/5 Testing: comms_bus_test
+1/5 Test: comms_bus_test
+Command: "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests/comms_bus_test"
+Directory: /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests
+"comms_bus_test" start time: Aug 22 17:44 PDT
+Output:
+----------------------------------------------------------
+[COMMS BUS] Slave connecting..
+[COMMS BUS] Master waiting for Slave...
+[COMMS BUS] Slave connected to Master.
+[COMMS BUS] Master accepted connection from Slave. Connection Count: 1
+[ADCS] PASS: received 13 bytes, sent matching 14-byte reply
+[OBC]  PASS: sent 13 bytes, received matching 14-byte reply
+comms_bus_test: PASS
+<end of output>
+Test time =   0.13 sec
+----------------------------------------------------------
+Test Passed.
+"comms_bus_test" end time: Aug 22 17:44 PDT
+"comms_bus_test" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/5 Testing: comms_bus_addressing_test
+2/5 Test: comms_bus_addressing_test
+Command: "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests/comms_bus_addressing_test"
+Directory: /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests
+"comms_bus_addressing_test" start time: Aug 22 17:44 PDT
+Output:
+----------------------------------------------------------
+[COMMS BUS] Slave connecting..
+[COMMS BUS] Slave connecting..
+[COMMS BUS] Master waiting for Slave...
+[COMMS BUS] Slave connected to Master.
+[COMMS BUS] Slave connected to Master.
+[COMMS BUS] Master accepted connection from Slave. Connection Count: 1
+[COMMS BUS] Master accepted connection from Slave. Connection Count: 2
+[OBC]  PASS: sent both addressed messages
+[ADCS] PASS: received its own message, not EPS's
+[EPS]  PASS: received its own message, not ADCS's
+comms_bus_addressing_test: PASS
+<end of output>
+Test time =   1.06 sec
+----------------------------------------------------------
+Test Passed.
+"comms_bus_addressing_test" end time: Aug 22 17:44 PDT
+"comms_bus_addressing_test" time elapsed: 00:00:01
+----------------------------------------------------------
+
+3/5 Testing: position_command_test
+3/5 Test: position_command_test
+Command: "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests/position_command_test"
+Directory: /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests
+"position_command_test" start time: Aug 22 17:44 PDT
+Output:
+----------------------------------------------------------
+[CHECK] PASS: OBC sends position command (7 occurrences, need >= 4)
+[CHECK] PASS: OBC receives telemetry reply (7 occurrences, need >= 3)
+[CHECK] PASS: ADCS command_handler decodes command (7 occurrences, need >= 4)
+[CHECK] PASS: Command task dispatches to other tasks (7 occurrences, need >= 4)
+[CHECK] PASS: Control task activated (7 occurrences, need >= 4)
+[CHECK] PASS: Estimation task activated (7 occurrences, need >= 4)
+[CHECK] PASS: Sensor task activated (7 occurrences, need >= 4)
+[CHECK] PASS: Telemetry task activated and reports back (7 occurrences, need >= 3)
+[CHECK] PASS: ADCS keeps up with OBC (sent=7, received=7)
+[CHECK] PASS: Housekeeping stays silent
+position_command_test: PASS (10/10 checks)
+<end of output>
+Test time =  13.52 sec
+----------------------------------------------------------
+Test Passed.
+"position_command_test" end time: Aug 22 17:44 PDT
+"position_command_test" time elapsed: 00:00:13
+----------------------------------------------------------
+
+4/5 Testing: command_ack_test
+4/5 Test: command_ack_test
+Command: "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests/command_ack_test"
+Directory: /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests
+"command_ack_test" start time: Aug 22 17:44 PDT
+Output:
+----------------------------------------------------------
+[CHECK] PASS: OBC sends position command (7 occurrences, need >= 4)
+[CHECK] PASS: OBC receives ACK for its commands (7 occurrences, need >= 3)
+[CHECK] PASS: No NACKs during normal traffic
+[CHECK] PASS: ADCS never fails to get an ACK reply buffer
+[CHECK] PASS: ACKs keep up with commands sent (sent=7, acked=7)
+command_ack_test: PASS (5/5 checks)
+<end of output>
+Test time =  13.52 sec
+----------------------------------------------------------
+Test Passed.
+"command_ack_test" end time: Aug 22 17:44 PDT
+"command_ack_test" time elapsed: 00:00:13
+----------------------------------------------------------
+
+5/5 Testing: sim_leak_check_macos
+5/5 Test: sim_leak_check_macos
+Command: "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/tests/sim_leak_check_macos.sh" "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/apps/obc/obc_sim" "/Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/apps/adcs/adcs_sim"
+Directory: /Users/wesleywong/Documents/GitHub/FlightSoftwareV1/build-leakcheck/tests
+"sim_leak_check_macos" start time: Aug 22 17:44 PDT
+Output:
+----------------------------------------------------------
+=== obc_sim leaks ===
+Process 94155 is not debuggable. Due to security restrictions, leaks can only show or save contents of readonly memory of restricted processes.
+
+Process:         obc_sim [94155]
+Path:            /Users/USER/Documents/*/obc_sim
+Load Address:    0x102640000
+Identifier:      obc_sim
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  bash [94153]
+Target Type:     live task
+
+Date/Time:       2026-08-22 17:45:04.496 -0700
+Launch Time:     2026-08-22 17:44:55.972 -0700
+OS Version:      macOS 26.5.2 (25F84)
+Report Version:  7
+Analysis Tool:   /usr/bin/leaks
+
+Physical footprint:         12.1M
+Physical footprint (peak):  12.1M
+Idle exit:                  untracked
+----
+
+leaks Report Version: 4.0, multi-line stacks
+Process 94155: 213 nodes malloced for 21 KB
+Process 94155: 0 leaks for 0 total leaked bytes.
+=== adcs_sim leaks ===
+Process 94157 is not debuggable. Due to security restrictions, leaks can only show or save contents of readonly memory of restricted processes.
+
+Process:         adcs_sim [94157]
+Path:            /Users/USER/Documents/*/adcs_sim
+Load Address:    0x102c8c000
+Identifier:      adcs_sim
+Version:         0
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  bash [94153]
+Target Type:     live task
+
+Date/Time:       2026-08-22 17:45:05.024 -0700
+Launch Time:     2026-08-22 17:44:56.478 -0700
+OS Version:      macOS 26.5.2 (25F84)
+Report Version:  7
+Analysis Tool:   /usr/bin/leaks
+
+Physical footprint:         12.5M
+Physical footprint (peak):  12.5M
+Idle exit:                  untracked
+----
+
+leaks Report Version: 4.0, multi-line stacks
+Process 94157: 230 nodes malloced for 23 KB
+Process 94157: 0 leaks for 0 total leaked bytes.
+<end of output>
+Test time =   9.50 sec
+----------------------------------------------------------
+Test Passed.
+"sim_leak_check_macos" end time: Aug 22 17:45 PDT
+"sim_leak_check_macos" time elapsed: 00:00:09
+----------------------------------------------------------
+
+End testing: Aug 22 17:45 PDT
