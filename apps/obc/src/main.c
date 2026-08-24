@@ -82,6 +82,7 @@ int main(void)
 
     int period_sec = get_period_sec();
     int32_t target_position = 0;
+    uint32_t seq = 0;
 
     while (1) {
         target_position += POSITION_STEP;
@@ -100,13 +101,35 @@ int main(void)
                 fflush(stdout);
                 csp_close(conn);
             } else {
-                position_command_t cmd = { .target_position = target_position };
+                position_command_t cmd = {
+                    .envelope = { .command_id = CMD_MOVE_TO_POSITION, .seq=seq }, 
+                    .target_position = target_position 
+                };
                 memcpy(packet->data, &cmd, sizeof(cmd));
                 packet->length = sizeof(cmd);
 
                 csp_send(conn, packet);
-                csp_close(conn);
 
+                while ((packet = csp_read(conn, 50)) != NULL) {
+                    if (packet->length >= sizeof(command_ack_t)) {
+                        
+                        command_ack_t command_ack;
+                        memcpy(&command_ack, packet->data, sizeof(command_ack));
+                        
+                        // NACK is 1, because it represents wire being pulled high
+                        if (command_ack.status == NACK) {
+                            printf("[OBC] Received NACK - Sequence: %d, Command ID: %d\n", seq, command_ack.ack_command_id);
+                        } else {
+                            printf("[OBC] Received ACK - Sequence: %d, Command ID: %d\n", seq, command_ack.ack_command_id);
+                        }
+
+                        fflush(stdout);
+                    }
+                    csp_buffer_free(packet); // don't forget this whenever you use packet
+                }
+                csp_close(conn);
+                seq++;
+                
                 printf("[OBC] Sending position command: target=%d\n", target_position);
                 fflush(stdout);
             }

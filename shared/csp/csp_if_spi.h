@@ -6,7 +6,8 @@
 #include <pthread.h>
 #include <netinet/in.h>
 
-// built for both driver and vbus
+// Transport-agnostic: any comms_bus backend (SIM or real) plugs in here
+// via these three function pointers, so this layer never assumes a medium.
 typedef struct {
     int (*initialize)(void);
 

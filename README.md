@@ -149,3 +149,6 @@ run them at the same time as each other or as a manually-launched `obc_sim`/`adc
 - `docs/api_contracts.md` — public API for every subsystem, built and planned
 - `docs/directory_conventions.md` — where new code goes and why
 - `docs/testing.md` — how each test works and how to read its output when it fails
+
+
+Sincerely, CubeSat

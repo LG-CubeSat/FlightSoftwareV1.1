@@ -24,12 +24,30 @@ ADCS telemetry = 20).
 #define EPS_CMD_PORT 11
 #define EPS_TELEM_PORT 21
 
+typedef struct {
+    uint8_t command_id;
+    uint32_t seq;
+} command_envelope_t;
+
 typedef enum {
     CMD_MOVE_TO_POSITION = 1
 } command_id_t;
 
+// what the status of ack is
+typedef enum {
+    ACK = 0,
+    NACK = 1
+} command_ack_status_t;
+
+typedef struct {
+    uint8_t ack_command_id;
+    uint32_t ack_seq;
+    command_ack_status_t status;
+} command_ack_t;
+
 /* OBC -> ADCS, port ADCS_CMD_PORT */
 typedef struct {
+    command_envelope_t envelope;
     int32_t target_position;
 } position_command_t;
 
