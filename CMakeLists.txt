@@ -22,6 +22,13 @@ set(CSP_PORT_MAX_BIND 31 CACHE STRING "Maximum number of bindable ports")
 
 add_subdirectory(libs/libcsp)
 
+# Import CGLm
+option(CGLM_SHARED "Shared build" OFF)
+option(CGLM_STATIC "Static build" ON)
+option(CGLM_USE_C99 "" OFF) # C11 
+option(CGLM_USE_TEST "Enable Tests" OFF) # for make check - make test
+add_subdirectory(libs/cglm)
+
 add_subdirectory(shared)
 add_subdirectory(sys)
 add_subdirectory(apps/adcs)
