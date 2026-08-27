@@ -1,0 +1,4 @@
+#ifndef OBC_TIME_TIME_SYNC_H
+#define OBC_TIME_TIME_SYNC_H
+
+#endif // OBC_TIME_TIME_SYNC_H

@@ -1,0 +1,4 @@
+#ifndef OBC_DATA_STORAGE_H
+#define OBC_DATA_STORAGE_H
+
+#endif // OBC_DATA_STORAGE_H

@@ -1,0 +1,4 @@
+#ifndef OBC_FDIR_WATCHDOG_H
+#define OBC_FDIR_WATCHDOG_H
+
+#endif // OBC_FDIR_WATCHDOG_H

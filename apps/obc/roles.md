@@ -5,3 +5,5 @@ Currently I'm thinking we'll have the OBC do the following roles:
 4. FDIR: Fault Detection, Isolation, and Discovery - This processes health, memory, load, manages fall back scripts, and runs the watchdog
 5. Mission: The OBC must be in charge of the mission, meaning it runs the experiments, timeline, and autonomy of the research. This is done by commanding the payload system.
 6. Time: Must keep syncronization and time.
+7. IPC: Its job is to manage the communication between processes. IPC = Internal Process Communication
+8. Supervisor: this guys job is to manage everyone else.

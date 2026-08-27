@@ -1,5 +1,8 @@
-add_executable(obc_sim
- src/main.c
-)
-
-target_link_libraries(obc_sim PRIVATE csp_interface)
+add_subdirectory(ipc)
+add_subdirectory(supervisor)
+add_subdirectory(commands)
+add_subdirectory(compute)
+add_subdirectory(data)
+add_subdirectory(fdir)
+add_subdirectory(mission)
+add_subdirectory(time)

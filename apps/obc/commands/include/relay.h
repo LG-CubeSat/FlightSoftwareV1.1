@@ -1,0 +1,4 @@
+#ifndef OBC_COMMANDS_RELAY_H
+#define OBC_COMMANDS_RELAY_H
+
+#endif // OBC_COMMANDS_RELAY_H
