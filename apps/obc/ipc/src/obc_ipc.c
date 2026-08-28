@@ -31,3 +31,10 @@ static const char *path_for_role(OBC_Roles_t role)
         defualt: return NULL;
     }
 }
+
+typedef struct {
+    uint8_t dest;
+    uint8_t src;
+    uint16_t length;
+    uint8_t payload[MAX_IPC_PAYLOAD];
+} IPCFrame;
