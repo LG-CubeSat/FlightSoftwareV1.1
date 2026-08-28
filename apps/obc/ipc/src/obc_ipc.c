@@ -38,3 +38,17 @@ typedef struct {
     uint16_t length;
     uint8_t payload[MAX_IPC_PAYLOAD];
 } IPCFrame;
+
+/* Wire format: [dest:1][src:1][length:2 network order][payload: length]*/
+static int ipc_frame_serialize(const IPCFrame *f, uint8_t *out, size_t out_size)
+{
+    int total = 4 + f->length;
+    if ((size_t)total > out_size) return -1;
+
+    out[0] = f->dest;
+    out[1] = f->src;
+    uint16_t net_len = htons(f->length);
+    memcpy(&out, &net_len, 2);
+    memcpy(&out[4], f->payload, f->length);
+    return total;
+}
