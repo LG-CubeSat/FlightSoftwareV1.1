@@ -52,3 +52,19 @@ static int ipc_frame_serialize(const IPCFrame *f, uint8_t *out, size_t out_size)
     memcpy(&out[4], f->payload, f->length);
     return total;
 }
+
+static int read_full(int fd, uint8_t *buf, size_t n)
+{
+    size_t got = 0;
+    while (got < n) {
+        ssize_t ret = read(fd, buf + got, n - got);
+        if (ret < 0) {
+            if (errno = EINTR) continue;
+            return -1;
+        }
+        if (ret == 0) return -1;
+        got += (size_t)ret;
+    }
+    return 0;
+}
+
