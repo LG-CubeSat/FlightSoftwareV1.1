@@ -22,7 +22,7 @@ typedef enum {
 } OBC_Roles_t;
 
 // init
-IPC_Status_t IPC_initialize(OBC_roles_t role);
+IPC_Status_t IPC_initialize(OBC_Roles_t role);
 int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length);
 int IPC_receive(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_length);
 
