@@ -137,3 +137,28 @@ int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length)
     close(fd);
 }
 
+int IPC_receive(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_length)
+{
+    if (bus_fd < 0) return -1;
+
+    int conn = accept(bus_fd, NULL, NULL); /* blocks */
+    if (conn < 0) return -1;
+
+    uint8_t header[4];
+    if (read_full(conn, header, 4) < 0) { close(conn); return -1; }
+
+    uint16_t net_len;
+    memcpy(&net_len, &header[2], 2);
+    uint16_t payload_len = ntohs(net_len);
+
+    if (payload_len > max_length) { close(conn); return -1; }
+
+    if (read_full(conn, buffer, payload_len) < 0) { close(conn); return -1; }
+
+    if (src_role != NULL) {
+        *src_role = (OBC_Roles_t)header[1];
+    }
+
+    close(conn);
+    return payload_len;
+}
