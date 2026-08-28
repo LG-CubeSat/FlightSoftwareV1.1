@@ -7,8 +7,3 @@ target_include_directories(obc_ipc
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(obc_ipc
-    PUBLIC
-        csp
-        pthread
-)

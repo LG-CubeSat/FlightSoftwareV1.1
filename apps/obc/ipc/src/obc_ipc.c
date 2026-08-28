@@ -8,9 +8,6 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#include <pthread.h>
-#include "frame.h"
-
 #define IPC_BACKLOG 5
 #define MAX_IPC_PAYLOAD 256
 
@@ -28,7 +25,7 @@ static const char *path_for_role(OBC_Roles_t role)
         case ROLE_MISSION: return "/tmp/obc_ipc_mission.sock";
         case ROLE_SUPERVISOR: return "/tmp/obc_ipc_supervisor.sock";
         case ROLE_TIME: return "/tmp/obc_ipc_time.sock";
-        defualt: return NULL;
+        default: return NULL;
     }
 }
 
@@ -48,7 +45,7 @@ static int ipc_frame_serialize(const IPCFrame *f, uint8_t *out, size_t out_size)
     out[0] = f->dest;
     out[1] = f->src;
     uint16_t net_len = htons(f->length);
-    memcpy(&out, &net_len, 2);
+    memcpy(&out[2], &net_len, 2);
     memcpy(&out[4], f->payload, f->length);
     return total;
 }
@@ -59,7 +56,7 @@ static int read_full(int fd, uint8_t *buf, size_t n)
     while (got < n) {
         ssize_t ret = read(fd, buf + got, n - got);
         if (ret < 0) {
-            if (errno = EINTR) continue;
+            if (errno == EINTR) continue;
             return -1;
         }
         if (ret == 0) return -1;
@@ -135,6 +132,8 @@ int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length)
     }
 
     close(fd);
+
+    return length;
 }
 
 int IPC_receive(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_length)
