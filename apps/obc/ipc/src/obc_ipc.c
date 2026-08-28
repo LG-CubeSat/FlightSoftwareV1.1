@@ -97,3 +97,43 @@ IPC_Status_t IPC_initialize(OBC_Roles_t role)
     return IPC_OK;
 }
 
+int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length)
+{
+    if (length > MAX_IPC_PAYLOAD) return -1;
+
+    const char *path = path_for_role(role_dest);
+    if (path==NULL) return -1;
+
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+    if (connect(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(fd);
+        return -1; /* target role not up (yet), or dead -- fail fast, don't retry-forever */
+    }
+
+    IPCFrame frame = { .dest = (uint8_t)role_dest, .src = (uint8_t)my_role, .length = length };
+    memcpy(frame.payload, data, length);
+
+    uint8_t wire[4 + MAX_IPC_PAYLOAD];
+    int wire_len = ipc_frame_serialize(&frame, wire, sizeof(wire));
+
+    size_t sent = 0;
+    while (sent < (size_t)wire_len) {
+        ssize_t ret = write(fd, wire + sent, wire_len - sent);
+        if (ret < 0) {
+            if (errno == EINTR) continue;
+            close(fd);
+            return -1;
+        }
+        sent += (size_t)ret;
+    }
+
+    close(fd);
+}
+
