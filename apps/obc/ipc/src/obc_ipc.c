@@ -94,3 +94,6 @@ IPC_Status_t IPC_initialize(OBC_Roles_t role)
         bus_fd = -1;
         return IPC_ERROR;
     }
+    return IPC_OK;
+}
+
