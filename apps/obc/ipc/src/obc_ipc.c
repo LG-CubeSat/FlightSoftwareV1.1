@@ -68,3 +68,29 @@ static int read_full(int fd, uint8_t *buf, size_t n)
     return 0;
 }
 
+IPC_Status_t IPC_initialize(OBC_Roles_t role)
+{
+    my_role = role;
+    const char *path = path_for_role(role);
+    if (path == NULL) return IPC_ERROR;
+
+    bus_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (bus_fd < 0) return IPC_ERROR;
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+    unlink(path);
+
+    if (bind(bus_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(bus_fd);
+        bus_fd = -1;
+        return IPC_ERROR;
+    }
+    if (listen(bus_fd, IPC_BACKLOG) < 0) {
+        close(bus_fd);
+        bus_fd = -1;
+        return IPC_ERROR;
+    }
