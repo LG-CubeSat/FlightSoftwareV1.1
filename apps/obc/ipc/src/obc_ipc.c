@@ -11,10 +11,10 @@
 #define IPC_BACKLOG 5
 #define MAX_IPC_PAYLOAD 256
 
-static OBC_Roles_t my_role;
-static int bus_fd = -1;
+static OBC_Roles_t my_role; // role/job.
+static int bus_fd = -1; // this is the phone itself
 
-// grabs socket path for role
+// grabs socket path for role: think of as a phone book
 static const char *path_for_role(OBC_Roles_t role)
 {
     switch (role) {
@@ -39,7 +39,7 @@ typedef struct {
 /* Wire format: [dest:1][src:1][length:2 network order][payload: length]*/
 static int ipc_frame_serialize(const IPCFrame *f, uint8_t *out, size_t out_size)
 {
-    int total = 4 + f->length;
+    int total = 4 + f->length; // add header to length
     if ((size_t)total > out_size) return -1;
 
     out[0] = f->dest;
@@ -71,21 +71,23 @@ IPC_Status_t IPC_initialize(OBC_Roles_t role)
     const char *path = path_for_role(role);
     if (path == NULL) return IPC_ERROR;
 
-    bus_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    bus_fd = socket(AF_UNIX, SOCK_STREAM, 0); // create a phone
     if (bus_fd < 0) return IPC_ERROR;
 
-    struct sockaddr_un addr;
+    struct sockaddr_un addr; // like a buisness card for the phone
     memset(&addr, 0, sizeof(addr));
     addr.sun_family = AF_UNIX;
     strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
 
-    unlink(path);
+    unlink(path); // remove anyone who is currently using our phone number (in case process died)
 
+    // take my current phone (bus_fd) and register it under the addr
     if (bind(bus_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         close(bus_fd);
         bus_fd = -1;
         return IPC_ERROR;
     }
+    // turn on the phone to start listening for calls
     if (listen(bus_fd, IPC_BACKLOG) < 0) {
         close(bus_fd);
         bus_fd = -1;
