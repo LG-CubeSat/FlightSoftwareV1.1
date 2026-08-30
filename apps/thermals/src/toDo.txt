@@ -1,0 +1,16 @@
+create global temp variable; current, target
+
+create tasks; sensor_read, thermal_write (placeholder), telemetry (send data, take in write commands), command task
+
+init main
+
+Progress:
+
+
+
+Notes:
+
+
+
+Questions / niggles:
+
