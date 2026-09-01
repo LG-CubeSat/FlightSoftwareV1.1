@@ -9,7 +9,7 @@
 
 #define SENSOR_READ_TASK_PRIORITY (1)
 #define SENSOR_READ_TASK_STACK_SIZE (1024)
-#define SENSOR_READ_TASK_PERIOD_MS (500)
+#define SENSOR_READ_TASK_PERIOD_MS (100)
 
 static StackType_t xSensorReadTaskStack[SENSOR_READ_TASK_STACK_SIZE];
 static StaticTask_t xSensorReadTaskBuffer;
@@ -40,7 +40,7 @@ void sensor_read_task(void *pvParameters) {
     TickType_t lastWakeTime = xTaskGetTickCount();
 
 
-    //!!! Placeholder address for sensors, fill in once we get the real hardware !!!
+    //Placeholder address for sensors, fill in once we get the real hardware
     thermal_sensor_t sensor1;
     sensor1.ADDRESS = 0x48;
     sensor1.SENSOR_GENERIC = 1;

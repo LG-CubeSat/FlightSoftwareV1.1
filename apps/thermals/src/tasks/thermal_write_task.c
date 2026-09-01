@@ -10,7 +10,7 @@
 
 #define THERMAL_WRITE_TASK_PRIORITY (1)
 #define THERMAL_WRITE_TASK_STACK_SIZE (1024)
-#define THERMAL_WRITE_TASK_PERIOD_MS (500)
+#define THERMAL_WRITE_TASK_PERIOD_MS (100)
 
 static StackType_t xThermalWriteTaskStack[THERMAL_WRITE_TASK_STACK_SIZE];
 static StaticTask_t xThermalWriteTaskBuffer;
