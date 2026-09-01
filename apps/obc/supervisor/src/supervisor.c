@@ -1,7 +1,29 @@
 #include "supervisor.h"
 
 #include <stdio.h>
+#include <spawn.h>
+#include <string.h>
+
 #include "pthread.h"
+
+extern char **environ;
+
+typedef struct {
+    const char *name;
+    const char *path;
+    pid_t pid;
+} obc_process_t;
+
+static obc_process_t processes[] = {
+    { "fdir", "./obc_fdir", -1 },
+    { "commands", "./obc_commands", -1 },
+    { "compute", "./obc_compute", -1},
+    { "data", "./obc_data", -1 },
+    { "mission", "./obc_mission", -1},
+    { "time", "./obc_time", -1},
+};
+
+#define NUM_PROCESSES (sizeof(processes) / sizeof(processes[0]))
 
 /* Restarts the actual programs/processes */
 
@@ -11,6 +33,21 @@ Also needs an init for getting all other processes up and running
 int init_supervisor(void)
 {
     /* Start all other processes */
+}
+
+int supervisor_start_all(void)
+{
+    for (size_t i = 0; i < NUM_PROCESSES; i++) {
+        char *argv[] = { (char *)processes[i].path, NULL };
+        int rc = posix_spawn(&processes[i].pid, processes[i].path,
+            NULL, NULL, argv, environ);
+        
+        if (rc != 0) {
+            fprintf(stderr, "supervisor: failed to spawn %s: %s\n", processes[i].name, strerror(rc));
+            return -1;
+        }
+    }
+    return 0;
 }
 
 /*
@@ -56,5 +93,5 @@ int init_shutdown(void)
 
 void shutdown(void)
 {
-    
+
 }
