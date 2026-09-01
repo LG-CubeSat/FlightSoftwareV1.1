@@ -33,3 +33,19 @@ int start_all_processes(void)
     return 0;
 }
 
+/* Corrects any directory issues with the processes */
+int obc_resolve_sibling(const char *sibling_name, char *out, size_t out_size)
+{
+    char self_path[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", self_path, sizeof(self_path) - 1);
+    
+    if (len < 0) {
+        perror("readlink /proc/self/exe");
+        return -1;
+    }
+    self_path[len] = '\0';
+
+    char *dir = dirname(self_path); // modifies self_path in place (glibc)
+    int n = snprintf(out, out_size, "%s/%s", dir, sibling_name);
+    return (n < 0 || (size_t)n >= out_size) ? -1 : 0;
+}
