@@ -88,10 +88,39 @@ void *shutdown_thread(void *arg)
 {
     (void)arg;
 
-    printf("[SHUTDOWN THREAD] Running now");
+    printf("[SHUTDOWN THREAD] Running now\n");
 
-    for(;;) {
+    for (;;) {
+        OBC_Roles_t src;
+        supervisor_request_t req;
+        int len = IPC_receive(&src, (uint8_t *)&req, sizeof(req));
+        if (len != sizeof(req)) {
+            continue; // short/malformed message, ignore and keep listening
+        }
 
+        obc_process_t *proc = supervisor_find_process((OBC_Roles_t)req.role);
+        if (proc == NULL) {
+            fprintf(stderr, "[SUPERVISOR SHUTDOWN] unknown role %d requested by role %d\n",
+                    req.role, src);
+            continue;
+        }
+
+        switch (req.cmd) {
+        case SUPERVISOR_CMD_SHUTDOWN:
+            printf("[SUPERVISOR SHUTDOWN] shutting down %s (requested by role %d)\n",
+                   proc->name, src);
+            supervisor_shutdown_process(proc);
+            break;
+        case SUPERVISOR_CMD_RESTART:
+            printf("[SUPERVISOR SHUTDOWN] restarting %s (requested by role %d)\n",
+                   proc->name, src);
+            supervisor_restart_process(proc);
+            break;
+        default:
+            fprintf(stderr, "[SUPERVISOR SHUTDOWN] unknown command %d from role %d\n",
+                    req.cmd, src);
+            break;
+        }
     }
 
     return NULL;

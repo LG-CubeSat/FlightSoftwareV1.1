@@ -2,6 +2,7 @@
 #define PROCESSES_H
 
 #include <spawn.h>
+#include <stdint.h>
 #include "obc_ipc.h"
 
 extern char **environ;
@@ -13,14 +14,17 @@ typedef struct {
     OBC_Roles_t role;
 } obc_process_t;
 
+/* Wire format for FDIR's requests to supervisor over ipc.
+   FDIR's sending side must match this layout exactly once written. */
 typedef enum {
-    FDIR = 0,
-    COMMANDS = 1,
-    COMPUTE = 2,
-    DATA = 3,
-    MISSION = 4,
-    TIME = 5,
-} OBC_Process_Indice;
+    SUPERVISOR_CMD_SHUTDOWN = 1,
+    SUPERVISOR_CMD_RESTART = 2,
+} supervisor_cmd_t;
+
+typedef struct {
+    uint8_t cmd;   // supervisor_cmd_t
+    uint8_t role;  // OBC_Roles_t
+} supervisor_request_t;
 
 int start_all_processes(void);
 

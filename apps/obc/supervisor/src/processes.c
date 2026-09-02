@@ -47,17 +47,6 @@ int start_all_processes(void)
     return 0;
 }
 
-int start_process(uint8_t index)
-{
-    char *argv[] = { (char *)processes[i].path, NULL };
-    int rc = posix_spawn(&processes[i].pid, processes[i].path,
-        NULL, NULL, argv, environ);
-
-    if (rc != 0) {
-        fprintf(stderr, "supervisor: failed to spawn %s: %s\n", processes[i])
-    }
-}
-
 /* Corrects any directory issues with the processes */
 int obc_resolve_sibling(const char *sibling_name, char *out, size_t out_size)
 {
