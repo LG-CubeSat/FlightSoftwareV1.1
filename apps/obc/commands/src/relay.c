@@ -19,6 +19,9 @@ int relay_thread_init()
     return ret;
 }
 
-int relay_thread() {
-
+void *relay_thread(void *arg) 
+{
+    (void)arg;
+    
+    return NULL;
 }

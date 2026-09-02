@@ -3,6 +3,6 @@
 
 int ingest_thread_init(void);
 
-int ingest_thread(void);
+void *ingest_thread(void *arg);
 
 #endif // OBC_COMMANDS_INGEST_H

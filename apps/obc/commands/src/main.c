@@ -16,8 +16,8 @@ int main(void) {
     Set off the threads
     */
 
-    ingest_thread();
-    relay_thread();
+    ingest_thread(NULL);
+    relay_thread(NULL);
 
 
     /*

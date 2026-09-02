@@ -13,4 +13,6 @@ typedef struct {
 
 int start_all_processes(void);
 
+void supervisor_reap(obc_process_t *processes, size_t n);
+
 #endif PROCESSES_H

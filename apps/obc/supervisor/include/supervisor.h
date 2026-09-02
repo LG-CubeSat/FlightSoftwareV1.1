@@ -3,12 +3,12 @@
 
 int init_supervisor(void);
 
-int heartbeat_init(void);
+int init_heartbeat_init_thread(void);
 
-void heatbeat(void);
+void *heartbeat_thread(void *arg);
 
-int shutdown_init(void);
+int init_shutdown_thread(void);
 
-void shutdown(void);
+void *shutdown_thread(void *arg);
 
 #endif // OBC_SUPERVISOR_H

@@ -3,6 +3,6 @@
 
 int relay_thread_init(void);
 
-int relay_thread(void);
+void *relay_thread(void *arg);
 
 #endif // OBC_COMMANDS_RELAY_H

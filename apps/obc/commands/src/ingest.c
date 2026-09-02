@@ -18,9 +18,9 @@ int ingest_thread_init()
     return ret;
 }
 
-int ingest_thread()
+void *ingest_thread(void *arg)
 {
-
-
+    (void)arg;
     // TODO: detatch vs join (for safe shutdown)
+    return NULL;
 }

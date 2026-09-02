@@ -5,9 +5,18 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <stdio.h>
-#include <sys.wait.h>
+#include <sys/wait.h>
+#include <time.h>
+#include "pthread.h"
+#include "string.h"
+
+#include "obc_ipc.h"
 
 #define NUM_PROCESSES (sizeof(processes) / sizeof(processes[0]))
+#define HEARTBEAT_TIMEOUT_SEC 5
+
+static struct timespec last_heartbeat[ROLE_TIME + 1]; // indexed by OBC_Roles_t
+static pthread_mutex_t hb_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static obc_process_t processes[] = {
     { "fdir", "./obc_fdir", -1 },
@@ -68,4 +77,23 @@ void supervisor_reap(obc_process_t *processes, size_t n)
         }
         processes[i].pid = -1; // dead. ready to restart with backoff
     }
+}
+
+void supervisor_mark_alive(OBC_Roles_t role)
+{
+    pthread_mutex_lock(&hb_lock);
+    clock_gettime(CLOCK_MONOTONIC, &last_heartbeat[role]);
+    pthread_mutex_unlock(&hb_lock);
+}
+
+void supervisor_is_frozen(OBC_Roles_t role)
+{
+    struct timespec now, seen;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    pthread_mutex_lock(&hb_lock);
+    seen = last_heartbeat[role];
+    pthread_mutex_unlock(&hb_lock);
+
+    double elapsed = (now.tv_sec - seen.tv_sec) + (now.tv_nsec - seen.tv_nsec) / 1e9;
+    return elapsed > HEARTBEAT_TIMEOUT_SEC;
 }
