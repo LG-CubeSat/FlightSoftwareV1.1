@@ -3,7 +3,7 @@
 
 int init_supervisor(void);
 
-int init_heartbeat_init_thread(void);
+int init_heartbeat_thread(void);
 
 void *heartbeat_thread(void *arg);
 

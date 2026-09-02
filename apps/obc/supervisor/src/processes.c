@@ -79,6 +79,11 @@ void supervisor_reap(obc_process_t *processes, size_t n)
     }
 }
 
+void supervisor_heartbeat(void)
+{
+    supervisor_reap(processes, NUM_PROCESSES);
+}
+
 void supervisor_mark_alive(OBC_Roles_t role)
 {
     pthread_mutex_lock(&hb_lock);
@@ -86,7 +91,7 @@ void supervisor_mark_alive(OBC_Roles_t role)
     pthread_mutex_unlock(&hb_lock);
 }
 
-void supervisor_is_frozen(OBC_Roles_t role)
+int supervisor_is_frozen(OBC_Roles_t role)
 {
     struct timespec now, seen;
     clock_gettime(CLOCK_MONOTONIC, &now);

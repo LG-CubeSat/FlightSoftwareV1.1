@@ -3,10 +3,11 @@
 #include <stdio.h>
 #include <spawn.h>
 #include <string.h>
-#include "pthread.h"
+#include <time.h>
+#include <pthread.h>
 
 #include "processes.h"
-
+#define PERIODIC_HEARTBEAT_SEC 1
 /* Restarts the actual programs/processes */
 
 /*
@@ -49,6 +50,18 @@ int init_heartbeat_thread(void)
 void *heartbeat_thread(void *arg)
 {
     (void)arg;
+
+    struct timespec next;
+    clock_gettime(CLOCK_MONOTONIC, &next);
+    
+    for(;;) {
+
+        supervisor_heartbeat();
+
+        next.tv_sec += PERIODIC_HEARTBEAT_SEC;
+        clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, NULL);
+    }
+
     return NULL;
 }
 
@@ -74,5 +87,12 @@ int init_shutdown_thread(void)
 void *shutdown_thread(void *arg)
 {
     (void)arg;
+
+    printf("[SHUTDOWN THREAD] Running now");
+
+    for(;;) {
+
+    }
+
     return NULL;
 }
