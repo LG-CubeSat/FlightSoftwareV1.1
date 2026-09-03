@@ -25,6 +25,9 @@ add_subdirectory(libs/libcsp)
 add_subdirectory(shared)
 add_subdirectory(sys)
 add_subdirectory(apps/adcs)
+
+# so supervisor can launch all the programs
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_subdirectory(apps/obc)
 add_subdirectory(apps/eps)
 
