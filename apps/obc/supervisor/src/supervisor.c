@@ -45,7 +45,7 @@ int init_supervisor(void)
 {
     printf("[SUPERVISOR] Initializing.\n");
     /* Start all other processes */
-    printf("[SUPERVISOR] Attmepting to start all processes.\n");
+    printf("[SUPERVISOR] Attempting to start all processes.\n");
     int ret = start_all_processes();
     if (ret != 0) {
         printf("[SUPERVISOR] Error starting all processes: %d\n", ret);
@@ -120,7 +120,7 @@ int init_shutdown_thread(void)
         printf("[SUPERVISOR SHUTDOWN] Successfully Initialized.\n");
     }
 
-    return ipc_ret | pt_ret;
+    return ipc_ret * pt_ret; // OR
 }
 
 void *shutdown_thread(void *arg)

@@ -96,11 +96,11 @@ int start_all_processes(void)
     return 0;
 }
 
-void supervisor_reap(obc_process_t *processes, size_t n)
+void supervisor_reap(obc_process_t *processes_to_reap, size_t n)
 {
     for (size_t i = 0; i < n; i++) {
         pthread_mutex_lock(&proc_lock);
-        pid_t pid = processes[i].pid;
+        pid_t pid = processes_to_reap[i].pid;
         pthread_mutex_unlock(&proc_lock);
 
         if (pid <= 0) continue;
@@ -111,13 +111,13 @@ void supervisor_reap(obc_process_t *processes, size_t n)
         if (rc < 0) { perror("waitpid"); continue; } // unusual (dead process are > 0)
 
         if (WIFEXITED(status)) {
-            fprintf(stderr, "supervisor: %s exited, code %d\n", processes[i].name, WEXITSTATUS(status));
+            fprintf(stderr, "supervisor: %s exited, code %d\n", processes_to_reap[i].name, WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
-            fprintf(stderr, "supervisor: %s killed by signal %d\n", processes[i].name, WTERMSIG(status));
+            fprintf(stderr, "supervisor: %s killed by signal %d\n", processes_to_reap[i].name, WTERMSIG(status));
         }
 
         pthread_mutex_lock(&proc_lock);
-        processes[i].pid = -1; // dead. ready to restart with backoff
+        processes_to_reap[i].pid = -1; // dead. ready to restart with backoff
         pthread_mutex_unlock(&proc_lock);
     }
 }

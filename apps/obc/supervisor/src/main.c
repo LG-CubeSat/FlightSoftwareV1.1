@@ -14,7 +14,7 @@ int main(void) {
     }
 
     if (init_shutdown_thread() != 0) {
-        printf("[OBC SUPERVISOR] Failed to launch the Shutdown thread\n.");
+        printf("[OBC SUPERVISOR] Failed to launch the Shutdown thread.\n");
     }
 
     for (;;) {
