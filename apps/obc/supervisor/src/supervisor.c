@@ -86,6 +86,8 @@ void *heartbeat_thread(void *arg)
 
         supervisor_heartbeat();
 
+        // TODO: actually do something with the processes that fail heartbeat and frozen check
+
         next.tv_sec += PERIODIC_HEARTBEAT_SEC;
         sleep_until(&next);
     }
@@ -120,7 +122,11 @@ int init_shutdown_thread(void)
         printf("[SUPERVISOR SHUTDOWN] Successfully Initialized.\n");
     }
 
-    return ipc_ret * pt_ret; // OR
+    if (ipc_ret != 0 || pt_ret != 0) {
+        return -1;
+    } else { 
+        return 0;
+    };
 }
 
 void *shutdown_thread(void *arg)
@@ -131,11 +137,24 @@ void *shutdown_thread(void *arg)
 
     for (;;) {
         OBC_Roles_t src;
-        supervisor_request_t req;
-        int len = IPC_receive(&src, (uint8_t *)&req, sizeof(req));
-        if (len != sizeof(req)) {
-            continue; // short/malformed message, ignore and keep listening
+        uint8_t buf[sizeof(supervisor_request_t)];
+        int len = IPC_receive(&src, buf, sizeof(buf));
+        if (len < 0) {
+            continue; // receive error, keep listening
         }
+
+        if (len == 0) {
+            // zero-payload message: a liveness ping, identity comes from `src` alone
+            supervisor_mark_alive(src);
+            continue;
+        }
+
+        if ((size_t)len != sizeof(supervisor_request_t)) {
+            continue; // unrecognized message shape, ignore
+        }
+
+        supervisor_request_t req;
+        memcpy(&req, buf, sizeof(req));
 
         obc_process_t *proc = supervisor_find_process((OBC_Roles_t)req.role);
         if (proc == NULL) {

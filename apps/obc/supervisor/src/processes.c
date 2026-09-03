@@ -23,8 +23,12 @@
 #define SHUTDOWN_GRACE_SEC 3
 
 static struct timespec last_heartbeat[ROLE_TIME + 1]; // indexed by OBC_Roles_t
-static pthread_mutex_t hb_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t hb_lock = PTHREAD_MUTEX_INITIALIZER; // guards the heartbeat timestamp updates
 static pthread_mutex_t proc_lock = PTHREAD_MUTEX_INITIALIZER; // guards .pid across processes[]
+static volatile sig_atomic_t shutting_down = 0; // set by supervisor_shutdown_all
+
+static void supervisor_check_frozen(void);
+int supervisor_is_frozen(OBC_Roles_t role);
 
 static obc_process_t processes[] = {
     { "fdir", "obc_fdir", {0}, -1, ROLE_FDIR },
@@ -92,6 +96,7 @@ int start_all_processes(void)
             fprintf(stderr, "supervisor: failed to spawn %s: %s\n", processes[i].name, strerror(rc));
             return -1;
         }
+        supervisor_mark_alive(processes[i].role); // grace period before it's judged frozen
     }
     return 0;
 }
@@ -124,7 +129,40 @@ void supervisor_reap(obc_process_t *processes_to_reap, size_t n)
 
 void supervisor_heartbeat(void)
 {
-    supervisor_reap(processes, NUM_PROCESSES);
+    supervisor_reap(processes, NUM_PROCESSES); // query if running through pid_wait
+    supervisor_check_frozen(); // check if stuck through a timestamp
+}
+
+/* Restarts any live process (pid > 0) that's gone quiet too long.
+   Already-dead slots are supervisor_reap's job, not this one's. */
+static void supervisor_check_frozen(void)
+{
+    if (shutting_down) {
+        return;
+    }
+
+    for (size_t i = 0; i < NUM_PROCESSES; i++) {
+        pthread_mutex_lock(&proc_lock);
+        pid_t pid = processes[i].pid;
+        pthread_mutex_unlock(&proc_lock);
+
+        if (pid <= 0) continue;
+
+        if (supervisor_is_frozen(processes[i].role)) {
+            fprintf(stderr, "supervisor: %s appears frozen, restarting\n", processes[i].name);
+            supervisor_restart_process(&processes[i]);
+        }
+    }
+}
+
+/* Signals intent to shut everything down, then does it -- the flag stops
+   supervisor_check_frozen from "helpfully" restarting something mid-shutdown. */
+void supervisor_shutdown_all(void)
+{
+    shutting_down = 1;
+    for (size_t i = 0; i < NUM_PROCESSES; i++) {
+        supervisor_shutdown_process(&processes[i]);
+    }
 }
 
 /* Sends SIGTERM and waits up to SHUTDOWN_GRACE_SEC for a clean exit,
@@ -203,6 +241,8 @@ int supervisor_restart_process(obc_process_t *proc)
     pthread_mutex_lock(&proc_lock);
     proc->pid = pid;
     pthread_mutex_unlock(&proc_lock);
+
+    supervisor_mark_alive(proc->role); // grace period before it's judged frozen again
 
     fprintf(stderr, "supervisor: restarted %s (pid %d)\n", proc->name, pid);
     return 0;

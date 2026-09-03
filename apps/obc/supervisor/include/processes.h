@@ -36,5 +36,7 @@ void supervisor_heartbeat(void);
 int supervisor_shutdown_process(obc_process_t *proc);
 int supervisor_restart_process(obc_process_t *proc);
 obc_process_t *supervisor_find_process(OBC_Roles_t role);
+void supervisor_shutdown_all(void);
+void supervisor_mark_alive(OBC_Roles_t role);
 
 #endif // PROCESSES_H
