@@ -144,9 +144,9 @@ int supervisor_shutdown_process(obc_process_t *proc)
         return -1;
     }
 
-    struct timespec deadline;
+    struct timespec deadline; // needs deadline to know when to forcefully shutdown
     clock_gettime(CLOCK_MONOTONIC, &deadline);
-    deadline.tv_sec += SHUTDOWN_GRACE_SEC;
+    deadline.tv_sec += SHUTDOWN_GRACE_SEC; // X seconds till deadline
 
     for (;;) {
         int status;
@@ -155,11 +155,11 @@ int supervisor_shutdown_process(obc_process_t *proc)
             pthread_mutex_lock(&proc_lock);
             proc->pid = -1;
             pthread_mutex_unlock(&proc_lock);
-            return 0;
+            return 0; // success
         }
         if (rc < 0) {
             perror("waitpid");
-            return -1;
+            return -1; // error
         }
 
         struct timespec now;
@@ -169,6 +169,7 @@ int supervisor_shutdown_process(obc_process_t *proc)
             break; // grace period expired, still alive
         }
 
+        // delays until trying again. tv_nsec is nano seconds.
         struct timespec poll_interval = { .tv_sec = 0, .tv_nsec = 50000000 }; // 50ms
         nanosleep(&poll_interval, NULL);
     }
@@ -181,7 +182,7 @@ int supervisor_shutdown_process(obc_process_t *proc)
     pthread_mutex_lock(&proc_lock);
     proc->pid = -1;
     pthread_mutex_unlock(&proc_lock);
-    return 0;
+    return 0; // forceful shutdown
 }
 
 /* Shuts the process down if still running, then spawns a fresh copy. */
@@ -220,12 +221,13 @@ obc_process_t *supervisor_find_process(OBC_Roles_t role)
 void supervisor_mark_alive(OBC_Roles_t role)
 {
     pthread_mutex_lock(&hb_lock);
-    clock_gettime(CLOCK_MONOTONIC, &last_heartbeat[role]);
+    clock_gettime(CLOCK_MONOTONIC, &last_heartbeat[role]); // writes the monotonic to the last_heartbeat
     pthread_mutex_unlock(&hb_lock);
 }
 
 int supervisor_is_frozen(OBC_Roles_t role)
 {
+    // checks the heartbeat timestamps and checks if its been too long since hearing from a process
     struct timespec now, seen;
     clock_gettime(CLOCK_MONOTONIC, &now);
     pthread_mutex_lock(&hb_lock);

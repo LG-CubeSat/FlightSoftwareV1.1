@@ -22,9 +22,11 @@ static void sleep_until(const struct timespec *next)
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
 
+    // notice the extra work since mac has no native absolute sleep. only relative.
     struct timespec delta;
     delta.tv_sec = next->tv_sec - now.tv_sec;
     delta.tv_nsec = next->tv_nsec - now.tv_nsec;
+    // corrects for the borrowing of subtraction. think 54 - 17. You get 4 and -3 for each place. So you must do (4-1) and (-3 + 10) = 37.
     if (delta.tv_nsec < 0) {
         delta.tv_sec -= 1;
         delta.tv_nsec += 1000000000L;
@@ -99,15 +101,26 @@ int init_shutdown_thread(void)
 {
     printf("[SUPERVISOR SHUTDOWN] Attempting Init.\n");
 
-    pthread_t shutdown_pthread;
-    int ret = pthread_create(&shutdown_pthread, NULL, shutdown_thread, NULL);
+    /* Init IPC for the shutdown task*/
 
-    if (ret != 0) {
-        fprintf(stderr, "[SUPERVISOR SHUTDOWN] failed to initialize thread: %d\n", ret);
+    int ipc_ret = IPC_initialize(ROLE_SUPERVISOR);
+
+    if (ipc_ret != 0) {
+        fprintf(stderr, "[SUPERVISOR SHUTDOWN] Failed to init IPC: %d\n", ipc_ret);
+    } else {
+        printf("[SUPERVISOR SHUTDOWN] IPC Initialized.\n");
+    }
+
+    pthread_t shutdown_pthread;
+    int pt_ret = pthread_create(&shutdown_pthread, NULL, shutdown_thread, NULL);
+
+    if (pt_ret != 0) {
+        fprintf(stderr, "[SUPERVISOR SHUTDOWN] failed to initialize thread: %d\n", pt_ret);
     } else {
         printf("[SUPERVISOR SHUTDOWN] Successfully Initialized.\n");
     }
-    return ret;
+
+    return ipc_ret | pt_ret;
 }
 
 void *shutdown_thread(void *arg)
