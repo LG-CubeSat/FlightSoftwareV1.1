@@ -14,6 +14,10 @@
 
 #include "obc_ipc.h"
 
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
+
 #define NUM_PROCESSES (sizeof(processes) / sizeof(processes[0]))
 #define HEARTBEAT_TIMEOUT_SEC 5
 #define SHUTDOWN_GRACE_SEC 3
@@ -23,45 +27,73 @@ static pthread_mutex_t hb_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t proc_lock = PTHREAD_MUTEX_INITIALIZER; // guards .pid across processes[]
 
 static obc_process_t processes[] = {
-    { "fdir", "./obc_fdir", -1, ROLE_FDIR },
-    { "commands", "./obc_commands", -1, ROLE_COMMANDS },
-    { "compute", "./obc_compute", -1, ROLE_COMPUTE },
-    { "data", "./obc_data", -1, ROLE_DATA },
-    { "mission", "./obc_mission", -1, ROLE_MISSION },
-    { "time", "./obc_time", -1, ROLE_TIME },
+    { "fdir", "obc_fdir", {0}, -1, ROLE_FDIR },
+    { "commands", "obc_commands", {0}, -1, ROLE_COMMANDS },
+    { "compute", "obc_compute", {0}, -1, ROLE_COMPUTE },
+    { "data", "obc_data", {0}, -1, ROLE_DATA },
+    { "mission", "obc_mission", {0}, -1, ROLE_MISSION },
+    { "time", "obc_time", {0}, -1, ROLE_TIME },
 };
 
-/* Starts the processes of the OBC */
-int start_all_processes(void)
+/* Finds the directory this supervisor binary itself is running from,
+   and fills `out` with "<that dir>/sibling_name". Linux gets it from
+   /proc/self/exe; macOS has no /proc, so it uses _NSGetExecutablePath. */
+static int obc_resolve_sibling(const char *sibling_name, char *out, size_t out_size)
+{
+    char self_path[PATH_MAX];
+
+#if defined(__APPLE__)
+    uint32_t size = sizeof(self_path);
+    if (_NSGetExecutablePath(self_path, &size) != 0) {
+        fprintf(stderr, "supervisor: executable path too long for buffer\n");
+        return -1;
+    }
+#else
+    ssize_t len = readlink("/proc/self/exe", self_path, sizeof(self_path) - 1);
+    if (len < 0) {
+        perror("readlink /proc/self/exe");
+        return -1;
+    }
+    self_path[len] = '\0';
+#endif
+
+    char *dir = dirname(self_path); // modifies self_path in place
+    int n = snprintf(out, out_size, "%s/%s", dir, sibling_name);
+    return (n < 0 || (size_t)n >= out_size) ? -1 : 0;
+}
+
+/* Resolves every sibling binary's path relative to supervisor's own
+   location, so start_all_processes works regardless of launch cwd. */
+int supervisor_resolve_paths(void)
 {
     for (size_t i = 0; i < NUM_PROCESSES; i++) {
-        char *argv[] = { (char *)processes[i].path, NULL };
-        int rc = posix_spawn(&processes[i].pid, processes[i].path,
-            NULL, NULL, argv, environ);
-        
-        if (rc != 0) {
-            fprintf(stderr, "supervisor: failed to spawn %s: %s\n", processes[i].name, strerror(rc));
+        if (obc_resolve_sibling(processes[i].exe_name, processes[i].resolved_path,
+                                 sizeof(processes[i].resolved_path)) != 0) {
+            fprintf(stderr, "supervisor: failed to resolve path for %s\n", processes[i].name);
             return -1;
         }
     }
     return 0;
 }
 
-/* Corrects any directory issues with the processes */
-int obc_resolve_sibling(const char *sibling_name, char *out, size_t out_size)
+/* Starts the processes of the OBC */
+int start_all_processes(void)
 {
-    char self_path[PATH_MAX];
-    ssize_t len = readlink("/proc/self/exe", self_path, sizeof(self_path) - 1);
-    
-    if (len < 0) {
-        perror("readlink /proc/self/exe");
+    if (supervisor_resolve_paths() != 0) {
         return -1;
     }
-    self_path[len] = '\0';
 
-    char *dir = dirname(self_path); // modifies self_path in place (glibc)
-    int n = snprintf(out, out_size, "%s/%s", dir, sibling_name);
-    return (n < 0 || (size_t)n >= out_size) ? -1 : 0;
+    for (size_t i = 0; i < NUM_PROCESSES; i++) {
+        char *argv[] = { processes[i].resolved_path, NULL };
+        int rc = posix_spawn(&processes[i].pid, processes[i].resolved_path,
+            NULL, NULL, argv, environ);
+
+        if (rc != 0) {
+            fprintf(stderr, "supervisor: failed to spawn %s: %s\n", processes[i].name, strerror(rc));
+            return -1;
+        }
+    }
+    return 0;
 }
 
 void supervisor_reap(obc_process_t *processes, size_t n)
@@ -159,9 +191,9 @@ int supervisor_restart_process(obc_process_t *proc)
         return -1;
     }
 
-    char *argv[] = { (char *)proc->path, NULL };
+    char *argv[] = { proc->resolved_path, NULL };
     pid_t pid;
-    int rc = posix_spawn(&pid, proc->path, NULL, NULL, argv, environ);
+    int rc = posix_spawn(&pid, proc->resolved_path, NULL, NULL, argv, environ);
     if (rc != 0) {
         fprintf(stderr, "supervisor: failed to restart %s: %s\n", proc->name, strerror(rc));
         return -1;
