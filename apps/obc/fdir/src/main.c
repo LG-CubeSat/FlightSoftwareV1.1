@@ -10,6 +10,22 @@ Then it hands it off to the Supervisor
 
 */
 
+#include <stdio.h>
+#include <signal.h>
+#include <unistd.h>
+
+#include "obc_ipc.h"
+
 int main(void) {
+    printf("[OBC FDIR] Initializing.\n");
+
+    /* Init here */
+    IPC_initialize(ROLE_FDIR);
+
+
+    for (;;) {
+        sleep(1);
+    }
+    
     return 0;
 }
