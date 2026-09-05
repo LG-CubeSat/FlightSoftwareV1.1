@@ -37,12 +37,18 @@ void *relay_thread(void *arg)
         relay_request_t req;
         memcpy(&req, buf, sizeof(req));
 
+        printf("[RELAY] DEBUG: got request from role %d -> addr=%d port=%d length=%d\n",
+               src, req.dest_addr, req.dest_port, req.length);
+        fflush(stdout);
+
         // prio norm indicates medium priority level
         csp_conn_t *conn = csp_connect(CSP_PRIO_NORM, req.dest_addr, req.dest_port, 1000, CSP_O_NONE);
         if (conn == NULL) {
             fprintf(stderr, "[RELAY] Connect to addr=%d port=%d failed\n", req.dest_addr, req.dest_port);
             continue;
         }
+        printf("[RELAY] DEBUG: connected, sending now\n");
+        fflush(stdout);
 
         csp_packet_t *packet = csp_buffer_get(0);
         if (packet == NULL) {

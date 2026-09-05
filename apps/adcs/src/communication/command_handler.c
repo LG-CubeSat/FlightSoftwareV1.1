@@ -16,6 +16,7 @@ queue -- this file's only job is CSP receive + decode.
 #include "csp_commands.h"
 #include "../../include/tasks/command_task.h"
 #include "fault_manager.h"
+#include "board_shutdown.h"
 
 static void * command_handler_rx_loop(void * param)
 {
@@ -69,9 +70,10 @@ static void * command_handler_rx_loop(void * param)
                         fault_management_trigger_reset(RESET_REASON_WATCHDOG);
                         break;
                     case CMD_SHUTDOWN:
-                        printf("[COMMAND HANDLER] Shutdown command received -- would shut down now (not yet implemented)\n");
+                        printf("[COMMAND HANDLER] Shutdown command received. Shutting down.\n");
                         fflush(stdout);
                         reply.status = ACK;
+                        board_shutdown();
                         break;
                     default:
                         reply.status = NACK;

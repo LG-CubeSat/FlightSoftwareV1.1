@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #include "obc_ipc.h"
 #include "csp_commands.h"
@@ -65,6 +66,15 @@ void *health_monitor_thread(void *arg)
             printf("[HEALTH MONITOR] board %d exceeded reset threshold, shutting it down\n",
                    notice.board_addr);
             fflush(stdout);
+
+            // A reset notice means the board is about to briefly go dark
+            // (it sends this, then resets itself) -- send the shutdown too
+            // soon and it races the board's own reconnect, landing on no
+            // live connection at all. This delay is a blunt fix for that.
+            // OPTIONAL TODO: replace with relay/transport-level retry so
+            // this doesn't depend on a fixed guess at reconnect time.
+            sleep(2);
+
             fallback_shutdown_board(notice.board_addr, cmd_port_for_board(notice.board_addr));
         }
     }
