@@ -1,6 +1,7 @@
 add_executable(adcs_sim
     src/main.c
     src/freertos_hooks.c
+    src/manager/fault_manager.c
     src/tasks/command_task.c
     src/tasks/control_task.c
     src/tasks/estimation_task.c
@@ -15,6 +16,7 @@ target_include_directories(adcs_sim PRIVATE
     ${CMAKE_SOURCE_DIR}/rtos/ports/posix
     ${CMAKE_SOURCE_DIR}/rtos/config
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/manager
 )
 
 target_link_libraries(adcs_sim PRIVATE freertos_kernel pthread platform csp_interface)

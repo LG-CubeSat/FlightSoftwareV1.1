@@ -24,6 +24,8 @@ ADCS telemetry = 20).
 #define EPS_CMD_PORT 11
 #define EPS_TELEM_PORT 21
 
+#define ADCS_STATUS_PORT 25 // board-initiated reset notices, telemetry range (20-29)
+
 typedef struct {
     uint8_t command_id;
     uint32_t seq;
@@ -32,8 +34,21 @@ typedef struct {
 /* Here is where you add more CMDs */
 typedef enum {
     CMD_MOVE_TO_POSITION = 1,
-    CMD_RESET = 2
+    CMD_RESET = 2,
+    CMD_SHUTDOWN = 3
 } command_id_t;
+
+typedef enum {
+    RESET_REASON_OUT_OF_BOUNDS = 1,
+    RESET_REASON_WATCHDOG = 2
+} reset_reason_t;
+
+/* sent to OBC from MCU, port ADCS_STATUS_PORT. Fire-and-forget: sent after a
+   board has already reset itself, not a request for permission. */
+typedef struct {
+    uint8_t board_addr; // e.g. ADCS_ADDRESS -- which board this is about
+    uint8_t reason;      // reset_reason_t
+} board_reset_notice_t;
 
 // what the status of ack is
 typedef enum {

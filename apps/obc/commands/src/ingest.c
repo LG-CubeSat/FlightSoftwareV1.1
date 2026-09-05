@@ -15,6 +15,7 @@ typedef struct {
 static const ingest_route_t routes[] = {
     { ADCS_TELEM_PORT, ROLE_MISSION, "adcs telemetry" },
     { EPS_TELEM_PORT, ROLE_MISSION, "eps telemetry" },
+    { ADCS_STATUS_PORT, ROLE_FDIR, "adcs reset notice" },
     // new board comes online -> add one line here, nothing else changes
 };
 

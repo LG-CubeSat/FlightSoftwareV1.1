@@ -24,4 +24,8 @@ int fallback_handle_fault(fault_report_t report);
    local OBC role -- use fallback_request/SUPERVISOR_CMD_RESTART for those). */
 int fallback_reset_board(uint8_t board_addr, uint8_t board_port);
 
+/* Same mechanism as fallback_reset_board, CMD_SHUTDOWN instead --
+   called once health_monitor decides a board resets too often. */
+int fallback_shutdown_board(uint8_t board_addr, uint8_t board_port);
+
 #endif

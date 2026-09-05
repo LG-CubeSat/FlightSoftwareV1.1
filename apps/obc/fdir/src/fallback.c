@@ -52,3 +52,17 @@ int fallback_reset_board(uint8_t board_addr, uint8_t board_port)
     }
     return 0;
 }
+
+int fallback_shutdown_board(uint8_t board_addr, uint8_t board_port)
+{
+    command_envelope_t shutdown_cmd = { .command_id = CMD_SHUTDOWN, .seq = 1 };
+    relay_request_t req = { .dest_addr = board_addr, .dest_port = board_port, .length = sizeof(shutdown_cmd) };
+    memcpy(req.payload, &shutdown_cmd, sizeof(shutdown_cmd));
+
+    int rc = IPC_send(ROLE_COMMANDS, (const uint8_t *)&req, sizeof(req));
+    if (rc < 0) {
+        fprintf(stderr, "[FDIR FALLBACK] failed to send board shutdown (addr=%d, port=%d)\n", board_addr, board_port);
+        return -1;
+    }
+    return 0;
+}

@@ -15,6 +15,7 @@ queue -- this file's only job is CSP receive + decode.
 
 #include "csp_commands.h"
 #include "../../include/tasks/command_task.h"
+#include "fault_manager.h"
 
 static void * command_handler_rx_loop(void * param)
 {
@@ -46,6 +47,11 @@ static void * command_handler_rx_loop(void * param)
                 
                 switch (envelope.command_id) {
                     case CMD_MOVE_TO_POSITION:
+                        // Bounds-checking a *commanded* value here would be wrong: an
+                        // out-of-range request is a bad command (or a bad sender), not
+                        // a local fault -- reject it and keep running. Checking our own
+                        // computed/estimated state (once real) is estimation_task's job,
+                        // see fault_management_check_bounds there.
                         if (packet->length >= sizeof(position_command_t)) {
                             position_command_t cmd;
                             memcpy(&cmd, packet->data, sizeof(cmd));
@@ -57,7 +63,13 @@ static void * command_handler_rx_loop(void * param)
                         }
                         break;
                     case CMD_RESET:
-                        printf("[COMMAND HANDLER] Reset command received -- would reset now (Tier 2 not implemented yet)\n");
+                        printf("[COMMAND HANDLER] Reset command received -- resetting now\n");
+                        fflush(stdout);
+                        reply.status = ACK;
+                        fault_management_trigger_reset(RESET_REASON_WATCHDOG);
+                        break;
+                    case CMD_SHUTDOWN:
+                        printf("[COMMAND HANDLER] Shutdown command received -- would shut down now (not yet implemented)\n");
                         fflush(stdout);
                         reply.status = ACK;
                         break;
