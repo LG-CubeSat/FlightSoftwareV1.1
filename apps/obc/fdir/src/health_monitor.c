@@ -60,7 +60,7 @@ void *health_monitor_thread(void *arg)
         fflush(stdout);
 
         // fires exactly once, on the cycle that crosses the threshold
-        // SHOULD add a command that lets operator manually force boot a board back up, so shutdown isn't permanent.
+        // SHOULD add an eps repower logic that lets operator manually force boot a board back up, so shutdown isn't permanent.
         if (reset_counts[notice.board_addr] == RESET_SHUTDOWN_THRESHOLD) {
             printf("[HEALTH MONITOR] board %d exceeded reset threshold, shutting it down\n",
                    notice.board_addr);
