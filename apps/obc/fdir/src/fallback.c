@@ -18,3 +18,21 @@ int fallback_request(supervisor_cmd_t cmd, OBC_Roles_t role)
     }
     return 0;
 }
+
+int fallback_handle_fault(fault_report_t report)
+{
+    // logic based on report, TODO: add logic
+    if (report.fault_type != OUT_OF_BOUNDS && report.fault_type != UNRESPONSIVE)
+    {
+        printf("[FDIR FALLBACK] Fault type not valid.\n");
+        return 1;
+    }
+    
+    // if (report.role) {} <-- fill logic here
+    supervisor_cmd_t cmd = SUPERVISOR_CMD_SHUTDOWN;
+    if (fallback_request(cmd, report.role) != 0) {
+        printf("[FDIR FALLBACK] Fallback request failed\n");
+        return 2;
+    }
+    return 0;
+}

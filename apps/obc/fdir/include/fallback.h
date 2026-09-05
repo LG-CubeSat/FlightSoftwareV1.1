@@ -16,6 +16,6 @@ typedef struct {
 
 
 int fallback_request(supervisor_cmd_t cmd, OBC_Roles_t role);
-supervisor_request_t fallback_handle_fault(fault_report_t report);
+int fallback_handle_fault(fault_report_t report);
 
 #endif
