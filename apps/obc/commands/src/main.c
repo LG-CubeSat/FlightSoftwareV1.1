@@ -1,8 +1,9 @@
 #include <stdio.h>
+#include <unistd.h>
 
 #include "relay.h"
 #include "ingest.h"
-#include "csp/csp_network.h"
+#include "csp_network.h"
 #include "csp_commands.h"
 #include "obc_ipc.h"
 
