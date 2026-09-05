@@ -7,36 +7,9 @@
 #include <pthread.h>
 
 #include "processes.h"
+#include "obc_sleep_until.h"
 #define PERIODIC_HEARTBEAT_SEC 1
 /* Restarts the actual programs/processes */
-
-/* Sleeps until the absolute time `next`, without drifting from this
-   function's own overhead. clock_nanosleep(TIMER_ABSTIME) does this
-   natively on Linux (the real target); macOS's libc has no such call,
-   so it's emulated there with a freshly-computed relative delta. */
-static void sleep_until(const struct timespec *next)
-{
-#if defined(__linux__)
-    clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, next, NULL);
-#else
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-
-    // notice the extra work since mac has no native absolute sleep. only relative.
-    struct timespec delta;
-    delta.tv_sec = next->tv_sec - now.tv_sec;
-    delta.tv_nsec = next->tv_nsec - now.tv_nsec;
-    // corrects for the borrowing of subtraction. think 54 - 17. You get 4 and -3 for each place. So you must do (4-1) and (-3 + 10) = 37.
-    if (delta.tv_nsec < 0) {
-        delta.tv_sec -= 1;
-        delta.tv_nsec += 1000000000L;
-    }
-
-    if (delta.tv_sec > 0 || (delta.tv_sec == 0 && delta.tv_nsec > 0)) {
-        nanosleep(&delta, NULL);
-    }
-#endif
-}
 
 /*
 Also needs an init for getting all other processes up and running
@@ -50,7 +23,7 @@ int init_supervisor(void)
     if (ret != 0) {
         printf("[SUPERVISOR] Error starting all processes: %d\n", ret);
     } else {
-        printf("[SUPERVISOR] Successfully started all processes.");
+        printf("[SUPERVISOR] Successfully started all processes.\n");
     }
 
     /* Add more init logic here */
@@ -89,7 +62,7 @@ void *heartbeat_thread(void *arg)
         // TODO: actually do something with the processes that fail heartbeat and frozen check
 
         next.tv_sec += PERIODIC_HEARTBEAT_SEC;
-        sleep_until(&next);
+        obc_sleep_until(&next);
     }
 
     return NULL;

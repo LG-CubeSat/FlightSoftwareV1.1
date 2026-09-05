@@ -1,11 +1,15 @@
 if (HW_MODE)
     add_library(platform STATIC
         real/drivers/comms_i2c.c
+        real/drivers/board_reset.c
+        real/drivers/board_shutdown.c
         )
     target_compile_definitions(platform PRIVATE HW_MODE)
 else()
     add_library(platform STATIC
         sim/drivers/comms_i2c.c
+        sim/drivers/board_reset.c
+        sim/drivers/board_shutdown.c
     )
     target_compile_definitions(platform PRIVATE SIM_MODE)
 endif()

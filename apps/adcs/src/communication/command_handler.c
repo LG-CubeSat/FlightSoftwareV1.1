@@ -15,6 +15,8 @@ queue -- this file's only job is CSP receive + decode.
 
 #include "csp_commands.h"
 #include "../../include/tasks/command_task.h"
+#include "fault_manager.h"
+#include "board_shutdown.h"
 
 static void * command_handler_rx_loop(void * param)
 {
@@ -37,30 +39,47 @@ static void * command_handler_rx_loop(void * param)
         csp_packet_t * packet;
         while ((packet = csp_read(conn, 50)) != NULL) {
             if (csp_conn_dport(conn) == ADCS_CMD_PORT &&
-                packet->length >= sizeof(position_command_t)) {
+                packet->length >= sizeof(command_envelope_t)) {
 
-                position_command_t cmd;
-                memcpy(&cmd, packet->data, sizeof(cmd));
-
-                printf("[COMMAND HANDLER] Position command received: target=%d\n", cmd.target_position);
-                fflush(stdout);
-
-                command_ack_t reply;
-
-                reply.ack_command_id = cmd.envelope.command_id;
-                reply.ack_seq = cmd.envelope.seq;
-
-                if (reply.ack_command_id == CMD_MOVE_TO_POSITION) {
-                    reply.status = ACK;
-
-                    CommandMessage_t msg = {
-                        .command = CMD_MOVE_TO_POSITION,
-                        .parameter = (uint32_t)cmd.target_position
-                    };
-                    command_task_send(&msg);
-                } else {
-                    reply.status = NACK; // don't send a command because we don't recognize the command.
+                command_envelope_t envelope;
+                memcpy(&envelope, packet->data, sizeof(envelope));
+                
+                command_ack_t reply = { .ack_command_id = envelope.command_id, .ack_seq = envelope.seq };
+                
+                switch (envelope.command_id) {
+                    case CMD_MOVE_TO_POSITION:
+                        // Bounds-checking a *commanded* value here would be wrong: an
+                        // out-of-range request is a bad command (or a bad sender), not
+                        // a local fault -- reject it and keep running. Checking our own
+                        // computed/estimated state (once real) is estimation_task's job,
+                        // see fault_management_check_bounds there.
+                        if (packet->length >= sizeof(position_command_t)) {
+                            position_command_t cmd;
+                            memcpy(&cmd, packet->data, sizeof(cmd));
+                            reply.status = ACK;
+                            CommandMessage_t msg = { .command = CMD_MOVE_TO_POSITION, .parameter = (uint32_t)cmd.target_position };
+                            command_task_send(&msg);
+                        } else {
+                            reply.status = NACK;
+                        }
+                        break;
+                    case CMD_RESET:
+                        printf("[COMMAND HANDLER] Reset command received -- resetting now\n");
+                        fflush(stdout);
+                        reply.status = ACK;
+                        fault_management_trigger_reset(RESET_REASON_WATCHDOG);
+                        break;
+                    case CMD_SHUTDOWN:
+                        printf("[COMMAND HANDLER] Shutdown command received. Shutting down.\n");
+                        fflush(stdout);
+                        reply.status = ACK;
+                        board_shutdown();
+                        break;
+                    default:
+                        reply.status = NACK;
+                        break;
                 }
+                
                 csp_packet_t * ack_packet = csp_buffer_get(0);
 
                 if (ack_packet == NULL) {
