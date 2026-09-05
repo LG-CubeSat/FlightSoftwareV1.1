@@ -15,6 +15,7 @@ Then it hands it off to the Supervisor
 #include <unistd.h>
 
 #include "obc_ipc.h"
+#include "watchdog.h"
 
 int main(void) {
     printf("[OBC FDIR] Initializing.\n");
@@ -22,10 +23,13 @@ int main(void) {
     /* Init here */
     IPC_initialize(ROLE_FDIR);
 
+    if (watchdog_thread_init() != 0) {
+        printf("[OBC FDIR] Failed to launch the Watchdog thread.\n");
+    }
 
     for (;;) {
         sleep(1);
     }
-    
+
     return 0;
 }
