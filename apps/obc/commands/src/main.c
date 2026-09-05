@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "relay.h"
@@ -6,6 +7,7 @@
 #include "csp_network.h"
 #include "csp_commands.h"
 #include "obc_ipc.h"
+#include "obc_relay_protocol.h"
 
 int main(void) {
     printf("[OBC COMMAND P] Program started.\n");
@@ -19,9 +21,6 @@ int main(void) {
     ingest_thread_init();
     relay_thread_init();
 
-    /*
-    Set off the threads
-    */
     for (;;) { sleep(1); }
 
     return 0;

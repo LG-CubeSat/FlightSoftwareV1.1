@@ -62,6 +62,7 @@ void *ingest_thread(void *arg)
         while ((packet = csp_read(conn, 50)) != NULL) {
             if (route != NULL) {
                 printf("[INGEST] %s: %d bytes -> role %d\n", route->name, packet->length, route->owner);
+                fflush(stdout);
                 if (IPC_send(route->owner, packet->data, packet->length) < 0) {
                     fprintf(stderr, "[INGEST] forward to role %d failed (not listening?)\n", route->owner);
                 }

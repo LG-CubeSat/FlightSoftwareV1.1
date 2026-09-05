@@ -29,8 +29,10 @@ typedef struct {
     uint32_t seq;
 } command_envelope_t;
 
+/* Here is where you add more CMDs */
 typedef enum {
-    CMD_MOVE_TO_POSITION = 1
+    CMD_MOVE_TO_POSITION = 1,
+    CMD_RESET = 2
 } command_id_t;
 
 // what the status of ack is
