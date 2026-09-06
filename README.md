@@ -186,19 +186,33 @@ cmake --build build
 ## Testing
 
 ```bash
+cmake -S . -B build -DHW_MODE=OFF -DBUILD_TESTS=ON
+cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-**Currently broken** — `position_command_test` and `command_ack_test` still depend on an
-`obc_sim` build target that no longer exists since the OBC split into 7 processes; CMake
-configure for the test suite fails until they're updated, see Known gaps. The other two
-still work:
+`BUILD_TESTS` defaults to `ON`, but if your `build/` directory was configured before (a
+cached `OFF` sticks around across plain re-runs of `cmake -S . -B build`), pass
+`-DBUILD_TESTS=ON` explicitly once to pick it back up.
+
+All four tests build and pass. None of them spawn a full OBC process tree (`obc_sim`
+doesn't exist anymore, and no single OBC process autonomously polls ADCS the way the old
+one-binary OBC did) — instead, `position_command_test` and `command_ack_test` *are* the
+OBC's CSP node themselves (the same `csp_network_init(OBC_ADDRESS, 1)` call any real OBC
+role makes), talking to a real spawned `adcs_sim`. This tests ADCS's actual command/task
+pipeline over the real wire contract without depending on which internal OBC processes
+happen to exist:
 
 | Test | What it proves |
 |---|---|
 | `comms_bus_test` | Two nodes (OBC + ADCS), addressed frames flow correctly both directions over the real (non-mocked) transport. |
 | `comms_bus_addressing_test` | Three nodes (OBC + two slaves) — a message addressed to one slave is *not* delivered to the other. This is the one that actually exercises the broadcast-and-filter design; two-node tests can't catch a misrouted message since there's nowhere else for it to go. |
-| ~~`position_command_test`~~ | ~~Full-stack integration: spawns the real `obc_sim`/`adcs_sim` binaries and verifies a command flows OBC → CSP → bus → ADCS's FreeRTOS tasks → telemetry → back to OBC, repeatedly.~~ Broken, see above. |
+| `position_command_test` | Full-stack happy path: repeated `CMD_MOVE_TO_POSITION` commands get ACKed, activate every task the command should (Control, Estimation, Sensor, Telemetry — not Housekeeping), and get a matching telemetry report back, all repeated across multiple cycles so a "works once then hangs" regression can't slip through. |
+| `command_ack_test` | ACK/NACK protocol edge cases `position_command_test` doesn't cover: an unrecognized command_id gets NACKed, an undersized `CMD_MOVE_TO_POSITION` (missing its target) gets NACKed, and a valid command right after both still gets ACKed — proving bad input doesn't wedge the handler. |
+
+Sabotage-verified: temporarily forcing `command_handler.c`'s `default` case to `ACK`
+instead of `NACK` makes `command_ack_test` fail as expected — confirms it's actually
+exercising the NACK path, not passing vacuously.
 
 All fork real processes and talk over a real Unix socket at `/tmp/comms_i2c.sock` — don't
 run them at the same time as each other or as a manually-launched binary using that socket.
@@ -213,11 +227,6 @@ run them at the same time as each other or as a manually-launched binary using t
   Fine for the current 2-3 node tests; will need `select()`/`poll()`-based multiplexing
   before many subsystems are simultaneously active and one shouldn't be able to stall
   reads from the others.
-- **`tests/CMakeLists.txt` still depends on an `obc_sim` target that no longer exists**
-  (`position_command_test` and `command_ack_test` both do `add_dependencies(... obc_sim
-  adcs_sim)`), left over from before the OBC split into 7 processes. CMake configure for
-  the test suite will fail until these are updated to spawn the new per-role binaries
-  (`obc_supervisor`, etc.) instead.
 - **OBC application services** (Telemetry Output, Time-Tagged Scheduler, Limit Checker)
   still don't exist — `compute`/`data`/`time` are stubs, and `fdir`'s own `limit_checker`
   was removed with nothing yet replacing it (blocked on a real telemetry pipeline).
