@@ -12,6 +12,7 @@ else()
         sim/drivers/board_reset.c
         sim/drivers/board_shutdown.c
         sim/drivers/camera.c
+        sim/drivers/radio.c
     )
     target_compile_definitions(platform PRIVATE SIM_MODE)
 endif()

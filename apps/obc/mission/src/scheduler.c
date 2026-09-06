@@ -56,6 +56,7 @@ void *scheduler_thread(void *arg) {
                 current_state = MISSION_DOWNLINKING;
                 break;
             case MISSION_DOWNLINKING:
+                payload_commander_downlink_photo(PHOTO_PATH);
                 current_state = MISSION_DONE;
                 break;
             case MISSION_DONE:
