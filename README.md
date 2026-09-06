@@ -13,7 +13,7 @@ picture; this file is the practical "clone it, build it, run it" reference.
 | ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. Also self-monitors now: an independent watchdog thread and an out-of-bounds check can trigger a real local reset, and repeated resets can lead to an OBC-directed shutdown — see "OBC internal architecture" below. |
 | OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. `supervisor`, `fdir`, `commands`, and `mission` are all real and working now. `mission` runs a one-shot scripted balloon timeline (ascent → photo → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `compute`/`data`/`time` are still stubs — Telemetry Output and Time-Tagged Scheduler described in `docs/api_contracts.md` don't exist yet. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. Real I2C HAL backend is still a stub (see Known gaps). |
-| EPS / Thermals / Camera / Comms (radio) | Not yet scaffolded. |
+| EPS / Thermals / Comms (radio HW) | Not yet scaffolded as CSP boards. Camera/radio *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; the real E22 radio driver is being built separately by a teammate. |
 | FPGA compression / Akida1500 | Out of scope for November; tracked in `docs/roadmap.md` Phase 4. |
 
 ## Architecture at a glance
@@ -41,7 +41,7 @@ Full design writeup: `docs/i2c_sim_transport_plan.md`.
 ### OBC internal architecture
 
 The OBC itself is 7 separate Linux processes, not one binary — see `apps/obc/roles.md`
-for the full breakdown of who owns what. The two worth knowing about here:
+for the full breakdown of who owns what. The ones worth knowing about here:
 
 - **`supervisor`** starts the other 6 processes (`posix_spawn`, resolving each sibling's
   path relative to its own so it works regardless of launch directory), sweeps them for
@@ -61,6 +61,38 @@ HAL/CMSIS dependency is needed). A board's own watchdog and bounds-checking call
 directly; the OBC never has to reach in and force anything on a board that's still
 responsive.
 
+- **`mission`** owns everything payload/mission-related, split into three pieces that
+  mirror the roles.md description of the role:
+  - `scheduler` runs a one-shot, linear balloon-flight timeline (a small state machine:
+    wait for ascent → take photo → downlink → done) — deliberately scripted, no real
+    autonomy, since the balloon flight doesn't need or want decision-making.
+  - `payload_commander` is what the scheduler (and autonomy) call to actually do
+    something: capture a photo (`camera_capture`), downlink a file over the radio
+    (`radio_send`), or command another board (e.g. `payload_commander_point_to_sun`
+    builds a `command_envelope_t` and hands it to `commands`' relay over
+    `obc_relay_protocol.h`).
+  - `autonomy` is a small recurring engine — a table of `{name, interval, last_fired,
+    function pointer}` entries, checked once a second — built now even though the
+    balloon flight doesn't use real autonomy, because the table-driven shape scales
+    cleanly to the real satellite mission and gives other subsystem teams something
+    concrete to mock against today. Its only entry right now periodically tells ADCS
+    to point at the sun; adding a new periodic behavior is one line in the table, not
+    new logic.
+
+  Camera and radio are USB/UART peripherals wired directly to the OBC's Linux box, not
+  separate CSP boards — `shared/interfaces/camera.h`/`radio.h` are mock-only contracts
+  for now (`platform/sim/drivers/` writes/logs a placeholder; `platform/real/drivers/`
+  has an honest not-yet-implemented stub for the camera). **The real radio driver is
+  intentionally not touched here** — a teammate is building the real E22 driver
+  separately, so `platform/real/drivers/radio.c` doesn't exist and isn't referenced from
+  `platform/CMakeLists.txt`'s `HW_MODE` branch, to avoid colliding with that work.
+
+Every long-lived OBC role sends a periodic no-payload heartbeat ping to `supervisor`
+(`IPC_send(ROLE_SUPERVISOR, NULL, 0)`, see any role's `heartbeat.c`) — without it,
+`supervisor`'s frozen-check can't distinguish "quietly working" from "hung," and will
+restart a perfectly healthy process. `fdir`, `commands`, and `mission` all do this today;
+`compute`/`data`/`time` will need the same `heartbeat.c` the moment they stop being stubs.
+
 ## Repository layout
 
 ```
@@ -70,8 +102,9 @@ apps/
 └── obc/                   # 7 separate Linux processes, not one binary -- see apps/obc/roles.md
     ├── supervisor/         # Process lifecycle: spawns, reaps, restarts the other 6
     ├── fdir/               # Fault policy: health_monitor tracks board resets, fallback acts on them
-    ├── commands/           # Owns the external bus: ingest (inbound routing), relay (outbound)
-    ├── compute/ data/ mission/ time/   # Still stubs
+    ├── commands/           # Owns the external bus: ingest (inbound routing), relay (outbound), heartbeat
+    ├── mission/            # scheduler (balloon timeline), payload_commander, autonomy, heartbeat
+    ├── compute/ data/ time/   # Still stubs
     └── ipc/                # Internal IPC shared by all 7
 
 shared/
@@ -79,12 +112,14 @@ shared/
 │   ├── comms_bus.h         # The medium-agnostic bus contract
 │   ├── board_reset.h       # Board self-reset, sim (re-exec) vs real (Cortex-M AIRCR) impl in platform/
 │   ├── board_shutdown.h    # Board halt, sim (exit) vs real (Cortex-M WFI) impl in platform/
+│   ├── camera.h            # Photo capture, mock only for now (mission's payload_commander)
+│   ├── radio.h             # Ground downlink, mock only -- real E22 driver owned separately, see above
 │   ├── frame.h / frame.c   # Wire framing (addressing + serialization), shared by every backend
 ├── csp/                    # CSP-to-transport glue (csp_network.c, csp_if_spi.c, csp_commands.h)
 
 platform/
-├── sim/drivers/    # comms_i2c.c, board_reset.c, board_shutdown.c -- what you build against today
-└── real/drivers/   # Same three, hardware-backed -- comms_i2c.c is stale, see Known gaps
+├── sim/drivers/    # comms_i2c.c, board_reset.c, board_shutdown.c, camera.c, radio.c -- build against today
+└── real/drivers/   # Hardware-backed; comms_i2c.c is stale (see Known gaps), radio.c intentionally absent
 
 tests/                      # CTest-registered integration tests, see Testing below
 docs/                       # roadmap.md, balloon_launch_plan.md, api_contracts.md, etc.
@@ -120,8 +155,9 @@ cmake --build build
 ### Run it
 
 Two terminals — OBC first. Running `obc_supervisor` alone brings up the whole OBC: it
-spawns `fdir`, `commands`, and the other roles internally (`commands` is the bus master
-and needs to be listening before ADCS connects, though ADCS retries if it isn't yet):
+spawns `fdir`, `commands`, `mission`, and the other roles internally (`commands` is the
+bus master and needs to be listening before ADCS connects, though ADCS retries if it
+isn't yet):
 
 ```bash
 # terminal 1
@@ -131,12 +167,14 @@ and needs to be listening before ADCS connects, though ADCS retries if it isn't 
 ./build/apps/adcs/adcs_sim
 ```
 
-With nothing else driving traffic, this just brings both sides up cleanly and connects
-them over the simulated bus. To actually see something happen, send ADCS a command from
-`commands`' `relay` (a `relay_request_t` over `IPC_send(ROLE_COMMANDS, ...)`, see
-`apps/obc/fdir/src/fallback.c` for a working example building one) — an out-of-range
-`CMD_MOVE_TO_POSITION` will walk the whole chain end to end: ADCS detects the fault,
-resets itself, notifies the OBC, and after enough repeats `fdir` shuts the board down.
+With both sides up, `mission` runs its scripted balloon timeline on its own (wait for
+"ascent" → mock photo capture → mock radio downlink, logged at each step — no ADCS
+involvement), and its `autonomy` thread periodically sends ADCS a `CMD_POINT_TO_SUN`
+through `commands`' `relay`. To exercise the fault path instead, send ADCS a command
+built the same way `fallback.c` does (a `relay_request_t` over
+`IPC_send(ROLE_COMMANDS, ...)`) — an out-of-range `CMD_MOVE_TO_POSITION` will walk the
+whole chain end to end: ADCS detects the fault, resets itself, notifies the OBC, and
+after enough repeats `fdir` shuts the board down.
 
 ### Build for hardware
 
@@ -181,9 +219,10 @@ run them at the same time as each other or as a manually-launched binary using t
   the test suite will fail until these are updated to spawn the new per-role binaries
   (`obc_supervisor`, etc.) instead.
 - **OBC application services** (Telemetry Output, Time-Tagged Scheduler, Limit Checker)
-  still don't exist — `compute`/`data`/`mission`/`time` are stubs, and `fdir`'s own
-  `limit_checker` was removed with nothing yet replacing it. `supervisor`, `fdir`, and
-  `commands` are real, see "OBC internal architecture" above.
+  still don't exist — `compute`/`data`/`time` are stubs, and `fdir`'s own `limit_checker`
+  was removed with nothing yet replacing it (blocked on a real telemetry pipeline).
+  `supervisor`, `fdir`, `commands`, and `mission` are real, see "OBC internal
+  architecture" above.
 - **A shut-down board has no way back except external intervention.** `fdir` can decide
   to shut a repeatedly-resetting board down, but nothing can un-shut-down it — that
   needs EPS to be able to power-cycle a board, which doesn't exist yet.
@@ -192,6 +231,16 @@ run them at the same time as each other or as a manually-launched binary using t
   hardware. Real hardware needs an actual watchdog peripheral (e.g. STM32's IWDG) kicked
   directly — unlike `board_reset`/`board_shutdown`, this isn't abstracted yet, since the
   register layout is part-specific rather than ARM-architectural.
+- **`CMD_POINT_TO_SUN` and `CMD_SHUTDOWN` are placeholders on the ADCS side.** ADCS
+  ACKs and logs them (`command_handler.c`) but doesn't yet actually point at the sun or
+  do anything shutdown-specific beyond calling `board_shutdown()` — real sun-pointing
+  behavior is future work.
+- **`autonomy.c`'s action table has exactly one entry** (point ADCS to the sun). The
+  table-driven shape is built to scale to other subsystems (e.g. telling a thermal board
+  to heat the bio-chamber), but nothing else is wired in yet.
+- **The real E22 radio driver doesn't live in this repo yet.** `radio.h`/`platform/sim/drivers/radio.c`
+  are the shared contract and mock; `platform/real/drivers/radio.c` is being built
+  separately and intentionally isn't referenced from `platform/CMakeLists.txt` yet.
 
 ## Where to go for more
 
