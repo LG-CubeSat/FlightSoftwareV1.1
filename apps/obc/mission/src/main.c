@@ -5,9 +5,11 @@
 
 int main(void) {
     printf("[OBC MISSION] Initializing.\n");
-    
+    fflush(stdout);
+
     if (IPC_initialize(ROLE_MISSION) != 0) {
         printf("[OBC_MISSION] Failed to init IPC.\n");
+        fflush(stdout);
         return 1;
     }
 

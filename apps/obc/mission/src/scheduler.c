@@ -6,7 +6,7 @@
 #include "payload_commander.h"
 #include "pthread.h"
 
-#define ASCENT_WAIT_SEC 100000 // make realistic when needed
+#define ASCENT_WAIT_SEC 5400 // ~90 min: typical HAB ascent to burst altitude at ~5 m/s; tune once real ascent rate/fill is known
 #define PHOTO_PATH "/tmp/photos" // placeholder
 
 typedef enum {
@@ -20,6 +20,7 @@ mission_state_t current_state = MISSION_WAITING_FOR_ASCENT;
 
 int init_scheduler_thread(void) {
     printf("[MISSION SCHEDULER] Attempting to create pthread.\n");
+    fflush(stdout);
     pthread_t scheduler_pthread;
     int ret = pthread_create(&scheduler_pthread, NULL, scheduler_thread, NULL);
     if (ret != 0) {
@@ -27,6 +28,7 @@ int init_scheduler_thread(void) {
     } else {
         printf("[MISSION SCHEDULER] Successfully created pthread.\n");
     }
+    fflush(stdout);
     return ret;
 }
 
@@ -45,6 +47,7 @@ void *scheduler_thread(void *arg) {
             case MISSION_WAITING_FOR_ASCENT:
                 if (elapsed >= ASCENT_WAIT_SEC) {
                     printf("[SCHEDULER] Ascent window reached\n");
+                    fflush(stdout);
                     current_state = MISSION_TAKING_PHOTO;
                 }
                 break;
