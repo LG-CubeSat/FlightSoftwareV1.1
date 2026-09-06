@@ -4,6 +4,7 @@
 
 #include "relay.h"
 #include "ingest.h"
+#include "heartbeat.h"
 #include "csp_network.h"
 #include "csp_commands.h"
 #include "obc_ipc.h"
@@ -20,6 +21,7 @@ int main(void) {
 
     ingest_thread_init();
     relay_thread_init();
+    heartbeat_thread_init();
 
     for (;;) { sleep(1); }
 

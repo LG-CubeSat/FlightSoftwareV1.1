@@ -3,6 +3,7 @@ add_executable(obc_mission
     src/scheduler.c
     src/autonomy.c
     src/payload_commander.c
+    src/heartbeat.c
 )
 
 target_include_directories(obc_mission PRIVATE

@@ -2,6 +2,7 @@
 #include "obc_ipc.h"
 #include "unistd.h"
 #include "scheduler.h"
+#include "heartbeat.h"
 
 int main(void) {
     printf("[OBC MISSION] Initializing.\n");
@@ -14,6 +15,7 @@ int main(void) {
     }
 
     init_scheduler_thread();
+    heartbeat_thread_init();
 
     for (;;) {
         sleep(1);
