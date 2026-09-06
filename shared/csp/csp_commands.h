@@ -33,9 +33,12 @@ typedef struct {
 
 /* Here is where you add more CMDs */
 typedef enum {
-    CMD_MOVE_TO_POSITION = 1,
+    CMD_MOVE_TO_POSITION = 1, // TODO: remove, its studded
     CMD_RESET = 2,
-    CMD_SHUTDOWN = 3
+    CMD_SHUTDOWN = 3,
+
+    // ADCS COMMANDS
+    CMD_POINT_TO_SUN = 4
 } command_id_t;
 
 typedef enum {

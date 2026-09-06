@@ -1,8 +1,14 @@
 #include "payload_commander.h"
-#include "camera.h"
+
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
+
+#include "csp_commands.h"
+#include "camera.h"
 #include "radio.h"
+#include "obc_ipc.h"
+#include "obc_relay_protocol.h"
 
 #define MAX_PHOTO_SIZE (64 * 1024) // tune to real photo size
 
@@ -45,4 +51,12 @@ int payload_commander_downlink_photo(const char *photo_path)
     }
 
     return 0;
+}
+
+int payload_commander_point_to_sun(void)
+{
+    command_envelope_t cmd = { .command_id = CMD_POINT_TO_SUN, .seq = 1 };
+    relay_request_t req = { .dest_addr = ADCS_ADDRESS, .dest_port = ADCS_CMD_PORT, .length = sizeof(cmd) };
+    memcpy(req.payload, &cmd, sizeof(cmd));
+    return IPC_send(ROLE_COMMANDS, (const uint8_t *)&req, sizeof(req)) < 0 ? -1 : 0;
 }

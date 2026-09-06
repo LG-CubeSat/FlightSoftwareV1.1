@@ -3,6 +3,7 @@
 #include "unistd.h"
 #include "scheduler.h"
 #include "heartbeat.h"
+#include "autonomy.h"
 
 int main(void) {
     printf("[OBC MISSION] Initializing.\n");
@@ -16,6 +17,7 @@ int main(void) {
 
     init_scheduler_thread();
     heartbeat_thread_init();
+    init_autonomy_thread();
 
     for (;;) {
         sleep(1);
