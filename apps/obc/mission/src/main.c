@@ -1,6 +1,7 @@
 #include "stdio.h"
 #include "obc_ipc.h"
-#include "stdint.h"
+#include "unistd.h"
+#include "scheduler.h"
 
 int main(void) {
     printf("[OBC MISSION] Initializing.\n");
@@ -9,6 +10,8 @@ int main(void) {
         printf("[OBC_MISSION] Failed to init IPC.\n");
         return 1;
     }
+
+    init_scheduler_thread();
 
     for (;;) {
         sleep(1);

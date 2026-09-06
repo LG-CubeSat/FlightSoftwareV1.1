@@ -1,8 +1,13 @@
 #include "scheduler.h"
+
+#include <stdio.h>
+#include <time.h>
+#include "obc_sleep_until.h"
+#include "payload_commander.h"
 #include "pthread.h"
 
 #define ASCENT_WAIT_SEC 100000 // make realistic when needed
-#define PHOTO_PATH '/tmp/photos' // placeholder
+#define PHOTO_PATH "/tmp/photos" // placeholder
 
 typedef enum {
     MISSION_WAITING_FOR_ASCENT,
