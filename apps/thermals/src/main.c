@@ -5,16 +5,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#include "../tasks/sensor_read_task.c"
-#include "../tasks/thermal_write_task.c"
-
-
-//ALL IN CELSIUS
-float temperature1; //global temperature variable from sensor 1
-float temperature2; //global temperature variable from sensor 2
-
-float goal_temp1; //what the current temp of sensor1 should be
-float goal_temp2; //what the current temp of sensor2 should be
+#include "tasks/sensor_read_task.h"
+#include "tasks/thermal_write_task.h"
 
 int main(void) {
 

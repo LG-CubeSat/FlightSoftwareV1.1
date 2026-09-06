@@ -25,6 +25,7 @@ add_subdirectory(libs/libcsp)
 add_subdirectory(shared)
 add_subdirectory(sys)
 add_subdirectory(apps/adcs)
+add_subdirectory(apps/thermals)
 add_subdirectory(apps/obc)
 
 # toggle for the platform code

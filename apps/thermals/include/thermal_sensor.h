@@ -36,6 +36,4 @@ returns negative if uncessesful (e.g. sensor not initialized, or address is inva
 */
 
 
-
-
 #endif // THERMAL_SENSOR_H

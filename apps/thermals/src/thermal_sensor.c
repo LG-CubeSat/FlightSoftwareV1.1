@@ -1,8 +1,8 @@
 
-#include "../include/thermal_sensor.h"
+#include "thermal_sensor.h"
 #include "stdint.h"
 
-uint8_t sensor_count = 0;
+static uint8_t sensor_count = 0;
 
 int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address) {
 

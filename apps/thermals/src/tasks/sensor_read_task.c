@@ -1,10 +1,13 @@
-#include "../../include/thermal_sensor.h"
+#include "tasks/sensor_read_task.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
-#include "main.h"
+#include "thermal_sensor.h"
 
 #include "stdint.h"
+#include <stdio.h>
+
+#include "thermal_data.h"
 
 
 #define SENSOR_READ_TASK_PRIORITY (1)
@@ -33,6 +36,7 @@ void sensor_read_task_init(void)
     }
 }
 
+
 void sensor_read_task(void *pvParameters) {
 
     (void) pvParameters;
@@ -41,37 +45,34 @@ void sensor_read_task(void *pvParameters) {
 
 
     //Placeholder address for sensors, fill in once we get the real hardware
-    thermal_sensor_t sensor1;
-    sensor1.ADDRESS = 0x48;
-    sensor1.SENSOR_GENERIC = 1;
-    
-    thermal_sensor_t sensor2;
-    sensor2.ADDRESS = 0x40;
-    sensor2.SENSOR_GENERIC = 2;
+    thermal_sensor_t sensor;
+    sensor.ADDRESS = 0x48;
+    sensor.SENSOR_GENERIC = 1;
 
-    int sensor_1_init_value = thermal_sensor_init(&sensor1, sensor1.ADDRESS);
-    if (sensor_1_init_value == -1) {
+    int sensor_init_value = thermal_sensor_init(&sensor, sensor.ADDRESS);
+    if (sensor_init_value == -1) {
         printf("INVALID ADDRESS\n");
-    } else if (sensor_1_init_value == -2) {
-        printf("2 SENSORS ALREADY INITIALIZED\n");
-    } else if (sensor_1_init_value == 1) {
-        printf("SENSOR1 INITIALIZED SUCCSESSFULY");
+    } else if (sensor_init_value == -2) {
+        printf("1 SENSORS ALREADY INITIALIZED\n");
+    } else if (sensor_init_value == 1) {
+        printf("SENSOR INITIALIZED SUCCESSFULLY\n");
+        fflush(stdout);
     }
 
-    int sensor_2_init_value = thermal_sensor_init(&sensor2, sensor2.ADDRESS);
-    if (sensor_2_init_value == -1) {
-        printf("INVALID ADDRESS\n");
-    } else if (sensor_2_init_value == -2) {
-        printf("2 SENSORS ALREADY INITIALIZED\n");
-    } else if (sensor_2_init_value == 1) {
-        printf("SENSOR2 INITIALIZED SUCCSESSFULY");
-    }
  
+    float currentTemp = get_thermal_data().current_temp;
+
     for (;;) {
 
-        //reads data from sensors 1 & 2 and writes data to global temp variables stored in main.c
-        temperature1 = read_temperature_sensor(&sensor1);
-        temperature2 = read_temperature_sensor(&sensor2);
+        currentTemp = thermal_sensor_read(&sensor);
+
+        if (currentTemp < -40.0 || currentTemp > 125.0) {
+            printf("[THERMAL_SENSOR_READ] ERROR: Likely Invalid temperature reading: %.2f°C\n", currentTemp);
+            fflush(stdout);
+        } else {
+            // Update the global thermal data structure with the new temperature reading
+            thermals_set_current(currentTemp);
+        }
 
         xTaskDelayUntil(
             &lastWakeTime,
