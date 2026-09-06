@@ -52,15 +52,17 @@ void sensor_read_task(void *pvParameters) {
     int sensor_init_value = thermal_sensor_init(&sensor, sensor.ADDRESS);
     if (sensor_init_value == -1) {
         printf("INVALID ADDRESS\n");
+        fflush(stdout);
     } else if (sensor_init_value == -2) {
         printf("1 SENSORS ALREADY INITIALIZED\n");
+        fflush(stdout);
     } else if (sensor_init_value == 1) {
         printf("SENSOR INITIALIZED SUCCESSFULLY\n");
         fflush(stdout);
     }
-
+//move this to sensor_init and check for errors in the function decleration 
  
-    float currentTemp = get_thermal_data().current_temp;
+    static float currentTemp;
 
     for (;;) {
 

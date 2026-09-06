@@ -48,8 +48,8 @@ void thermal_write_task(void *pvParameters) {
 
     for (;;) {
 
-    current_temp = get_thermal_data().current_temp;
-    goal_temp = get_thermal_data().goal_temp;
+        current_temp = get_thermal_data().current_temp;
+        goal_temp = get_thermal_data().goal_temp;
 
         if (fabs(goal_temp - current_temp) > 1.0f) {
 
