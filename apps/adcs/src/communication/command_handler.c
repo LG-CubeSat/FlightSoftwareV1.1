@@ -77,7 +77,7 @@ static void * command_handler_rx_loop(void * param)
                         break;
                     case CMD_POINT_TO_SUN:
                         printf("[COMMAND HANDLER] Point to sun command received. \n");
-                        fflush(stdout)
+                        fflush(stdout);
                         reply.status = ACK;
                     default:
                         reply.status = NACK;
