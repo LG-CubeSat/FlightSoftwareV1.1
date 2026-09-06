@@ -80,6 +80,11 @@ static void * command_handler_rx_loop(void * param)
                         fflush(stdout);
                         reply.status = ACK;
                         break;
+                    case CMD_TIME_SYNC:
+                        printf("[COMMAND HANDLER] Time sync command received. \n");
+                        fflush(stdout);
+                        reply.status = ACK;
+                        break;
                     default:
                         reply.status = NACK;
                         break;
