@@ -15,6 +15,7 @@
 
 #include "csp_network.h"
 #include "csp_commands.h"
+#include "fault_manager.h"
 
 int main(void)
 {
@@ -25,6 +26,8 @@ int main(void)
     fflush(stdout);
 
     csp_network_init(ADCS_ADDRESS, /* is_master = */ 0);
+
+    fault_management_init();
 
     command_handler_init();
 

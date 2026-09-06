@@ -10,9 +10,9 @@ picture; this file is the practical "clone it, build it, run it" reference.
 
 | Piece | State |
 |---|---|
-| ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. |
-| OBC | CSP hub running (Linux/POSIX sim). Application services (Command Ingest, Telemetry Output, Time-Tagged Scheduler, Limit Checker) **not yet built**. |
-| Comms bus (I2C) | **Just landed.** Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. Real I2C HAL backend is still a stub (see Known gaps). |
+| ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. Also self-monitors now: an independent watchdog thread and an out-of-bounds check can trigger a real local reset, and repeated resets can lead to an OBC-directed shutdown — see "OBC internal architecture" below. |
+| OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. `supervisor` (process lifecycle), `fdir` (fault tracking, board reset/shutdown decisions), and `commands` (CSP relay to/from other boards) are real and working. `compute`/`data`/`mission`/`time` are still stubs — Telemetry Output, Time-Tagged Scheduler, and Limit Checker described in `docs/api_contracts.md` don't exist yet. |
+| Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. Real I2C HAL backend is still a stub (see Known gaps). |
 | EPS / Thermals / Camera / Comms (radio) | Not yet scaffolded. |
 | FPGA compression / Akida1500 | Out of scope for November; tracked in `docs/roadmap.md` Phase 4. |
 
@@ -38,22 +38,53 @@ broadcasts every frame to every connected node and lets each node's `receive()` 
 anything not addressed to it, mirroring how a real shared I2C wire works electrically.
 Full design writeup: `docs/i2c_sim_transport_plan.md`.
 
+### OBC internal architecture
+
+The OBC itself is 7 separate Linux processes, not one binary — see `apps/obc/roles.md`
+for the full breakdown of who owns what. The two worth knowing about here:
+
+- **`supervisor`** starts the other 6 processes (`posix_spawn`, resolving each sibling's
+  path relative to its own so it works regardless of launch directory), sweeps them for
+  liveness, and restarts a crashed or unresponsive one — mechanism only, no policy.
+- **`fdir`** is where fault policy lives. Its `health_monitor` receives fire-and-forget
+  reset notices from external boards (a board decides and acts on a local fault entirely
+  on its own — see below — then tells the OBC after the fact) and tracks how often each
+  board has reset; past a threshold, it decides the board needs a full shutdown rather
+  than another automatic restart, and asks `commands` to relay that over CSP.
+
+**Board-side self-reset/shutdown** (currently implemented for ADCS) follows the same
+sim/real split as the comms bus: `shared/interfaces/board_reset.h` and `board_shutdown.h`
+each have a `platform/sim/drivers/` implementation (a Linux process re-exec / clean exit)
+and a `platform/real/drivers/` implementation (an ARM Cortex-M `AIRCR` system reset /
+`WFI` low-power halt — architectural instructions, not vendor-specific, so no STM32
+HAL/CMSIS dependency is needed). A board's own watchdog and bounds-checking call these
+directly; the OBC never has to reach in and force anything on a board that's still
+responsive.
+
 ## Repository layout
 
 ```
 apps/
-├── adcs/                  # FreeRTOS MCU app -- done, the reference implementation
-└── obc/                   # Linux CSP hub -- application services not yet built
+├── adcs/                  # FreeRTOS MCU app -- reference implementation, now with local fault handling
+│   └── src/manager/fault_manager.c   # Watchdog thread, bounds checking, reset/shutdown triggers
+└── obc/                   # 7 separate Linux processes, not one binary -- see apps/obc/roles.md
+    ├── supervisor/         # Process lifecycle: spawns, reaps, restarts the other 6
+    ├── fdir/               # Fault policy: health_monitor tracks board resets, fallback acts on them
+    ├── commands/           # Owns the external bus: ingest (inbound routing), relay (outbound)
+    ├── compute/ data/ mission/ time/   # Still stubs
+    └── ipc/                # Internal IPC shared by all 7
 
 shared/
 ├── interfaces/
 │   ├── comms_bus.h         # The medium-agnostic bus contract
+│   ├── board_reset.h       # Board self-reset, sim (re-exec) vs real (Cortex-M AIRCR) impl in platform/
+│   ├── board_shutdown.h    # Board halt, sim (exit) vs real (Cortex-M WFI) impl in platform/
 │   ├── frame.h / frame.c   # Wire framing (addressing + serialization), shared by every backend
-├── csp/                    # CSP-to-transport glue (csp_network.c, csp_if_spi.c)
+├── csp/                    # CSP-to-transport glue (csp_network.c, csp_if_spi.c, csp_commands.h)
 
 platform/
-├── sim/drivers/comms_i2c.c    # Unix-socket shared-bus simulation (what you build against today)
-└── real/drivers/comms_i2c.c   # Real hardware backend -- currently a stub, see Known gaps
+├── sim/drivers/    # comms_i2c.c, board_reset.c, board_shutdown.c -- what you build against today
+└── real/drivers/   # Same three, hardware-backed -- comms_i2c.c is stale, see Known gaps
 
 tests/                      # CTest-registered integration tests, see Testing below
 docs/                       # roadmap.md, balloon_launch_plan.md, api_contracts.md, etc.
@@ -88,20 +119,24 @@ cmake --build build
 
 ### Run it
 
-Two terminals — OBC first (it's the bus master and needs to be listening before ADCS
-connects, though ADCS retries if it isn't yet):
+Two terminals — OBC first. Running `obc_supervisor` alone brings up the whole OBC: it
+spawns `fdir`, `commands`, and the other roles internally (`commands` is the bus master
+and needs to be listening before ADCS connects, though ADCS retries if it isn't yet):
 
 ```bash
 # terminal 1
-./build/apps/obc/obc_sim
+./build/bin/obc_supervisor
 
 # terminal 2
 ./build/apps/adcs/adcs_sim
 ```
 
-You'll see OBC issue a position command, ADCS's command handler pick it up and dispatch it
-through the control/estimation/sensor/telemetry tasks, and telemetry flow back to OBC —
-that's the full CSP round trip over the simulated I2C bus.
+With nothing else driving traffic, this just brings both sides up cleanly and connects
+them over the simulated bus. To actually see something happen, send ADCS a command from
+`commands`' `relay` (a `relay_request_t` over `IPC_send(ROLE_COMMANDS, ...)`, see
+`apps/obc/fdir/src/fallback.c` for a working example building one) — an out-of-range
+`CMD_MOVE_TO_POSITION` will walk the whole chain end to end: ADCS detects the fault,
+resets itself, notifies the OBC, and after enough repeats `fdir` shuts the board down.
 
 ### Build for hardware
 
@@ -116,16 +151,19 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Three tests, each proving something different:
+**Currently broken** — `position_command_test` and `command_ack_test` still depend on an
+`obc_sim` build target that no longer exists since the OBC split into 7 processes; CMake
+configure for the test suite fails until they're updated, see Known gaps. The other two
+still work:
 
 | Test | What it proves |
 |---|---|
 | `comms_bus_test` | Two nodes (OBC + ADCS), addressed frames flow correctly both directions over the real (non-mocked) transport. |
 | `comms_bus_addressing_test` | Three nodes (OBC + two slaves) — a message addressed to one slave is *not* delivered to the other. This is the one that actually exercises the broadcast-and-filter design; two-node tests can't catch a misrouted message since there's nowhere else for it to go. |
-| `position_command_test` | Full-stack integration: spawns the real `obc_sim`/`adcs_sim` binaries and verifies a command flows OBC → CSP → bus → ADCS's FreeRTOS tasks → telemetry → back to OBC, repeatedly. |
+| ~~`position_command_test`~~ | ~~Full-stack integration: spawns the real `obc_sim`/`adcs_sim` binaries and verifies a command flows OBC → CSP → bus → ADCS's FreeRTOS tasks → telemetry → back to OBC, repeatedly.~~ Broken, see above. |
 
-All three fork real processes and talk over a real Unix socket at `/tmp/comms_i2c.sock` — don't
-run them at the same time as each other or as a manually-launched `obc_sim`/`adcs_sim`.
+All fork real processes and talk over a real Unix socket at `/tmp/comms_i2c.sock` — don't
+run them at the same time as each other or as a manually-launched binary using that socket.
 
 ## Known gaps
 
@@ -137,9 +175,23 @@ run them at the same time as each other or as a manually-launched `obc_sim`/`adc
   Fine for the current 2-3 node tests; will need `select()`/`poll()`-based multiplexing
   before many subsystems are simultaneously active and one shouldn't be able to stall
   reads from the others.
-- **OBC application services** (Command Ingest, Telemetry Output, Time-Tagged Scheduler,
-  Limit Checker) don't exist yet — OBC currently only demonstrates the position-command
-  round trip with ADCS, not the ground-facing services described in `docs/api_contracts.md`.
+- **`tests/CMakeLists.txt` still depends on an `obc_sim` target that no longer exists**
+  (`position_command_test` and `command_ack_test` both do `add_dependencies(... obc_sim
+  adcs_sim)`), left over from before the OBC split into 7 processes. CMake configure for
+  the test suite will fail until these are updated to spawn the new per-role binaries
+  (`obc_supervisor`, etc.) instead.
+- **OBC application services** (Telemetry Output, Time-Tagged Scheduler, Limit Checker)
+  still don't exist — `compute`/`data`/`mission`/`time` are stubs, and `fdir`'s own
+  `limit_checker` was removed with nothing yet replacing it. `supervisor`, `fdir`, and
+  `commands` are real, see "OBC internal architecture" above.
+- **A shut-down board has no way back except external intervention.** `fdir` can decide
+  to shut a repeatedly-resetting board down, but nothing can un-shut-down it — that
+  needs EPS to be able to power-cycle a board, which doesn't exist yet.
+- **ADCS's watchdog is POSIX-only.** The independent watchdog thread in
+  `apps/adcs/src/manager/fault_manager.c` uses `pthread`, which doesn't exist on bare-metal
+  hardware. Real hardware needs an actual watchdog peripheral (e.g. STM32's IWDG) kicked
+  directly — unlike `board_reset`/`board_shutdown`, this isn't abstracted yet, since the
+  register layout is part-specific rather than ARM-architectural.
 
 ## Where to go for more
 

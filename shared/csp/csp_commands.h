@@ -12,20 +12,59 @@ ADCS telemetry = 20).
 
 #define OBC_ADDRESS      1
 #define ADCS_ADDRESS     2
-#define EPS              3
+#define EPS_ADDRESS      3
 #define THERMALS         4
 #define CAMERA           5
 #define COMMS            6
 
+// MAKE SURE TO USE PORTS OUTLINED IN README. DONT MAKE THEM UP!
 #define ADCS_CMD_PORT    10
 #define ADCS_TELEM_PORT  20
 
+#define EPS_CMD_PORT 11
+#define EPS_TELEM_PORT 21
+
+#define ADCS_STATUS_PORT 25 // board-initiated reset notices, telemetry range (20-29)
+
+typedef struct {
+    uint8_t command_id;
+    uint32_t seq;
+} command_envelope_t;
+
+/* Here is where you add more CMDs */
 typedef enum {
-    CMD_MOVE_TO_POSITION = 1
+    CMD_MOVE_TO_POSITION = 1,
+    CMD_RESET = 2,
+    CMD_SHUTDOWN = 3
 } command_id_t;
+
+typedef enum {
+    RESET_REASON_OUT_OF_BOUNDS = 1,
+    RESET_REASON_WATCHDOG = 2
+} reset_reason_t;
+
+/* sent to OBC from MCU, port ADCS_STATUS_PORT. Fire-and-forget: sent after a
+   board has already reset itself, not a request for permission. */
+typedef struct {
+    uint8_t board_addr; // e.g. ADCS_ADDRESS -- which board this is about
+    uint8_t reason;      // reset_reason_t
+} board_reset_notice_t;
+
+// what the status of ack is
+typedef enum {
+    ACK = 0,
+    NACK = 1
+} command_ack_status_t;
+
+typedef struct {
+    uint8_t ack_command_id;
+    uint32_t ack_seq;
+    command_ack_status_t status;
+} command_ack_t;
 
 /* OBC -> ADCS, port ADCS_CMD_PORT */
 typedef struct {
+    command_envelope_t envelope;
     int32_t target_position;
 } position_command_t;
 
