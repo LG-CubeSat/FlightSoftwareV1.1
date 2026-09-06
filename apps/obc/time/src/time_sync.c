@@ -40,6 +40,7 @@ static int send_time_sync_to(uint8_t addr, uint8_t cmd_port, uint32_t seq)
     return IPC_send(ROLE_COMMANDS, (const uint8_t *)&req, sizeof(req)) < 0 ? -1 : 0;
 }
 
+/* Basically sync is a constant periodic thread that updates */
 int time_sync_broadcast_thread_init(void)
 {
     printf("[TIME SYNC] Attempting to create pthread.\n");
@@ -72,6 +73,7 @@ void *time_sync_broadcast_thread(void *arg)
     return NULL;
 }
 
+/* request is if the boards can't wait, then we can serve immediately.*/
 int time_sync_request_thread_init(void)
 {
     printf("[REQUEST LISTENER] Attempting to create pthread.\n");

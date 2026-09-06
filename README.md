@@ -11,7 +11,7 @@ picture; this file is the practical "clone it, build it, run it" reference.
 | Piece | State |
 |---|---|
 | ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. Also self-monitors now: an independent watchdog thread and an out-of-bounds check can trigger a real local reset, and repeated resets can lead to an OBC-directed shutdown — see "OBC internal architecture" below. |
-| OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. `supervisor`, `fdir`, `commands`, and `mission` are all real and working now. `mission` runs a one-shot scripted balloon timeline (ascent → photo → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `compute`/`data`/`time` are still stubs — Telemetry Output and Time-Tagged Scheduler described in `docs/api_contracts.md` don't exist yet. |
+| OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. `supervisor`, `fdir`, `commands`, `mission`, and `time` are all real and working now. `mission` runs a one-shot scripted balloon timeline (ascent → photo → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `compute`/`data` are still stubs — Telemetry Output and Time-Tagged Scheduler described in `docs/api_contracts.md` don't exist yet. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. Real I2C HAL backend is still a stub (see Known gaps). |
 | EPS / Thermals / Comms (radio HW) | Not yet scaffolded as CSP boards. Camera/radio *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; the real E22 radio driver is being built separately by a teammate. |
 | FPGA compression / Akida1500 | Out of scope for November; tracked in `docs/roadmap.md` Phase 4. |
@@ -87,11 +87,29 @@ responsive.
   separately, so `platform/real/drivers/radio.c` doesn't exist and isn't referenced from
   `platform/CMakeLists.txt`'s `HW_MODE` branch, to avoid colliding with that work.
 
+- **`time`** keeps the boards' clocks aligned to the OBC's. Rather than a new CSP port, it
+  reuses the same command-envelope/ACK mechanism every board's `command_handler.c` already
+  implements: a `CMD_TIME_SYNC` command carrying a `time_sync_command_t` (envelope +
+  `unix_time_sec`), sent to each board's own existing command port via `commands`' relay.
+  A local `known_boards[]` table (address + cmd port) drives two threads: one broadcasts
+  to every board on a timer (`time_sync_broadcast_thread`), the other answers an on-demand
+  resync request from a specific board immediately instead of making it wait for the next
+  tick (`time_sync_request_thread`, fed by one more row in `commands`' `ingest_thread`
+  routing table — a board pushes a self-identifying `time_sync_request_t` to
+  `TIME_SYNC_REQUEST_PORT`, same self-identifying-payload idea as `board_reset_notice_t`).
+  On-demand queries from *other internal OBC roles* were deliberately left out of scope —
+  every internal process already has `clock_gettime()` locally, so there's no real problem
+  an IPC round-trip to `time` would solve. `unix_time_sec` comes straight from the OBC
+  Linux box's own system clock for now — no real RTC/GPS discipline yet, same "sim now,
+  real later" honesty as `camera`/`radio`, and boards don't actually apply the synced time
+  anywhere yet (`command_handler.c`'s `CMD_TIME_SYNC` case is an ACK+log placeholder, like
+  `CMD_POINT_TO_SUN`).
+
 Every long-lived OBC role sends a periodic no-payload heartbeat ping to `supervisor`
 (`IPC_send(ROLE_SUPERVISOR, NULL, 0)`, see any role's `heartbeat.c`) — without it,
 `supervisor`'s frozen-check can't distinguish "quietly working" from "hung," and will
-restart a perfectly healthy process. `fdir`, `commands`, and `mission` all do this today;
-`compute`/`data`/`time` will need the same `heartbeat.c` the moment they stop being stubs.
+restart a perfectly healthy process. `fdir`, `commands`, `mission`, and `time` all do this
+today; `compute`/`data` will need the same `heartbeat.c` the moment they stop being stubs.
 
 ## Repository layout
 
@@ -104,7 +122,8 @@ apps/
     ├── fdir/               # Fault policy: health_monitor tracks board resets, fallback acts on them
     ├── commands/           # Owns the external bus: ingest (inbound routing), relay (outbound), heartbeat
     ├── mission/            # scheduler (balloon timeline), payload_commander, autonomy, heartbeat
-    ├── compute/ data/ time/   # Still stubs
+    ├── time/               # time_sync: periodic + on-demand CMD_TIME_SYNC to every board, heartbeat
+    ├── compute/ data/      # Still stubs
     └── ipc/                # Internal IPC shared by all 7
 
 shared/
@@ -155,9 +174,9 @@ cmake --build build
 ### Run it
 
 Two terminals — OBC first. Running `obc_supervisor` alone brings up the whole OBC: it
-spawns `fdir`, `commands`, `mission`, and the other roles internally (`commands` is the
-bus master and needs to be listening before ADCS connects, though ADCS retries if it
-isn't yet):
+spawns `fdir`, `commands`, `mission`, `time`, and the other roles internally (`commands`
+is the bus master and needs to be listening before ADCS connects, though ADCS retries if
+it isn't yet):
 
 ```bash
 # terminal 1
@@ -167,14 +186,16 @@ isn't yet):
 ./build/apps/adcs/adcs_sim
 ```
 
-With both sides up, `mission` runs its scripted balloon timeline on its own (wait for
+With both sides up: `mission` runs its scripted balloon timeline on its own (wait for
 "ascent" → mock photo capture → mock radio downlink, logged at each step — no ADCS
-involvement), and its `autonomy` thread periodically sends ADCS a `CMD_POINT_TO_SUN`
-through `commands`' `relay`. To exercise the fault path instead, send ADCS a command
-built the same way `fallback.c` does (a `relay_request_t` over
-`IPC_send(ROLE_COMMANDS, ...)`) — an out-of-range `CMD_MOVE_TO_POSITION` will walk the
-whole chain end to end: ADCS detects the fault, resets itself, notifies the OBC, and
-after enough repeats `fdir` shuts the board down.
+involvement); its `autonomy` thread periodically sends ADCS a `CMD_POINT_TO_SUN` through
+`commands`' `relay`; and `time` immediately (then periodically) sends ADCS a
+`CMD_TIME_SYNC` the same way — watch for `[COMMAND HANDLER] Time sync command received.`
+in ADCS's log. To exercise the fault path instead, send ADCS a command built the same way
+`fallback.c` does (a `relay_request_t` over `IPC_send(ROLE_COMMANDS, ...)`) — an
+out-of-range `CMD_MOVE_TO_POSITION` will walk the whole chain end to end: ADCS detects
+the fault, resets itself, notifies the OBC, and after enough repeats `fdir` shuts the
+board down.
 
 ### Build for hardware
 
@@ -227,11 +248,10 @@ run them at the same time as each other or as a manually-launched binary using t
   Fine for the current 2-3 node tests; will need `select()`/`poll()`-based multiplexing
   before many subsystems are simultaneously active and one shouldn't be able to stall
   reads from the others.
-- **OBC application services** (Telemetry Output, Time-Tagged Scheduler, Limit Checker)
-  still don't exist — `compute`/`data`/`time` are stubs, and `fdir`'s own `limit_checker`
-  was removed with nothing yet replacing it (blocked on a real telemetry pipeline).
-  `supervisor`, `fdir`, `commands`, and `mission` are real, see "OBC internal
-  architecture" above.
+- **OBC application services** (Telemetry Output, Limit Checker) still don't exist —
+  `compute`/`data` are stubs, and `fdir`'s own `limit_checker` was removed with nothing
+  yet replacing it (blocked on a real telemetry pipeline). `supervisor`, `fdir`,
+  `commands`, `mission`, and `time` are real, see "OBC internal architecture" above.
 - **A shut-down board has no way back except external intervention.** `fdir` can decide
   to shut a repeatedly-resetting board down, but nothing can un-shut-down it — that
   needs EPS to be able to power-cycle a board, which doesn't exist yet.
@@ -240,10 +260,16 @@ run them at the same time as each other or as a manually-launched binary using t
   hardware. Real hardware needs an actual watchdog peripheral (e.g. STM32's IWDG) kicked
   directly — unlike `board_reset`/`board_shutdown`, this isn't abstracted yet, since the
   register layout is part-specific rather than ARM-architectural.
-- **`CMD_POINT_TO_SUN` and `CMD_SHUTDOWN` are placeholders on the ADCS side.** ADCS
-  ACKs and logs them (`command_handler.c`) but doesn't yet actually point at the sun or
-  do anything shutdown-specific beyond calling `board_shutdown()` — real sun-pointing
-  behavior is future work.
+- **`CMD_POINT_TO_SUN`, `CMD_SHUTDOWN`, and `CMD_TIME_SYNC` are placeholders on the ADCS
+  side.** ADCS ACKs and logs them (`command_handler.c`) but doesn't yet actually point at
+  the sun, do anything shutdown-specific beyond calling `board_shutdown()`, or apply the
+  synced time anywhere — real behavior for all three needs hardware (an actual sun
+  sensor/actuator, an RTC) this session doesn't have yet.
+- **`time`'s sync source is the OBC Linux box's own system clock**, not a real RTC/GPS
+  reference — fine for proving the sync mechanism works, not for real timekeeping.
+  `time_sync.c`'s `known_boards[]` table also includes EPS even though EPS has no
+  command handler yet — same intentional "free" scalability as `autonomy.c`'s table;
+  the send just goes nowhere until EPS exists.
 - **`autonomy.c`'s action table has exactly one entry** (point ADCS to the sun). The
   table-driven shape is built to scale to other subsystems (e.g. telling a thermal board
   to heat the bio-chamber), but nothing else is wired in yet.
