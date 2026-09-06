@@ -2,10 +2,12 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "pthread.h"
 #include "csp_commands.h"
 #include "obc_relay_protocol.h"
 #include "obc_ipc.h"
+#include "obc_sleep_until.h"
 #include "time.h"
 
 #define TIME_SYNC_INTERVAL_SEC (300) // 5 min, tune later
@@ -42,7 +44,7 @@ int time_sync_broadcast_thread_init(void)
 {
     printf("[TIME SYNC] Attempting to create pthread.\n");
     pthread_t time_sync_broadcast_pthread;
-    int ret = pthread_create(&time_sync_broadcast_pthread, NULL, broadcast_thread, NULL);
+    int ret = pthread_create(&time_sync_broadcast_pthread, NULL, time_sync_broadcast_thread, NULL);
     if (ret != 0) {
         printf("[TIME SYNC] Failed to create pthread.\n");
     } else {
@@ -51,7 +53,7 @@ int time_sync_broadcast_thread_init(void)
     return ret;
 }
 
-static void *broadcast_thread(void *arg)
+void *time_sync_broadcast_thread(void *arg)
 {
     (void)arg;
     uint32_t seq = 0;
@@ -70,21 +72,21 @@ static void *broadcast_thread(void *arg)
     return NULL;
 }
 
-int init_request_listener_thread(void)
+int time_sync_request_thread_init(void)
 {
-    printf("[REQUEST LISTENER] Attemtping to create pthread.\n");
-    pthread_t request_listener_thread;
-    int ret = pthread_create(&request_listener_thread, NULL, request_listener_thread, NULL);
+    printf("[REQUEST LISTENER] Attempting to create pthread.\n");
+    pthread_t time_sync_request_pthread;
+    int ret = pthread_create(&time_sync_request_pthread, NULL, time_sync_request_thread, NULL);
 
     if (ret != 0) {
         printf("[REQUEST LISTENER] Failed to create pthread.\n");
     } else {
-        printf("[REQUEST LISTENER] Successfully created pthreads.\n");
+        printf("[REQUEST LISTENER] Successfully created pthread.\n");
     }
     return ret;
 }
 
-static void *request_listener_thread(void *arg)
+void *time_sync_request_thread(void *arg)
 {
     (void)arg;
     uint32_t seq = 0;

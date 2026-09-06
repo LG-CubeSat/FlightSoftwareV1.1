@@ -4,7 +4,6 @@
 #include "obc_ipc.h"
 #include "time_sync.h"
 #include "heartbeat.h"
-#include "time_sync.h"
 
 int main(void) {
     printf("[OBC TIME] Initializing.\n");
