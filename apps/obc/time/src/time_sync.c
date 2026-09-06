@@ -70,3 +70,41 @@ static void *broadcast_thread(void *arg)
     return NULL;
 }
 
+int init_request_listener_thread(void)
+{
+    printf("[REQUEST LISTENER] Attemtping to create pthread.\n");
+    pthread_t request_listener_thread;
+    int ret = pthread_create(&request_listener_thread, NULL, request_listener_thread, NULL);
+
+    if (ret != 0) {
+        printf("[REQUEST LISTENER] Failed to create pthread.\n");
+    } else {
+        printf("[REQUEST LISTENER] Successfully created pthreads.\n");
+    }
+    return ret;
+}
+
+static void *request_listener_thread(void *arg)
+{
+    (void)arg;
+    uint32_t seq = 0;
+
+    for (;;) {
+        OBC_Roles_t src;
+        uint8_t buf[sizeof(time_sync_request_t)];
+        int len = IPC_receive(&src, buf, sizeof(buf));
+        if (len != sizeof(time_sync_request_t)) continue;
+    
+        time_sync_request_t req;
+        memcpy(&req, buf, sizeof(req));
+
+        for (size_t i=0; i < sizeof(targets)/sizeof(targets[0]); i++) {
+            if (targets[i].addr == req.requester_addr) {
+                send_time_sync_to(targets[i].addr, targets[i].cmd_port, seq++);
+                break;
+            }
+        }
+    }
+    
+    return NULL;
+}
