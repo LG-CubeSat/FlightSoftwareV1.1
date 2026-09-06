@@ -84,5 +84,8 @@ typedef struct {
     int64_t unix_time_sec;
 } time_sync_command_t; // OBC -> board, sent to the board's own CMD Port
 
+typedef struct {
+    uint8_t requester_addr; // e.g. ADCS_ADRESS
+} time_sync_request_t;
 
 #endif
