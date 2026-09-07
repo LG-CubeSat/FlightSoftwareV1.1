@@ -41,6 +41,23 @@ typedef struct {
 static leftover_t slave_leftover;
 static leftover_t master_leftover[MAX_CONNECTIONS];
 
+/* A board simulating a hardware reset closes its end of the connection
+   (see fault_management.c's CLOEXEC'd bus_fd) -- write()/read() on that
+   slot then fails, and it needs to stay dead (not retried forever) while
+   NOT stopping delivery to any later, still-live slot. connections_fd is
+   append-only by design (see comms_bus_receive's comment on indexing),
+   so this leaves a hole rather than compacting -- callers must treat -1
+   as "skip this slot", not "no more slots after this one". */
+static void mark_connection_dead(int index)
+{
+    pthread_mutex_lock(&connection_lock);
+    if (connections_fd[index] != -1) {
+        close(connections_fd[index]);
+        connections_fd[index] = -1;
+    }
+    pthread_mutex_unlock(&connection_lock);
+}
+
 CommsBus_t create_comms_bus(void)
 {
     CommsBus_t bus;
@@ -112,6 +129,10 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
         fflush(stderr);
         return COMMS_BUS_ERROR;
     }
+    // Without this, a board simulating a hardware reset via execv() would
+    // leak this socket into the "fresh" process instead of it actually
+    // being gone, since execv only closes fds marked close-on-exec.
+    fcntl(bus_fd, F_SETFD, FD_CLOEXEC);
 
     // fill out the address card
     memset(&addr, 0, sizeof(addr));
@@ -267,7 +288,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 
         for (int i=0; i < snapshot_count; i++) {
             if (snapshot_fds[i] == -1) {
-                break; // check if no more connections
+                continue; // this slot's connection already died -- skip, more may follow
             }
 
             do {
@@ -276,6 +297,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
             if (ret < 0) {
                 fprintf(stderr, "[COMMS BUS] write() failed: %s\n", strerror(errno));
                 fflush(stderr);
+                mark_connection_dead(i);
             }
         }
     } else {
@@ -315,14 +337,15 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
 
         for (int i=0; i < snapshot_count; i++) {
             if (snapshot_fds[i] == -1) {
-                printf("[COMMS BUS] failed to receive as no connections exist.\n");
-                break;
+                continue; // this slot's connection already died -- skip, more may follow
             }
 
             // Indexed by connection slot, not fd -- connections_fd only
-            // ever appends, so slot i is always the same physical
-            // connection across calls, matching master_leftover[i].
+            // ever appends (dead slots are nulled in place, not removed),
+            // so slot i is always the same physical connection across
+            // calls, matching master_leftover[i].
             if (receive_one_frame(snapshot_fds[i], &master_leftover[i], &frame) < 0) {
+                mark_connection_dead(i);
                 continue; // this connection's read failed -- try the next
             }
             if (frame.dest_addr != my_bus_address) {

@@ -13,6 +13,8 @@ publishes the current attitude
 
 #include <stdio.h>
 
+#include "fault_manager.h"
+
 #define ESTIMATION_TASK_PRIORITY (3)
 #define ESTIMATION_TASK_STACK_SIZE (1024)
 #define ESTIMATION_TASK_PERIOD_MS (100)
@@ -56,6 +58,17 @@ void estimation_task(void *pvParameters)
             int32_t target_position = (int32_t)notified_value;
             printf("[ESTIMATION] Updating attitude estimate for target position: %d\n", target_position);
             fflush(stdout);
+
+            // Placeholder for real sensor fusion/Kalman filter output --
+            // once that exists, check ITS result here, not the commanded
+            // target. A local reset belongs to *our own* state going
+            // physically implausible, not to being asked to do something.
+            if (fault_management_check_bounds(target_position)) {
+                printf("[ESTIMATION] estimated position %d out of bounds -- local fault, resetting\n",
+                       target_position);
+                fflush(stdout);
+                fault_management_trigger_reset(RESET_REASON_OUT_OF_BOUNDS);
+            }
         }
 
         xTaskDelayUntil(

@@ -24,14 +24,37 @@ ADCS telemetry = 20).
 #define EPS_CMD_PORT 11
 #define EPS_TELEM_PORT 21
 
+#define ADCS_STATUS_PORT 25 // board-initiated reset notices, telemetry range (20-29)
+#define TIME_SYNC_REQUEST_PORT 26
+
 typedef struct {
     uint8_t command_id;
     uint32_t seq;
 } command_envelope_t;
 
+/* Here is where you add more CMDs */
 typedef enum {
-    CMD_MOVE_TO_POSITION = 1
+    CMD_MOVE_TO_POSITION = 1, // TODO: remove, its studded
+    CMD_RESET = 2,
+    CMD_SHUTDOWN = 3,
+    CMD_TIME_SYNC = 4,
+    // ADCS COMMANDS
+    CMD_POINT_TO_SUN = 5
 } command_id_t;
+
+// ------
+
+typedef enum {
+    RESET_REASON_OUT_OF_BOUNDS = 1,
+    RESET_REASON_WATCHDOG = 2
+} reset_reason_t;
+
+/* sent to OBC from MCU, port ADCS_STATUS_PORT. Fire-and-forget: sent after a
+   board has already reset itself, not a request for permission. */
+typedef struct {
+    uint8_t board_addr; // e.g. ADCS_ADDRESS -- which board this is about
+    uint8_t reason;      // reset_reason_t
+} board_reset_notice_t;
 
 // what the status of ack is
 typedef enum {
@@ -55,5 +78,14 @@ typedef struct {
 typedef struct {
     int32_t current_position;
 } position_telemetry_t;
+
+typedef struct {
+    command_envelope_t envelope;
+    int64_t unix_time_sec;
+} time_sync_command_t; // OBC -> board, sent to the board's own CMD Port
+
+typedef struct {
+    uint8_t requester_addr; // e.g. ADCS_ADRESS
+} time_sync_request_t;
 
 #endif

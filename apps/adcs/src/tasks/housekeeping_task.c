@@ -11,6 +11,8 @@ Stack usage, CPU usage, Temp, Task heartbeat
 
 #include <stdio.h>
 
+#include "fault_manager.h"
+
 #define HOUSEKEEPING_TASK_PRIORTIY (1)
 #define HOUSEKEEPING_TASK_STACK_SIZE (1024)
 #define HOUSEKEEPING_TASK_PERIOD_MS (1000)
@@ -46,6 +48,8 @@ void housekeeping_task(void *pvParameters)
 
     for (;;)
     {
+        fault_management_pet(); // pets the watchdog.
+
         xTaskDelayUntil(
             &lastWakeTime,
             pdMS_TO_TICKS(HOUSEKEEPING_TASK_PERIOD_MS)
