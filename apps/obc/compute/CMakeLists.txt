@@ -1,6 +1,7 @@
 add_executable(obc_compute
     src/main.c
-    src/image_compression.c
+    src/rice_codec.c
+    src/bit_stream.c
 )
 
 target_include_directories(obc_compute PRIVATE

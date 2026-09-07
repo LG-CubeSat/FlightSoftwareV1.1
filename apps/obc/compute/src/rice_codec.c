@@ -24,8 +24,8 @@ static uint32_t read_sample(const uint8_t *in, size_t index, sample_width_t widt
     uint32_t v = in[off]; // first bit
 
     // little endian formatting (like reading right -> left)
-    if (width >= SAMPLE_WIDTH_16) v |= (uint32_t)(in[off+1] << 8); // if another byte, throw in front
-    if (width >= SAMPLE_WIDTH_32) v |= ((uint32_t)(in[off+2] << 16) | (uint32_t)(in[off+3] << 24)); // if 2 more bytes, throw in front
+    if (width >= SAMPLE_WIDTH_16) v |= (uint32_t)in[off+1] << 8; // if another byte, throw in front
+    if (width >= SAMPLE_WIDTH_32) v |= ((uint32_t)in[off+2] << 16) | ((uint32_t)in[off+3] << 24); // if 2 more bytes, throw in front
 
     return v;
 }
@@ -68,6 +68,9 @@ static int max_k_for(int width_bits)
     return (width_bits >= 32) ? 31 : width_bits;
 }
 
+/*
+See html file in the include for learning what this math works.
+*/
 int rice_compress(const uint8_t *in, size_t in_len, sample_width_t width,
                    uint8_t *out, size_t out_cap, size_t *out_len)
 {
@@ -85,11 +88,23 @@ int rice_compress(const uint8_t *in, size_t in_len, sample_width_t width,
     };
     memcpy(out, &header, sizeof(header));
 
+    /* sample - prev is computed in a uint32_t regardless of width, but the
+       wraparound needs to happen at width_bits, not 32 -- e.g. for an 8-bit
+       sample, sample=106 minus prev=247 must wrap to 115 (mod 256), not to
+       the huge 32-bit value (106-247) actually is. Masking to width_bits
+       here is what makes zigzag_encode's "already a width_bits-wide
+       wraparound value" precondition actually true. This is a no-op for
+       width=4, since a uint32_t's native wraparound already matches
+       width_bits=32 -- which is exactly why this bug was invisible there
+       and only showed up for width 1/2. */
+    uint32_t wrap_mask = (width_bits >= 32) ? 0xFFFFFFFFu : ((1u << width_bits) - 1u);
+
     static uint32_t mapped[RICE_MAX_SAMPLES];
     uint32_t prev = 0;
     for (size_t i = 0; i < n_samples; i++) {
         uint32_t sample = read_sample(in, i, width);
-        mapped[i] = zigzag_encode(sample - prev, width_bits); /* unsigned subtraction wraps on purpose */
+        uint32_t wrapped_diff = (sample - prev) & wrap_mask;
+        mapped[i] = zigzag_encode(wrapped_diff, width_bits);
         prev = sample;
     }
 
