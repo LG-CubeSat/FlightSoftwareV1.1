@@ -1,6 +1,7 @@
 #include "time_sync.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include "pthread.h"
@@ -11,6 +12,18 @@
 #include "time.h"
 
 #define TIME_SYNC_INTERVAL_SEC (300) // 5 min, tune later
+
+/* Overridable so an integration test can see multiple broadcast ticks in
+   seconds instead of waiting out the real 5 minute interval. Production
+   default is untouched unless the env var is set. */
+static int get_time_sync_interval_sec(void)
+{
+    const char *env = getenv("TIME_SYNC_INTERVAL_SEC");
+    if (env == NULL) return TIME_SYNC_INTERVAL_SEC;
+
+    int val = atoi(env);
+    return (val > 0) ? val : TIME_SYNC_INTERVAL_SEC;
+}
 
 typedef struct {
     uint8_t addr;
@@ -61,13 +74,15 @@ void *time_sync_broadcast_thread(void *arg)
     struct timespec next;
     clock_gettime(CLOCK_MONOTONIC, &next);
 
+    int interval_sec = get_time_sync_interval_sec();
+
     for (;;) {
         for (size_t i = 0; i < sizeof(targets)/sizeof(targets[0]); i++) {
             send_time_sync_to(targets[i].addr, targets[i].cmd_port, seq);
         }
         seq++;
 
-        next.tv_sec += TIME_SYNC_INTERVAL_SEC;
+        next.tv_sec += interval_sec;
         obc_sleep_until(&next);
     }
     return NULL;

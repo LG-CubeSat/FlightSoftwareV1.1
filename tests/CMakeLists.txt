@@ -29,3 +29,13 @@ add_dependencies(command_ack_test adcs_sim)
 
 add_test(NAME command_ack_test COMMAND command_ack_test)
 set_tests_properties(command_ack_test PROPERTIES TIMEOUT 30)
+
+add_executable(full_constellation_test test_full_constellation.c)
+target_compile_definitions(full_constellation_test PRIVATE
+    OBC_SUPERVISOR_PATH="$<TARGET_FILE:obc_supervisor>"
+    ADCS_SIM_PATH="$<TARGET_FILE:adcs_sim>"
+)
+add_dependencies(full_constellation_test obc_supervisor adcs_sim)
+
+add_test(NAME full_constellation_test COMMAND full_constellation_test)
+set_tests_properties(full_constellation_test PROPERTIES TIMEOUT 30)

@@ -8,6 +8,7 @@ int camera_capture(const char *out_path)
         fprintf(stderr, "[CAMERA] failed to open %s for writing", out_path);
         return -1;
     }
+    
     fprintf(f, "MOCK PHOTO DATA\n");
     fclose(f);
 
