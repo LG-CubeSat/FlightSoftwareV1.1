@@ -1,6 +1,7 @@
 #include "scheduler.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include "obc_sleep_until.h"
 #include "payload_commander.h"
@@ -8,6 +9,18 @@
 
 #define ASCENT_WAIT_SEC 5400 // ~90 min: typical HAB ascent to burst altitude at ~5 m/s; tune once real ascent rate/fill is known
 #define PHOTO_PATH "/tmp/photos" // placeholder
+
+/* Overridable so an integration test can run the full timeline in seconds
+   instead of waiting out the real ~90 minute ascent. Production default is
+   untouched unless the env var is set. */
+static int get_ascent_wait_sec(void)
+{
+    const char *env = getenv("MISSION_ASCENT_WAIT_SEC");
+    if (env == NULL) return ASCENT_WAIT_SEC;
+
+    int val = atoi(env);
+    return (val > 0) ? val : ASCENT_WAIT_SEC;
+}
 
 typedef enum {
     MISSION_WAITING_FOR_ASCENT,
@@ -38,6 +51,8 @@ void *scheduler_thread(void *arg) {
     clock_gettime(CLOCK_MONOTONIC, &start);
     next = start;
 
+    int ascent_wait_sec = get_ascent_wait_sec();
+
     for (;;) {
         struct timespec now;
         clock_gettime(CLOCK_MONOTONIC, &now);
@@ -45,7 +60,7 @@ void *scheduler_thread(void *arg) {
 
         switch (current_state) {
             case MISSION_WAITING_FOR_ASCENT:
-                if (elapsed >= ASCENT_WAIT_SEC) {
+                if (elapsed >= ascent_wait_sec) {
                     printf("[SCHEDULER] Ascent window reached\n");
                     fflush(stdout);
                     current_state = MISSION_TAKING_PHOTO;

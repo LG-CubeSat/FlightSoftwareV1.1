@@ -52,8 +52,14 @@ void *autonomy_thread(void *arg)
             if (since_last >= actions[i].interval_sec) {
                 printf("[AUTONOMY] firing: %s\n", actions[i].name);
                 fflush(stdout);
-                actions[i].action();
-                actions[i].last_fired = now;
+                /* Only mark this as done if it actually went out -- a
+                   startup race (e.g. commands isn't listening yet) would
+                   otherwise get treated the same as a real send and go
+                   unretried for a full interval instead of trying again
+                   on the very next tick. */
+                if (actions[i].action() == 0) {
+                    actions[i].last_fired = now;
+                }
             }
         }
 
