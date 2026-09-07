@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define DATA_MAX_PATH
+#define DATA_MAX_PATH 64
 #define DATA_CHUNK_SIZE 200 // headroom under obc_ipc's 256-byte MAX_IPC_PAYLOAD
 
 /* role -> ROLE_DATA: "read this file back to me, in chunks" */
