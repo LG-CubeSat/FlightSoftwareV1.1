@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "obc_ipc.h"
 #include "obc_data_protocol.h"
@@ -28,9 +29,12 @@ void *storage_thread(void *arg)
     for (;;) {
         OBC_Roles_t src;
         uint8_t buf[sizeof(data_read_request_t)];
-        int len = IPC_recieve(&src, buf, sizeof(buf));
+        int len = IPC_receive(&src, buf, sizeof(buf));
 
         data_read_request_t req;
+
+        if (len != sizeof(data_read_request_t)) continue;
+
         memcpy(&req, buf, sizeof(req));
         req.path[sizeof(req.path) - 1] = '\0';  // don't trust the sender to have NUL terminated it.
 

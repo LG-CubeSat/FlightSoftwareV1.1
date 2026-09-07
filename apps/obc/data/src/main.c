@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "storage.h"
-#include "filesystem.c"
+#include "filesystem.h"
 #include "heartbeat.h"
 
 int main(void) {
@@ -14,7 +14,7 @@ int main(void) {
     }
 
     storage_thread_init();
-    heart_thread_init();
+    heartbeat_thread_init();
 
     for (;;) { sleep(1); }
 
