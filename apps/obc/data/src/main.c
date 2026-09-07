@@ -14,6 +14,7 @@ int main(void) {
     }
 
     storage_thread_init();
+    heart_thread_init();
 
     for (;;) { sleep(1); }
 

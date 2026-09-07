@@ -2,6 +2,7 @@ add_executable(obc_data
     src/main.c
     src/storage.c
     src/filesystem.c
+    src/heartbeat.c
 )
 
 target_include_directories(obc_data PRIVATE
