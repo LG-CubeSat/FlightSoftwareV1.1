@@ -1,3 +1,6 @@
 [submodule "libs/libcsp"]
 	path = libs/libcsp
 	url = https://github.com/libcsp/libcsp
+[submodule "libs/ssdv"]
+	path = libs/ssdv
+	url = https://github.com/fsphil/ssdv
