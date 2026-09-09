@@ -10,6 +10,7 @@
 #include "obc_ipc.h"
 #include "obc_relay_protocol.h"
 #include "obc_data_protocol.h"
+#include "obc_compute_protocol.h"
 
 #define MAX_PHOTO_SIZE (64 * 1024) // 64kb, tune to real photo size
 
@@ -24,6 +25,43 @@ int payload_commander_take_photo(const char *out_path)
         return -1;
     }
     return 0;
+}
+
+int payload_commander_compress_photo(const char *in_path, const char *out_path)
+{
+    printf("[PAYLOAD COMMANDER] Requesting compression of %s\n", in_path);
+    fflush(stdout);
+
+    static uint32_t next_job_id = 1;
+    uint32_t job_id = next_job_id++;
+
+    compute_compress_request_t req = {0};
+    req.job_id = job_id;
+    snprintf(req.in_path, sizeof(req.in_path), "%s", in_path);
+    snprintf(req.out_path, sizeof(req.out_path), "%s", out_path);
+    req.sample_width = 1; // the mock photo is a raw byte stream, not fixed-width samples
+
+    IPC_send(ROLE_COMPUTE, (const uint8_t *)&req, sizeof(req));
+
+    for (;;) {
+        OBC_Roles_t src;
+        uint8_t buf[sizeof(compute_result_t)];
+        int len = IPC_receive(&src, buf, sizeof(buf));
+        if (len != sizeof(compute_result_t)) continue;
+
+        compute_result_t result;
+        memcpy(&result, buf, sizeof(result));
+        if (result.job_id != job_id) continue; // stale reply from an earlier job, not ours
+
+        if (result.status != COMPUTE_STATUS_OK) {
+            fprintf(stderr, "[PAYLOAD COMMANDER] compression of %s failed (status=%d)\n", in_path, result.status);
+            return -1;
+        }
+
+        printf("[PAYLOAD COMMANDER] Compression done: %u bytes\n", result.output_size);
+        fflush(stdout);
+        return 0;
+    }
 }
 
 int payload_commander_downlink_photo(const char *photo_path)

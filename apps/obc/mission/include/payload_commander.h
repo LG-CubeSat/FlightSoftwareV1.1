@@ -3,6 +3,8 @@
 
 int payload_commander_take_photo(const char *out_path);
 
+int payload_commander_compress_photo(const char *in_path, const char *out_path);
+
 int payload_commander_downlink_photo(const char *photo_path);
 
 int payload_commander_point_to_sun(void);

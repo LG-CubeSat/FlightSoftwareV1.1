@@ -158,6 +158,7 @@ int main(void) {
     check_contains("mission came up", sup_log, "[OBC MISSION] Initializing.");
     check_contains("time came up", sup_log, "[OBC TIME] Initializing.");
     check_contains("data came up", sup_log, "[OBC DATA] Initializing.");
+    check_contains("compute came up", sup_log, "[OBC COMPUTE] Initializing.");
 
     /* autonomy and time_sync both fire on their very first tick (their
        last-fired baseline starts at zero), so both should reach ADCS well
@@ -166,27 +167,26 @@ int main(void) {
     check_contains("time's sync reached ADCS", adcs_log, "[COMMAND HANDLER] Time sync command received.");
 
     /* mission's full scripted timeline, sped up via MISSION_ASCENT_WAIT_SEC:
-       ascent -> photo -> ask data to stream it back -> downlink. */
+       ascent -> photo -> compute compresses it -> data streams it back -> downlink. */
     check_contains("mission reached the ascent window", sup_log, "[SCHEDULER] Ascent window reached");
     check_contains("mission requested a photo capture", sup_log, "[PAYLOAD COMMANDER] Requesting photo capture");
     check_contains("camera captured the mock photo", sup_log, "[CAMERA] (mock) captured photo");
-    check_contains("mission asked data to stream the photo back", sup_log, "[STORAGE] Streaming");
+    check_contains("mission requested compression of the photo", sup_log, "[PAYLOAD COMMANDER] Requesting compression of");
+    check_contains("compute finished the compression job", sup_log, "[PAYLOAD COMMANDER] Compression done:");
+    check_contains("mission asked data to stream the (compressed) photo back", sup_log, "[STORAGE] Streaming");
     check_contains("radio downlink fired with the retrieved bytes", sup_log, "[RADIO] (mock) would transmit");
 
     /* The bug class this whole test suite exists to catch: a real, healthy
        process getting killed and restarted because its heartbeat wasn't
-       wired up. compute is a known, intentional exception (see below). */
+       wired up. All 6 non-supervisor roles are real now -- none of them
+       should show up in an exit/kill message during the run. */
     check_not_contains("supervisor never falsely restarted a healthy process", sup_log, "appears frozen");
-
-    /* compute is still a stub (main() returns immediately) -- supervisor
-       seeing it exit cleanly is expected, not a failure. The other five
-       real roles must NOT show up in an exit/kill message during the run. */
-    check_contains("compute (still a stub) exits as expected", sup_log, "compute exited, code 0");
     check_not_contains("fdir never exited/was killed", sup_log, "fdir exited");
     check_not_contains("commands never exited/was killed", sup_log, "commands exited");
     check_not_contains("mission never exited/was killed", sup_log, "mission exited");
     check_not_contains("time never exited/was killed", sup_log, "time exited");
     check_not_contains("data never exited/was killed", sup_log, "data exited");
+    check_not_contains("compute never exited/was killed", sup_log, "compute exited");
 
     check_contains("supervisor shut down cleanly on SIGTERM", sup_log, "[OBC SUPERVISOR] Clean shutdown complete.");
 
