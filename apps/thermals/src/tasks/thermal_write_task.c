@@ -14,6 +14,8 @@
 #define THERMAL_WRITE_TASK_STACK_SIZE (1024)
 #define THERMAL_WRITE_TASK_PERIOD_MS (100)
 
+#define THERMAL_TOLERANCE (1.5) //degres C
+
 static StackType_t xThermalWriteTaskStack[THERMAL_WRITE_TASK_STACK_SIZE];
 static StaticTask_t xThermalWriteTaskBuffer;
 
@@ -51,7 +53,7 @@ void thermal_write_task(void *pvParameters) {
         current_temp = get_thermal_data().current_temp;
         goal_temp = get_thermal_data().goal_temp;
 
-        if (fabs(goal_temp - current_temp) > 1.0f) {
+        if (fabs(goal_temp - current_temp) > THERMAL_TOLERANCE) {
 
         //to be implimented w/ hardware
         //writes thermals to get closer to goal temp

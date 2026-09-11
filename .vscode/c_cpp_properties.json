@@ -12,6 +12,17 @@
             "cStandard": "c17",
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64"
+        },
+        {
+            "name": "Configuration",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c17",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "macos-clang-arm64"
         }
     ],
     "version": 4
