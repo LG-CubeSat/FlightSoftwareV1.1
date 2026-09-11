@@ -3,4 +3,7 @@
 	url = https://github.com/libcsp/libcsp
 [submodule "libs/ssdv"]
 	path = libs/ssdv
-	url = https://github.com/fsphil/ssdv
+	url = https://github.com/LG-CubeSat/SSDV
+[submodule "libs/CCSDS_121.0"]
+	path = libs/CCSDS_121.0
+	url = https://github.com/LG-CubeSat/CCSDS_121.0
