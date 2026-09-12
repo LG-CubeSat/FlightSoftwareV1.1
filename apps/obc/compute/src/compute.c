@@ -50,23 +50,19 @@ void *dispatch_thread(void *arg) {
         if (len < 0) continue;
 
         printf("[OBC COMPUTE] got %d bytes from role %d\n", len, src);
+
+        if (len == sizeof(compute_compress_request_t)) {
+            handle_compress_request(buf, src);
+        } else if (len == sizeof(compute_cancel_request_t)) {
+            handle_cancel_request(buf);
+        }
     }
 }
 
-int compression_thread_init(void) {
-    printf("[OBC COMPUTE] Attempting to create compression pthread.\n");
-    pthread_t compression_pthread;
-    int ret = pthread_create(&compression_pthread, NULL, compression_thread, NULL);
-    if (ret != 0) {
-        printf("[OBC COMPUTE] Failed to create compression pthread.\n");
-    } else {
-        printf("[OBC COMPUTE] Successfully created compression pthread.\n");
-    }
-    return ret;
+int handle_compress_request(uint8_t buf, OBC_Roles_t src) {
+
 }
 
-void *compression_thread(void *arg) {
-    (void)arg;
-
+int handle_cancel_request(uint8_t buf) {
     
 }
