@@ -1,11 +1,15 @@
 #include "worker.h"
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 #include "pthread.h"
 #include "obc_data_protocol.h"
 #include "ssdv_codec.h"
 #include "dispatch.h"
-#include <string.h>
+#include "time.h"
 
 #define CALL_SIGN "COM" // TODO: make this fetched from mission process...
 #define COMPUTE_MAX_DATA_SIZE (64 * 1024)          // matches payload_commander's MAX_PHOTO_SIZE ceiling
@@ -24,6 +28,25 @@ static int image_id_counter = 0;
 
 static uint8_t input_buf[COMPUTE_MAX_DATA_SIZE];
 static uint8_t compressed_buf[COMPUTE_COMPRESSED_CAP];
+
+/* 
+Recommend searching up 'Chunk Delay'. It makes the compression determinisitc and controlled
+This is done by a delay
+*/
+static int chunk_delay_ms(void) {
+    const char *env = getenv("COMPUTE_CHUNK_DELAY_MS");
+    if (env == NULL) return 0;
+    int val = atoi(env); // atoi turns string -> int
+    return (val > 0) ? val : 0;
+}
+
+static int check_cancelled(uint32_t job_id) {
+    int cancelled;
+    pthread_mutex_lock(&job_lock);
+    cancelled = job_busy && job_id_running == job_id && job_cancel_requested; // checking ID ensures previous jobs don't mess things up
+    pthread_mutex_unlock(&job_lock);
+    return cancelled;
+}
 
 void *worker_thread(void *arg) {
     worker_job_t *job = (worker_job_t *)arg;
@@ -60,6 +83,16 @@ void *worker_thread(void *arg) {
         memcpy(input_buf + input_len, reply.payload, reply.length);
         input_len += reply.length;
         if (reply.is_last) break;
+
+        /* Cancellation Block */
+        if (check_cancelled(job_id)) {
+            compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_CANCELLED };
+            IPC_send(requester, (const uint8_t *)&result, sizeof(result));
+            pthread_mutex_lock(&job_lock); job_busy = 0;
+            pthread_mutex_unlock(&job_lock);
+            return NULL;
+        }
+        if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
     }
 
     size_t compressed_len = 0;
@@ -71,6 +104,16 @@ void *worker_thread(void *arg) {
         pthread_mutex_unlock(&job_lock);
         return NULL;
     }
+
+    /* Cancellation Block */
+    if (check_cancelled(job_id)) {
+            compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_CANCELLED };
+            IPC_send(requester, (const uint8_t *)&result, sizeof(result));
+            pthread_mutex_lock(&job_lock); job_busy = 0;
+            pthread_mutex_unlock(&job_lock);
+            return NULL;
+        }
+    if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
 
     size_t written = 0;
     while (written < compressed_len) {
@@ -96,6 +139,16 @@ void *worker_thread(void *arg) {
             return NULL;
         }
         written += chunk_len;
+
+        /* Cancellation Block */
+        if (check_cancelled(job_id)) {
+            compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_CANCELLED };
+            IPC_send(requester, (const uint8_t *)&result, sizeof(result));
+            pthread_mutex_lock(&job_lock); job_busy = 0;
+            pthread_mutex_unlock(&job_lock);
+            return NULL;
+        }
+        if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
     }
     compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_OK, .output_size = (uint32_t)compressed_len };
     IPC_send(requester, (const uint8_t *)&result, sizeof(result));
@@ -153,5 +206,5 @@ void handle_compress_request(const uint8_t *buf, OBC_Roles_t src) {
 }
 
 void handle_cancel_request(const uint8_t *buf) {
-
+    
 }
