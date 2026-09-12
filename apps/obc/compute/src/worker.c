@@ -16,8 +16,6 @@
 #define COMPUTE_COMPRESSED_CAP (COMPUTE_MAX_DATA_SIZE + 1024) // header + per-block overhead margin
 #define COMPUTE_MAX_MSG_SIZE 256                    // matches obc_ipc's own MAX_IPC_PAYLOAD cap
 
-#define COMPUTE_MAX_DATA_SIZE (64 * 1024)          // matches payload_commander's MAX_PHOTO_SIZE ceiling
-
 static pthread_mutex_t job_lock = PTHREAD_MUTEX_INITIALIZER;
 static int job_busy = 0;
 static uint32_t job_id_running = 0;
