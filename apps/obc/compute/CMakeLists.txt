@@ -1,7 +1,5 @@
 add_executable(obc_compute
     src/main.c
-    src/bitstream.c
-    src/rice_codec.c
     src/ssdv_codec.c
     src/compute.c
     src/heartbeat.c

@@ -40,18 +40,6 @@ add_dependencies(full_constellation_test obc_supervisor adcs_sim)
 add_test(NAME full_constellation_test COMMAND full_constellation_test)
 set_tests_properties(full_constellation_test PROPERTIES TIMEOUT 30)
 
-add_executable(rice_codec_test
-    test_rice_codec.c
-    ${CMAKE_SOURCE_DIR}/apps/obc/compute/src/rice_codec.c
-    ${CMAKE_SOURCE_DIR}/apps/obc/compute/src/bitstream.c
-)
-target_include_directories(rice_codec_test PRIVATE
-    ${CMAKE_SOURCE_DIR}/apps/obc/compute/include
-)
-
-add_test(NAME rice_codec_test COMMAND rice_codec_test)
-set_tests_properties(rice_codec_test PROPERTIES TIMEOUT 10)
-
 add_executable(compute_async_test test_compute_async.c)
 target_link_libraries(compute_async_test PRIVATE obc_ipc)
 target_include_directories(compute_async_test PRIVATE
