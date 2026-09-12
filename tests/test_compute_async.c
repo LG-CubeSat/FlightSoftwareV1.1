@@ -30,23 +30,23 @@
 
 #include "obc_ipc.h"
 #include "obc_compute_protocol.h"
+#include "test_jpeg_data.h"
 
 #define TEST_TIMEOUT_SEC 30
 #define CHUNK_DELAY_MS   "150"
 #define MID_JOB_DELAY_USEC 200000 /* fire the 2nd request / cancel ~200ms into a job that takes ~750ms at 150ms/chunk */
 
-/* Deliberately small: this test races a second job's traffic against the
- * first's on the same listening socket, and every chunk is one more
- * connection contending for obc_ipc's backlog -- keeping the chunk count
- * low (a couple of read chunks, a couple of write chunks) keeps that
- * self-induced contention within what data's bounded retry can absorb.
- * A real job never has this problem (mission only ever runs one at a
- * time); this is purely to keep the test itself non-flaky. */
+/* The input file has to be real JPEG data -- SSDV repackages an
+ * already-JPEG-encoded byte stream, it doesn't create one, so unlike the
+ * old Rice codec (which compressed arbitrary bytes), garbage input here
+ * gets a legitimate COMPUTE_STATUS_FAILED instead of a real compression.
+ * test_jpeg_data.h's 16x16 JPEG is small enough to still race a second
+ * job's traffic against the first without overloading obc_ipc's backlog,
+ * the same reason the old random buffer was kept small. */
 #define TEST_FILE  "/tmp/compute_async_test_input.txt"
-#define TEST_FILE_SIZE 300
-#define OUT_1 "/tmp/compute_async_test_out1.rice"
-#define OUT_2 "/tmp/compute_async_test_out2.rice"
-#define OUT_3 "/tmp/compute_async_test_out3.rice"
+#define OUT_1 "/tmp/compute_async_test_out1.ssdv"
+#define OUT_2 "/tmp/compute_async_test_out2.ssdv"
+#define OUT_3 "/tmp/compute_async_test_out3.ssdv"
 
 static int total_checks = 0;
 static int failed_checks = 0;
@@ -161,13 +161,12 @@ int main(void) {
     unlink(OUT_2);
     unlink(OUT_3);
 
-    /* Deterministic, incompressible-ish input -- large enough that at
-     * CHUNK_DELAY_MS per chunk the whole job takes over a second, giving
-     * both scenarios below a wide, reliable window to land in. */
+    /* Real JPEG, small enough that at CHUNK_DELAY_MS per chunk the whole
+     * job still takes the better part of a second, giving both scenarios
+     * below a wide, reliable window to land in. */
     FILE * f = fopen(TEST_FILE, "wb");
     if (f == NULL) { fprintf(stderr, "compute_async_test: FAIL (could not create input file)\n"); return 1; }
-    srand(7);
-    for (int i = 0; i < TEST_FILE_SIZE; i++) fputc(rand() & 0xFF, f);
+    fwrite(test_jpeg_data, 1, test_jpeg_data_len, f);
     fclose(f);
 
     pid_t data_pid = spawn_logged(DATA_PATH, "/tmp/compute_async_test_data.log", 0);

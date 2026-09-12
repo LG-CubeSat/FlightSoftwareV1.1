@@ -2,7 +2,8 @@
 #include <unistd.h>
 
 #include "obc_ipc.h"
-#include "compute.h"
+#include "worker.h"
+#include "dispatch.h"
 #include "heartbeat.h"
 
 int main(void) {

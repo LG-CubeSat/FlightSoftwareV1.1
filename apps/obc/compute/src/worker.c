@@ -1,21 +1,18 @@
-#include "compute.h"
+#include "worker.h"
 
 #include <stdio.h>
-#include <string.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <pthread.h>
-
-#include "obc_ipc.h"
-#include "obc_compute_protocol.h"
+#include "pthread.h"
 #include "obc_data_protocol.h"
 #include "ssdv_codec.h"
+#include "dispatch.h"
+#include <string.h>
 
-#define CALL_SIGN 'A' // TODO: make this fetched from mission process...
+#define CALL_SIGN "COM" // TODO: make this fetched from mission process...
 #define COMPUTE_MAX_DATA_SIZE (64 * 1024)          // matches payload_commander's MAX_PHOTO_SIZE ceiling
 #define COMPUTE_COMPRESSED_CAP (COMPUTE_MAX_DATA_SIZE + 1024) // header + per-block overhead margin
 #define COMPUTE_MAX_MSG_SIZE 256                    // matches obc_ipc's own MAX_IPC_PAYLOAD cap
+
+#define COMPUTE_MAX_DATA_SIZE (64 * 1024)          // matches payload_commander's MAX_PHOTO_SIZE ceiling
 
 static pthread_mutex_t job_lock = PTHREAD_MUTEX_INITIALIZER;
 static int job_busy = 0;
@@ -23,59 +20,10 @@ static uint32_t job_id_running = 0;
 static volatile int job_cancel_requested = 0; // not required to be volatile, but matches convention
 
 static worker_job_t current_job; // One job at a time, safe to reuse
-
 static int image_id_counter = 0;
-static int computing = 0; // 1 means we are computing
-
-static pthread_mutex_t reply_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t reply_cond = PTHREAD_COND_INITIALIZER;
-static uint8_t reply_buf[COMPUTE_MAX_MSG_SIZE];
-static int reply_len = 0;
-static int reply_ready = 0;
 
 static uint8_t input_buf[COMPUTE_MAX_DATA_SIZE];
 static uint8_t compressed_buf[COMPUTE_COMPRESSED_CAP];
-
-/* Called only by dispatch_thread, when a message arrives from ROLE_DATE. */
-static void deliver_reply(const uint8_t *buf, int len) {
-    pthread_mutex_lock(&reply_lock);
-    while (reply_ready) {
-        pthread_cond_wait(&reply_cond, &reply_lock); // wait if worker hasn't consumed the last one yet.
-    }
-    memcpy(reply_buf, buf, (size_t)len);
-    reply_len = len;
-    reply_ready = 1;
-    pthread_cond_signal(&reply_cond); // wake the worker
-    pthread_mutex_unlock(&reply_lock);
-}
-
-static int wait_for_reply(uint8_t *buf, size_t buf_size) {
-    pthread_mutex_lock(&reply_lock);
-    while (!reply_ready) {
-        pthread_cond_wait(&reply_cond, &reply_lock); // sleep until deliver_reply signals
-    }
-    int len = reply_len;
-    if ((size_t)len <= buf_size) {
-        memcpy(buf, reply_buf, (size_t)len);
-    } else {
-        reply_ready = 0;
-        pthread_cond_signal(&reply_cond); // wake deliver_reply if it's waiting for the slot to free up
-        pthread_mutex_unlock(&reply_lock);
-        return len;
-    }
-}
-
-int dispatch_thread_init(void) {
-    printf("[OBC COMPUTE] Attempting dispatch pthread creation.\n");
-    pthread_t dispatch_pthread;
-    int ret = pthread_create(&dispatch_pthread, NULL, dispatch_thread, NULL);
-    if (ret != 0) {
-        printf("[OBC COMPUTE] Failed to create pthread.\n");
-    } else {
-        printf("[OBC COMPUTE] Successfully create pthread.\n");
-    }
-    return ret;
-}
 
 void *worker_thread(void *arg) {
     worker_job_t *job = (worker_job_t *)arg;
@@ -83,6 +31,8 @@ void *worker_thread(void *arg) {
     OBC_Roles_t requester = job->requester;
     char in_path[COMPUTE_MAX_PATH];
     char out_path[COMPUTE_MAX_PATH];
+    memcpy(&in_path, job->req.in_path, sizeof(in_path));
+    memcpy(&out_path, job->req.out_path, sizeof(out_path));
 
     /* --- phase 1: read in_path from data, in chunks --- */
     data_read_request_t read_req = {0};
@@ -149,30 +99,10 @@ void *worker_thread(void *arg) {
     }
     compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_OK, .output_size = (uint32_t)compressed_len };
     IPC_send(requester, (const uint8_t *)&result, sizeof(result));
+    pthread_mutex_lock(&job_lock);
+    job_busy = 0;
     pthread_mutex_unlock(&job_lock);
     return NULL;
-}
-
-void *dispatch_thread(void *arg) {
-    (void)arg;
-    uint8_t buf[COMPUTE_MAX_MSG_SIZE];
-
-    for (;;) {
-        OBC_Roles_t src;
-        int len = IPC_receive(&src, buf, sizeof(buf));
-
-        if (len < 0) continue;
-
-        printf("[OBC COMPUTE] got %d bytes from role %d\n", len, src);
-
-        if (src == ROLE_DATA) {
-            deliver_reply(buf, len);
-        } else if (len == sizeof(compute_compress_request_t)) {
-            handle_compress_request(buf, src);
-        } else if (len == sizeof(compute_cancel_request_t)) {
-            handle_cancel_request(buf);
-        }
-    }
 }
 
 void handle_compress_request(const uint8_t *buf, OBC_Roles_t src) {
@@ -198,6 +128,7 @@ void handle_compress_request(const uint8_t *buf, OBC_Roles_t src) {
     pthread_mutex_unlock(&job_lock);
 
     current_job.req = req;
+    current_job.requester = src;
     pthread_t worker;
 
     /*
