@@ -11,7 +11,7 @@ picture; this file is the practical "clone it, build it, run it" reference.
 | Piece | State |
 |---|---|
 | ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. Also self-monitors now: an independent watchdog thread and an out-of-bounds check can trigger a real local reset, and repeated resets can lead to an OBC-directed shutdown — see "OBC internal architecture" below. |
-| OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. `supervisor`, `fdir`, `commands`, `mission`, `time`, and `data` are all real and working now — only `compute` remains a stub. `mission` runs a one-shot scripted balloon timeline (ascent → photo → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. |
+| OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. CCSDS 121.0 (ground-station packetization/link) is a separate, in-progress effort tracked outside this repo's `compute` process. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. Real I2C HAL backend is still a stub (see Known gaps). |
 | EPS / Thermals / Comms (radio HW) | Not yet scaffolded as CSP boards. Camera/radio *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; the real E22 radio driver is being built separately by a teammate. |
 | FPGA compression / Akida1500 | Out of scope for November; tracked in `docs/roadmap.md` Phase 4. |
@@ -64,13 +64,14 @@ responsive.
 - **`mission`** owns everything payload/mission-related, split into three pieces that
   mirror the roles.md description of the role:
   - `scheduler` runs a one-shot, linear balloon-flight timeline (a small state machine:
-    wait for ascent → take photo → downlink → done) — deliberately scripted, no real
-    autonomy, since the balloon flight doesn't need or want decision-making.
+    wait for ascent → take photo → compress → downlink → done) — deliberately scripted,
+    no real autonomy, since the balloon flight doesn't need or want decision-making.
   - `payload_commander` is what the scheduler (and autonomy) call to actually do
-    something: capture a photo (`camera_capture`), downlink a file over the radio
-    (`radio_send`), or command another board (e.g. `payload_commander_point_to_sun`
-    builds a `command_envelope_t` and hands it to `commands`' relay over
-    `obc_relay_protocol.h`).
+    something: capture a photo (`camera_capture`), ask `compute` to compress a file
+    and block for the result (`payload_commander_compress_photo`), downlink a file
+    over the radio (`radio_send`), or command another board (e.g.
+    `payload_commander_point_to_sun` builds a `command_envelope_t` and hands it to
+    `commands`' relay over `obc_relay_protocol.h`).
   - `autonomy` is a small recurring engine — a table of `{name, interval, last_fired,
     function pointer}` entries, checked once a second — built now even though the
     balloon flight doesn't use real autonomy, because the table-driven shape scales
@@ -109,22 +110,64 @@ responsive.
   `data`, not another process touching the filesystem directly" — closing a real
   violation where `mission`'s `payload_commander.c` used to `fopen`/`fread` the photo file
   itself. Split into `filesystem.c` (the only file in the whole codebase that still calls
-  `fopen`; one function, `filesystem_stream_file(path, requester)`) and `storage.c` (the
-  IPC-facing thread that receives a `data_read_request_t{path}` and calls it). Files cross
-  IPC chunked, not as one message: `obc_ipc.c` caps a single message at 256 bytes, so a
-  64KB photo can't fit in one `data_read_reply_t` — `filesystem_stream_file` streams
-  `DATA_CHUNK_SIZE`-sized (~200 byte) chunks with `{status, offset, length, is_last}`
-  until `is_last`, and the not-found case sends one `status=-1, is_last=1` reply so the
-  caller's loop always terminates instead of hanging. Only the read path exists — nothing
-  needs a managed write yet (the camera's own capture is treated as a driver writing to
-  its own storage, not something `data` should own), so a write path wasn't built
-  speculatively.
+  `fopen`) and `storage.c` (the IPC-facing thread that dispatches by message size to the
+  read or write path). Files cross IPC chunked, not as one message: `obc_ipc.c` caps a
+  single message at 256 bytes, so a 64KB photo can't fit in one `data_read_reply_t` —
+  `filesystem_stream_file` streams `DATA_CHUNK_SIZE`-sized (~200 byte) chunks with
+  `{status, offset, length, is_last}` until `is_last`, and the not-found case sends one
+  `status=-1, is_last=1` reply so the caller's loop always terminates instead of hanging.
+  The write path (`filesystem_write_chunk`) is the same idea in reverse — `data_write_chunk_t`
+  carries its own `path` (writes are self-contained per-message, no session state kept in
+  `data` across chunks; `offset==0` truncates/creates, `offset>0` appends) — with one ack
+  per chunk so the writer can abort immediately on the first failure. `filesystem_stream_file`
+  also retries a transient `IPC_send` failure a bounded number of times before giving up: a
+  real bug caught by testing had a fast reader outrun `obc_ipc`'s connection backlog,
+  silently dropping chunks (`IPC_send` is deliberately fail-fast and doesn't retry itself —
+  see Known gaps) — including, once, the final chunk, which left the reader waiting forever
+  for one that would never arrive.
+- **`compute`** is the last of the 7 to go from stub to real, and the first genuinely
+  asynchronous one: `threading.md` specs it as "a dispatcher blocks on ipc for work
+  requests; a separate worker thread does the actual compute... so a long job never blocks
+  the dispatcher from accepting a new request or a cancellation," and `dispatch.c`/`worker.c`
+  follow that directly (split across two files along that exact seam: `dispatch.c` only
+  ever receives IPC and routes it, `worker.c` owns job state and does the actual work). A
+  single job slot (one photo per flight is all that's needed — a second `compress` request
+  while one is running gets an immediate `COMPUTE_STATUS_BUSY`, not queued); the dispatcher
+  hands each job to a detached worker thread, which reads the input from `data`, compresses
+  it, writes the result back to `data`, and checks a cancellation flag between chunks
+  throughout. Because `obc_ipc` only supports one blocking receiver per process, the
+  dispatcher stays the *only* thread that ever calls `IPC_receive` — anything it gets from
+  `ROLE_DATA` is routed to the worker through a small single-slot mailbox (mutex + condition
+  variable) instead of the worker calling `IPC_receive` itself, which would race the
+  dispatcher's own `accept()`. `COMPUTE_CHUNK_DELAY_MS` (read once per job in `worker.c`)
+  widens the artificial per-chunk delay so a test can reliably land a `BUSY` rejection or a
+  mid-flight cancel against a job that would otherwise finish in well under a millisecond
+  over local IPC — production default is 0 (no delay) unless the env var is set.
+
+  The compression itself (`ssdv_codec.c`) wraps **SSDV** (`libs/ssdv`, a git submodule,
+  forked from fsphil's reference implementation), the same scheme amateur high-altitude
+  balloon payloads use to get images down over a lossy RF link: it repackages an
+  already-JPEG-encoded byte stream into fixed 256-byte packets, each carrying its own
+  Reed-Solomon FEC, callsign/image-id/packet-id metadata, and an end-of-image flag on the
+  last packet — a single dropped or corrupted packet on the ground only costs one packet's
+  worth of image data, not the whole photo. SSDV repackages a JPEG, it doesn't create
+  one — the input has to already be valid JPEG bytes (see "Known gaps" below on what this
+  means for the mock camera). `ssdv_encode_image()` is a thin wrapper that drives SSDV's
+  pull-based packet-generation state machine to completion against an in-memory buffer,
+  giving the rest of `compute` the same "one buffer in, one buffer out" call shape the
+  dispatcher/worker split expects, so nothing else in `compute` needs to know SSDV's API is
+  a state machine underneath. Verified byte-for-byte identical against the reference `ssdv`
+  CLI tool's own output for the same input, and round-tripped through the reference
+  decoder, before being wired into the real dispatcher/worker pipeline. **CCSDS 121.0**
+  (`libs/CCSDS_121.0`, also a submodule) is reserved for ground-station packetization and
+  uplink/downlink framing — a separate, in-progress piece of work, not part of `compute`
+  today (the vendored build only ships precompiled x86-64 Linux binaries, no source, so
+  there's nothing for this repo to build against yet regardless).
 
 Every long-lived OBC role sends a periodic no-payload heartbeat ping to `supervisor`
 (`IPC_send(ROLE_SUPERVISOR, NULL, 0)`, see any role's `heartbeat.c`) — without it,
 `supervisor`'s frozen-check can't distinguish "quietly working" from "hung," and will
-restart a perfectly healthy process. `fdir`, `commands`, `mission`, `time`, and `data` all
-do this today; `compute` will need the same `heartbeat.c` the moment it stops being a stub.
+restart a perfectly healthy process. All 6 non-supervisor roles do this today.
 
 ## Repository layout
 
@@ -139,7 +182,7 @@ apps/
     ├── mission/            # scheduler (balloon timeline), payload_commander, autonomy, heartbeat
     ├── time/               # time_sync: periodic + on-demand CMD_TIME_SYNC to every board, heartbeat
     ├── data/               # storage (IPC service) + filesystem (the only fopen left), heartbeat
-    ├── compute/            # Still a stub
+    ├── compute/            # dispatch (async job engine) + worker (job state) + ssdv_codec, heartbeat
     └── ipc/                # Internal IPC shared by all 7
 
 shared/
@@ -158,7 +201,12 @@ platform/
 
 tests/                      # CTest-registered integration tests, see Testing below
 docs/                       # roadmap.md, balloon_launch_plan.md, api_contracts.md, etc.
-libs/libcsp/                # CSP protocol implementation (git submodule)
+libs/
+├── libcsp/                 # CSP protocol implementation (git submodule)
+├── ssdv/                   # SSDV image-packetization library (git submodule), linked into compute
+└── CCSDS_121.0/            # Reference CCSDS 121.0 tools (git submodule) -- precompiled x86-64
+                            # Linux binaries only, no source; reserved for a separate,
+                            # in-progress ground-station packetization effort, not built here
 rtos/                       # FreeRTOS kernel + POSIX/hardware ports
 ```
 
@@ -166,7 +214,7 @@ Full convention (naming, where new subsystems go, CMake patterns): `docs/directo
 
 ## Getting started
 
-### Clone (this repo uses a git submodule for libcsp)
+### Clone (this repo uses git submodules for libcsp, ssdv, and CCSDS_121.0)
 
 ```bash
 git clone --recurse-submodules https://github.com/LG-CubeSat/FlightSoftwareV1.git
@@ -190,9 +238,8 @@ cmake --build build
 ### Run it
 
 Two terminals — OBC first. Running `obc_supervisor` alone brings up the whole OBC: it
-spawns `fdir`, `commands`, `mission`, `time`, `data`, and `compute` internally (`commands`
-is the bus master and needs to be listening before ADCS connects, though ADCS retries if
-it isn't yet):
+spawns the other 6 real roles internally (`commands` is the bus master and needs to be
+listening before ADCS connects, though ADCS retries if it isn't yet):
 
 ```bash
 # terminal 1
@@ -203,13 +250,13 @@ it isn't yet):
 ```
 
 With both sides up: `mission` runs its scripted balloon timeline on its own (wait for
-"ascent" → mock photo capture → ask `data` to stream the photo back → mock radio downlink,
-logged at each step — no ADCS involvement); its `autonomy` thread periodically sends ADCS
-a `CMD_POINT_TO_SUN` through `commands`' `relay`; and `time` immediately (then
-periodically) sends ADCS a `CMD_TIME_SYNC` the same way — watch for `[COMMAND HANDLER]
-Time sync command received.` in ADCS's log, and `[STORAGE] Streaming ... to role 5` in
-`data`'s output for the photo readback. To exercise the fault path instead, send ADCS a
-command built the same way
+"ascent" → mock photo capture → `compute` compresses it → `data` streams the compressed
+result back → mock radio downlink, logged at each step — no ADCS involvement); its
+`autonomy` thread periodically sends ADCS a `CMD_POINT_TO_SUN` through `commands`'
+`relay`; and `time` immediately (then periodically) sends ADCS a `CMD_TIME_SYNC` the same
+way — watch for `[COMMAND HANDLER] Time sync command received.` in ADCS's log, and
+`[PAYLOAD COMMANDER] Compression done: ... bytes` for the compression step. To exercise the fault
+path instead, send ADCS a command built the same way
 `fallback.c` does (a `relay_request_t` over `IPC_send(ROLE_COMMANDS, ...)`) — an
 out-of-range `CMD_MOVE_TO_POSITION` will walk the whole chain end to end: ADCS detects
 the fault, resets itself, notifies the OBC, and after enough repeats `fdir` shuts the
@@ -234,7 +281,7 @@ ctest --test-dir build --output-on-failure
 cached `OFF` sticks around across plain re-runs of `cmake -S . -B build`), pass
 `-DBUILD_TESTS=ON` explicitly once to pick it back up.
 
-All five tests build and pass. `position_command_test` and `command_ack_test` *are* the
+All six tests build and pass. `position_command_test` and `command_ack_test` *are* the
 OBC's CSP node themselves (the same `csp_network_init(OBC_ADDRESS, 1)` call any real OBC
 role makes), talking to a real spawned `adcs_sim` — this tests ADCS's actual command/task
 pipeline over the real wire contract without depending on which internal OBC processes
@@ -248,7 +295,8 @@ launch would, alongside a real `adcs_sim`:
 | `comms_bus_addressing_test` | Three nodes (OBC + two slaves) — a message addressed to one slave is *not* delivered to the other. This is the one that actually exercises the broadcast-and-filter design; two-node tests can't catch a misrouted message since there's nowhere else for it to go. |
 | `position_command_test` | Full-stack happy path: repeated `CMD_MOVE_TO_POSITION` commands get ACKed, activate every task the command should (Control, Estimation, Sensor, Telemetry — not Housekeeping), and get a matching telemetry report back, all repeated across multiple cycles so a "works once then hangs" regression can't slip through. |
 | `command_ack_test` | ACK/NACK protocol edge cases `position_command_test` doesn't cover: an unrecognized command_id gets NACKed, an undersized `CMD_MOVE_TO_POSITION` (missing its target) gets NACKed, and a valid command right after both still gets ACKed — proving bad input doesn't wedge the handler. |
-| `full_constellation_test` | The only test that checks the processes actually work *together*, not just individually: every real role (`fdir`/`commands`/`mission`/`time`/`data`) comes up, `autonomy`'s sun-pointing and `time`'s sync both reach ADCS, `mission`'s full scripted timeline runs end to end (ascent → photo → `data` streams it back → downlink), and `supervisor` never falsely restarts a healthy process. `MISSION_ASCENT_WAIT_SEC` and `TIME_SYNC_INTERVAL_SEC` env vars let it run the real ~90 min / 5 min timers in seconds — production defaults are untouched unless the var is set. |
+| `full_constellation_test` | The only test that checks the processes actually work *together*, not just individually: every real role comes up, `autonomy`'s sun-pointing and `time`'s sync both reach ADCS, `mission`'s full scripted timeline runs end to end (ascent → photo → real SSDV compression → `data` streams it back → downlink), and `supervisor` never falsely restarts a healthy process. `MISSION_ASCENT_WAIT_SEC` and `TIME_SYNC_INTERVAL_SEC` env vars let it run the real ~90 min / 5 min timers in seconds — production defaults are untouched unless the var is set. |
+| `compute_async_test` | The two behaviors that make `compute` different from every other request/reply role: a second concurrent compress request gets `COMPUTE_STATUS_BUSY` (not queued) while one is running, and an in-flight job can be cancelled mid-run. Forks two real requester processes with different roles against real `obc_data`/`obc_compute` binaries, compressing a real (tiny, embedded) JPEG — `COMPUTE_CHUNK_DELAY_MS` widens the job's runtime so both checks land reliably. |
 
 Building `full_constellation_test` caught a real bug: `autonomy_thread` marked an action
 as "done" (updating `last_fired`) even when its `IPC_send` failed — so a transient startup
@@ -276,9 +324,9 @@ run them at the same time as each other or as a manually-launched binary using t
   before many subsystems are simultaneously active and one shouldn't be able to stall
   reads from the others.
 - **OBC application services** (Telemetry Output, Limit Checker) still don't exist —
-  `compute` is a stub, and `fdir`'s own `limit_checker` was removed with nothing yet
-  replacing it (blocked on a real telemetry pipeline). `supervisor`, `fdir`, `commands`,
-  `mission`, `time`, and `data` are real, see "OBC internal architecture" above.
+  `fdir`'s own `limit_checker` was removed with nothing yet replacing it (blocked on a
+  real telemetry pipeline). All 7 OBC processes are real now, see "OBC internal
+  architecture" above.
 - **A shut-down board has no way back except external intervention.** `fdir` can decide
   to shut a repeatedly-resetting board down, but nothing can un-shut-down it — that
   needs EPS to be able to power-cycle a board, which doesn't exist yet.
@@ -303,15 +351,34 @@ run them at the same time as each other or as a manually-launched binary using t
 - **The real E22 radio driver doesn't live in this repo yet.** `radio.h`/`platform/sim/drivers/radio.c`
   are the shared contract and mock; `platform/real/drivers/radio.c` is being built
   separately and intentionally isn't referenced from `platform/CMakeLists.txt` yet.
-- **`data` only has a read path.** Nothing needs a managed write yet, so one wasn't built
-  speculatively — if a future role needs `data` to own a write (not just the camera's own
-  capture), that's new scope, not something already there unused.
 - **`IPC_send` itself never retries** (see its own comment: "fail fast, don't retry
-  forever") — that's a deliberate transport-level choice, not a bug. `autonomy_thread` now
-  compensates for it correctly (only marks an action "done" if the send actually
-  succeeded, so a lost startup race gets retried on the very next tick); any *new* periodic
-  sender should follow the same pattern rather than assuming a single send attempt is
-  enough.
+  forever") — that's a deliberate transport-level choice, not a bug. Two different callers
+  compensate for it where it actually matters: `autonomy_thread` only marks an action
+  "done" if the send actually succeeded (so a lost startup race gets retried on the very
+  next tick, not a full interval later), and `data`'s `filesystem_stream_file` retries a
+  failed chunk send a bounded number of times (a fast reader can outrun `obc_ipc`'s
+  connection backlog otherwise — a real bug this caught, see "OBC internal architecture"
+  above). Any *new* periodic sender or fast streaming loop should follow one of these
+  patterns rather than assuming a single send attempt is enough.
+- **SSDV requires real JPEG input** — it repackages an already-encoded JPEG byte stream,
+  it doesn't create one, so `compute` returns `COMPUTE_STATUS_FAILED` for anything that
+  isn't valid JPEG. This is why the mock camera (`platform/sim/drivers/camera.c`) writes a
+  real (tiny, embedded) JPEG rather than placeholder text — a real camera will produce real
+  JPEG bytes too, so the mock now matches that contract instead of standing in for "some
+  bytes."
+- **CCSDS 121.0 ground-station packetization/link work hasn't started in this repo.**
+  `libs/CCSDS_121.0` is vendored as a submodule (see Repository layout) but is reserved for
+  a separate, in-progress effort — it isn't wired into `compute` or any other OBC process
+  yet, and the vendored build is precompiled x86-64 Linux binaries with no source, so
+  nothing in this repo builds against it today regardless of host architecture.
+- **`compute`'s single job slot rejects a second concurrent request** (`COMPUTE_STATUS_BUSY`)
+  rather than queuing it — right-sized for one photo per balloon flight; a queue/pool is
+  straightforward to add later if `compute` ever needs to run more than one job at a time.
+- **`compute_compress_request_t`'s `sample_width` field is vestigial.** It mattered for the
+  project's earlier Rice-codec compressor (which needed to know the native width of the
+  data being compressed); SSDV only ever deals with byte streams, so nothing in `compute`
+  reads it anymore. `payload_commander.c` still sets it to `1` for now — removing the field
+  outright is a small follow-up, not done yet since it's harmless as-is.
 
 ## Where to go for more
 
