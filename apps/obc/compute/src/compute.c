@@ -39,6 +39,12 @@ int dispatch_thread_init(void) {
     return ret;
 }
 
+void *worker_thread(void *arg) {
+    (void)arg;
+    
+    
+}
+
 void *dispatch_thread(void *arg) {
     (void)arg;
     uint8_t buf[COMPUTE_MAX_MSG_SIZE];
@@ -59,10 +65,52 @@ void *dispatch_thread(void *arg) {
     }
 }
 
-int handle_compress_request(uint8_t buf, OBC_Roles_t src) {
+void handle_compress_request(const uint8_t *buf, OBC_Roles_t src) {
+    compute_compress_request_t req;
+    memcpy(&req, buf, sizeof(req));
+    req.in_path[sizeof(req.in_path) - 1] = '\0'; // guard against a non-terminated string on a wire
+    req.out_path[sizeof(req.out_path) -1] = '\0';
 
+    pthread_mutex_lock(&job_lock);
+    if (job_busy) {
+        pthread_mutex_unlock(&job_lock);
+        printf("[OBC COMPUTE] job %u rejected -- already running job %u\n", req.job_id, job_id_running);
+
+        compute_result_t result = { .job_id = req.job_id, .status = COMPUTE_STATUS_BUSY };
+        IPC_send(src, (const uint8_t *)&result, sizeof(result));
+        return;
+    }
+    
+    // set the job to busy
+    job_busy = 1;
+    job_id_running = req.job_id;
+    job_cancel_requested = 0;
+    pthread_mutex_unlock(&job_lock);
+
+    current_job.req = req;
+    pthread_t worker;
+
+    /*
+    Making pthread detached means it is on-demand
+    It reports its own result over IPC and exits when finished.
+    This way it doesn't need to be tied down and can be a job/worker instead of a queried loop
+    */
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    int ret = pthread_create(&worker, &attr, worker_thread, &current_job);
+    pthread_attr_destroy(&attr);
+
+    if (ret != 0) {
+        printf("[OBC COMPUTE] Failed to start worker thread for job %u\n", req.job_id);
+        pthread_mutex_lock(&job_lock);
+        job_busy = 0;
+        pthread_mutex_unlock(&job_lock);
+        compute_result_t result = { .job_id = req.job_id, .status = COMPUTE_STATUS_FAILED };
+        IPC_send(src, (const uint8_t *)&result, sizeof(result));
+    }
 }
 
-int handle_cancel_request(uint8_t buf) {
-    
+void handle_cancel_request(const uint8_t *buf) {
+
 }
