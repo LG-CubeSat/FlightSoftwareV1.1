@@ -210,8 +210,6 @@ void handle_cancel_request(const uint8_t *buf) {
     memcpy(&req, buf, sizeof(req));
 
     pthread_mutex_lock(&job_lock);
-
-    pthread_mutex_unlock(&job_lock);
     if (job_busy && job_id_running == req.job_id) {
         job_cancel_requested = 1;
         printf("[OBC COMPUTE] cancel requested for job %u\n", req.job_id);
