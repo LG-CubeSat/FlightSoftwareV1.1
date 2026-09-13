@@ -7,11 +7,10 @@ decides which of the two .c files gets compiled.
 
 NOTE: the peripheral logic below is still SPI HAL calls (HAL_SPI_Init,
 SPI1, SPI_MODE_MASTER, ...), left over from before the I2C-only bus
-decision (see docs/roadmap.md). Swapping this for a real I2C HAL sequence
-is its own task (roadmap.md 1.6-1.8 for the SIM-side design, Phase 6 for
-real hardware bring-up) -- renaming these calls without implementing real
-I2C init semantics would just be a label change, not a fix, since I2C
-doesn't have fields like CLKPolarity/NSS that SPI's config struct sets.
+decision. Swapping this for a real I2C HAL sequence is its own task --
+renaming these calls without implementing real I2C init semantics would
+just be a label change, not a fix, since I2C doesn't have fields like
+CLKPolarity/NSS that SPI's config struct sets.
 
 No STM32 HAL is vendored in this repo yet, and there is no ARM
 cross-compilation toolchain wired into the build (see docs "Next Steps").

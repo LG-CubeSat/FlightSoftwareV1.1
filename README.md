@@ -2,9 +2,9 @@
 
 Flight software stack for LG-CubeSat, currently aimed at a **November balloon launch** —
 the near-term goal is proving the CSP/I2C bus architecture end-to-end on real hardware
-before it carries the full satellite. See `docs/roadmap.md` (full satellite plan) and
-`docs/balloon_launch_plan.md` (November-specific scope and cut list) for the complete
-picture; this file is the practical "clone it, build it, run it" reference.
+before it carries the full satellite. See `docs/satellite_architecture.md` for the confirmed
+physical hardware (OBC, power, radio, camera, ADCS, Thermals) and CSP node/address table;
+this file is the practical "clone it, build it, run it" reference for the software.
 
 ## Status snapshot
 
@@ -13,22 +13,22 @@ picture; this file is the practical "clone it, build it, run it" reference.
 | ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. Also self-monitors now: an independent watchdog thread and an out-of-bounds check can trigger a real local reset, and repeated resets can lead to an OBC-directed shutdown — see "OBC internal architecture" below. |
 | OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. CCSDS 121.0 (ground-station packetization/link) is a separate, in-progress effort tracked outside this repo's `compute` process. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. Real I2C HAL backend is still a stub (see Known gaps). |
-| EPS / Thermals / Comms (radio HW) | Not yet scaffolded as CSP boards. Camera/radio *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; the real E22 radio driver is being built separately by a teammate. |
-| FPGA compression / Akida1500 | Out of scope for November; tracked in `docs/roadmap.md` Phase 4. |
+| Thermals | Not yet scaffolded as a CSP board — same pattern as ADCS, not started. |
+| EPS | Not a CSP board at all — real hardware is a passive buck converter with no MCU. Address reserved in code in case future battery-monitoring hardware needs it. See `docs/satellite_architecture.md`. |
+| Camera / Comms (radio) | Not CSP boards — both are OBC-local peripherals (Arducam over USB-C, E22 LoRa module over UART). Their *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; real backends aren't written yet. |
 
 ## Architecture at a glance
 
-Every board is its own CSP node on a shared I2C bus (SPI and CAN were retired — see
-`docs/roadmap.md`'s "Architecture Decisions" section for why):
+Every board with its own MCU is a CSP node on a shared I2C bus (SPI and CAN were retired).
+That's OBC, ADCS, and Thermals only — see `docs/satellite_architecture.md` for the full
+physical picture (why EPS/Camera/Comms aren't in this table):
 
 | Node | CSP Addr | Cmd Port | Telem Port | Status |
 |---|---|---|---|---|
 | OBC | 1 | — | — | done (SIM) |
 | ADCS | 2 | 10 | 20 | **done** |
-| EPS | 3 | 11 | 21 | reserved, not built |
+| EPS | 3 | 11 | 21 | reserved — not a real board, see `docs/satellite_architecture.md` |
 | THERMALS | 4 | 12 | 22 | reserved, not built |
-| CAMERA | 5 | 13 | 23 | reserved, not built |
-| COMMS | 6 | 14 | 24 | reserved, not built |
 
 **The bus contract** (`shared/interfaces/comms_bus.h`) is medium-agnostic: `initialize`,
 `send`, and `receive` don't change whether the backend is a Unix-socket simulation or real
@@ -36,7 +36,6 @@ I2C hardware. Every message is framed as `[dest_addr][src_addr][length][payload]
 (`shared/interfaces/frame.c`) — the SIM backend (`platform/sim/drivers/comms_i2c.c`)
 broadcasts every frame to every connected node and lets each node's `receive()` discard
 anything not addressed to it, mirroring how a real shared I2C wire works electrically.
-Full design writeup: `docs/i2c_sim_transport_plan.md`.
 
 ### OBC internal architecture
 
@@ -56,7 +55,7 @@ for the full breakdown of who owns what. The ones worth knowing about here:
 sim/real split as the comms bus: `shared/interfaces/board_reset.h` and `board_shutdown.h`
 each have a `platform/sim/drivers/` implementation (a Linux process re-exec / clean exit)
 and a `platform/real/drivers/` implementation (an ARM Cortex-M `AIRCR` system reset /
-`WFI` low-power halt — architectural instructions, not vendor-specific, so no STM32
+`WFI` low-power halt — architectural instructions, not vendor-specific, so no vendor
 HAL/CMSIS dependency is needed). A board's own watchdog and bounds-checking call these
 directly; the OBC never has to reach in and force anything on a board that's still
 responsive.
@@ -84,7 +83,7 @@ responsive.
   separate CSP boards — `shared/interfaces/camera.h`/`radio.h` are mock-only contracts
   for now (`platform/sim/drivers/` writes/logs a placeholder; `platform/real/drivers/`
   has an honest not-yet-implemented stub for the camera). **The real radio driver is
-  intentionally not touched here** — a teammate is building the real E22 driver
+  intentionally not touched here** — a teammate is building the real radio driver
   separately, so `platform/real/drivers/radio.c` doesn't exist and isn't referenced from
   `platform/CMakeLists.txt`'s `HW_MODE` branch, to avoid colliding with that work.
 
@@ -191,7 +190,7 @@ shared/
 │   ├── board_reset.h       # Board self-reset, sim (re-exec) vs real (Cortex-M AIRCR) impl in platform/
 │   ├── board_shutdown.h    # Board halt, sim (exit) vs real (Cortex-M WFI) impl in platform/
 │   ├── camera.h            # Photo capture, mock only for now (mission's payload_commander)
-│   ├── radio.h             # Ground downlink, mock only -- real E22 driver owned separately, see above
+│   ├── radio.h             # Ground downlink, mock only -- real driver owned separately, see above
 │   ├── frame.h / frame.c   # Wire framing (addressing + serialization), shared by every backend
 ├── csp/                    # CSP-to-transport glue (csp_network.c, csp_if_spi.c, csp_commands.h)
 
@@ -200,7 +199,7 @@ platform/
 └── real/drivers/   # Hardware-backed; comms_i2c.c is stale (see Known gaps), radio.c intentionally absent
 
 tests/                      # CTest-registered integration tests, see Testing below
-docs/                       # roadmap.md, balloon_launch_plan.md, api_contracts.md, etc.
+docs/                       # satellite_architecture.md, api_contracts.md, directory_conventions.md, testing.md
 libs/
 ├── libcsp/                 # CSP protocol implementation (git submodule)
 ├── ssdv/                   # SSDV image-packetization library (git submodule), linked into compute
@@ -317,7 +316,7 @@ run them at the same time as each other or as a manually-launched binary using t
 
 - **`platform/real/drivers/comms_i2c.c` is stale.** It still matches the pre-addressing
   `comms_bus.h` contract (2-argument `send`/`receive`, no `my_address`) and won't compile
-  against the current header. Real I2C HAL work is scoped for `docs/roadmap.md` Phase 6;
+  against the current header. Real I2C HAL work is planned but not scheduled yet;
   updating the stub's signatures to match is a prerequisite that hasn't been done yet.
 - **The master's `receive()` reads connections one at a time, blocking per connection.**
   Fine for the current 2-3 node tests; will need `select()`/`poll()`-based multiplexing
@@ -332,7 +331,7 @@ run them at the same time as each other or as a manually-launched binary using t
   needs EPS to be able to power-cycle a board, which doesn't exist yet.
 - **ADCS's watchdog is POSIX-only.** The independent watchdog thread in
   `apps/adcs/src/manager/fault_manager.c` uses `pthread`, which doesn't exist on bare-metal
-  hardware. Real hardware needs an actual watchdog peripheral (e.g. STM32's IWDG) kicked
+  hardware. Real hardware needs an actual watchdog peripheral (e.g. an IWDG-style timer) kicked
   directly — unlike `board_reset`/`board_shutdown`, this isn't abstracted yet, since the
   register layout is part-specific rather than ARM-architectural.
 - **`CMD_POINT_TO_SUN`, `CMD_SHUTDOWN`, and `CMD_TIME_SYNC` are placeholders on the ADCS
@@ -343,12 +342,13 @@ run them at the same time as each other or as a manually-launched binary using t
 - **`time`'s sync source is the OBC Linux box's own system clock**, not a real RTC/GPS
   reference — fine for proving the sync mechanism works, not for real timekeeping.
   `time_sync.c`'s `known_boards[]` table also includes EPS even though EPS has no
-  command handler yet — same intentional "free" scalability as `autonomy.c`'s table;
-  the send just goes nowhere until EPS exists.
+  command handler and, per `docs/satellite_architecture.md`, isn't a real MCU board at
+  all — same intentional "free" scalability as `autonomy.c`'s table; the send just goes
+  nowhere.
 - **`autonomy.c`'s action table has exactly one entry** (point ADCS to the sun). The
   table-driven shape is built to scale to other subsystems (e.g. telling a thermal board
   to heat the bio-chamber), but nothing else is wired in yet.
-- **The real E22 radio driver doesn't live in this repo yet.** `radio.h`/`platform/sim/drivers/radio.c`
+- **The real radio driver doesn't live in this repo yet.** `radio.h`/`platform/sim/drivers/radio.c`
   are the shared contract and mock; `platform/real/drivers/radio.c` is being built
   separately and intentionally isn't referenced from `platform/CMakeLists.txt` yet.
 - **`IPC_send` itself never retries** (see its own comment: "fail fast, don't retry
@@ -382,9 +382,7 @@ run them at the same time as each other or as a manually-launched binary using t
 
 ## Where to go for more
 
-- `docs/roadmap.md` — full satellite plan, phased task list, architecture decisions and why they were made
-- `docs/balloon_launch_plan.md` + `docs/balloon_schedule.md` — November-specific scope, cut list, calendar
-- `docs/i2c_sim_transport_plan.md` — the I2C bus design this README summarizes
+- `docs/satellite_architecture.md` — the confirmed physical hardware (OBC, power, radio, camera, ADCS, Thermals) and the CSP node/address table
 - `docs/api_contracts.md` — public API for every subsystem, built and planned
 - `docs/directory_conventions.md` — where new code goes and why
 - `docs/testing.md` — how each test works and how to read its output when it fails

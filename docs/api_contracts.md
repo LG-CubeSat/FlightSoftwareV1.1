@@ -36,7 +36,7 @@ int comms_bus_receive(uint8_t *buffer, uint16_t max_length);
 
 | Function | Direction | Blocking | Description |
 |---|---|---|---|
-| `comms_bus_initialize(int is_master)` | Setup | Yes | `is_master=1` for OBC (bus master), `is_master=0` for MCU (bus slave). In SIM mode, sets up Unix Domain Socket server/client. In HW mode, the real backend still runs the SPI-era STM32 HAL sequence under the hood (see `platform/real/drivers/comms_i2c.c`) — swapping that for a real I2C HAL sequence is separate, not-yet-done work (`roadmap.md` 1.6-1.8, Phase 6), so don't read the file name as a claim that real I2C is wired up yet. |
+| `comms_bus_initialize(int is_master)` | Setup | Yes | `is_master=1` for OBC (bus master), `is_master=0` for MCU (bus slave). In SIM mode, sets up Unix Domain Socket server/client. In HW mode, the real backend still runs the SPI-era vendor HAL sequence under the hood (see `platform/real/drivers/comms_i2c.c`) — swapping that for a real I2C HAL sequence is separate, not-yet-done work, so don't read the file name as a claim that real I2C is wired up yet. |
 | `comms_bus_send(const uint8_t *data, uint16_t length)` | OBC→MCU or MCU→OBC | No | Sends `length` bytes over the bus. Returns number of bytes sent or negative on error. |
 | `comms_bus_receive(uint8_t *buffer, uint16_t max_length)` | OBC→MCU or MCU→OBC | Yes | Blocks until data arrives or timeout. Returns bytes received or negative on error. |
 
@@ -47,7 +47,7 @@ int comms_bus_receive(uint8_t *buffer, uint16_t max_length);
 - Message framing: length-prefix + payload (avoids stream ambiguity).
 
 ### HW Implementation Details
-- Today: an honest stub (returns `COMMS_BUS_ERROR`) unless `STM32_HAL_AVAILABLE` is defined, in which case it runs SPI HAL calls left over from before the I2C-only bus decision — not real I2C yet.
+- Today: an honest stub (returns `COMMS_BUS_ERROR`) unless a vendor-HAL-available macro is defined, in which case it runs SPI HAL calls left over from before the I2C-only bus decision — not real I2C yet.
 - Same API as SIM — application code does not change between modes, regardless of which medium is actually wired up underneath.
 
 ---
