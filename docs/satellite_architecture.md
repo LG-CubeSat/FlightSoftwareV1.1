@@ -173,11 +173,31 @@ boards (ADCS, Thermals) — each needing different real backends and different t
 
 ### C. OBC-side real peripheral drivers (Raspberry Pi)
 
-4. **Real I2C master driver.** Implement `comms_bus_initialize`/`send`/`receive` against Linux
-   `i2c-dev` (`/dev/i2c-N`), using per-transaction addressing (`I2C_RDWR` ioctl so each message
-   can target a different slave address) rather than the fixed-address `I2C_SLAVE` ioctl, since
-   OBC talks to two different slaves (ADCS, Thermals) on one bus. The wire frame format
-   (`shared/interfaces/frame.c`) doesn't change — only the transport underneath.
+4. **Real I2C master driver — DONE (OBC side only), not yet verified on real hardware.**
+   `platform/real/drivers/comms_i2c.c` now implements `comms_bus_initialize`/`send`/`receive`
+   against Linux `i2c-dev` (`/dev/i2c-1`), using per-transaction addressing (`I2C_RDWR` ioctl so
+   each message can target a different slave) rather than the fixed-address `I2C_SLAVE` ioctl,
+   since OBC talks to two different slaves (ADCS, Thermals) on one bus. The wire frame format
+   (`shared/interfaces/frame.c`) didn't change — only the transport underneath.
+   Bring-up steps (OS-level, before this code can run for real): `docs/obc_i2c_bringup.md`.
+
+   **The addressing/receive design question below is resolved: option 1.** `receive()`
+   round-robin polls each known slave (`known_slaves[]` in the driver, keyed by CSP address from
+   `csp_commands.h` and physical I2C address from `platform/real/include/i2c_addresses.h`),
+   returning the first one with real data (a `frame.length == 0` reply means "checked in,
+   nothing new" and the loop moves on). `comms_bus.h`'s contract and every caller above it are
+   unchanged, as intended.
+
+   **Still open:**
+   - `platform/real/include/i2c_addresses.h`'s addresses (`0x42`/`0x43`) are placeholders, not
+     confirmed against real wiring (ties to D.12 and the Open Items below).
+   - Verified so far only by syntax/type-checking against real Linux kernel headers via Docker
+     (macOS has no `<linux/i2c-dev.h>` — see `docs/obc_i2c_bringup.md`'s note on this). No
+     physical I2C bus has exercised this code yet.
+   - **This is currently the only real backend, and `platform/CMakeLists.txt` compiles it for
+     every `HW_MODE=ON` target** — item B.2 (splitting OBC-real vs. MCU-real into separate
+     files/targets) still hasn't happened, so an ADCS/Thermals HW_MODE build today would
+     incorrectly pull in this Linux-only code instead of a real STM32 I2C slave implementation.
 5. **Real radio driver (`platform/real/drivers/radio.c` — doesn't exist yet, not even
    referenced in `platform/CMakeLists.txt`'s HW_MODE branch).**
    - Configure the Pi's UART (likely needs `enable_uart=1` and `dtoverlay=disable-bt` in
