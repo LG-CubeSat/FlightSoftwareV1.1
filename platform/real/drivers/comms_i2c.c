@@ -9,6 +9,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+/* The following may be red/error because you are not on a Linux device. */
 #include <linux/i2c-dev.h> // I2C_RDWR, I2C_M_RD
 #include <linux/i2c.h> // struct i2c_msg, struct i2c_rdwer_ioctl_data
 
