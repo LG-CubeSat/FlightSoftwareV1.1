@@ -24,6 +24,9 @@ ADCS telemetry = 20).
 #define EPS_CMD_PORT 11
 #define EPS_TELEM_PORT 21
 
+#define THERMALS_CMD_PORT 12
+#define THERMALS_TELEM_PORT 22
+
 #define ADCS_STATUS_PORT 25 // board-initiated reset notices, telemetry range (20-29)
 
 typedef struct {
@@ -72,5 +75,19 @@ typedef struct {
 typedef struct {
     int32_t current_position;
 } position_telemetry_t;
+
+/* OBC -> THERMALS, port THERMALS_CMD_PORT */
+typedef struct {
+    command_envelope_t envelope;
+    float goal_temp;
+} thermal_command_t;
+
+/* THERMALS -> OBC, port THERMALS_TELEM_PORT */
+typedef struct {
+    float current_temp;
+    float goal_temp;
+} thermals_telemetry_t;
+
+
 
 #endif

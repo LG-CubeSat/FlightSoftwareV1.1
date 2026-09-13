@@ -33,6 +33,8 @@ void sensor_read_task_init(void)
 
     if (xSensorReadHandle == NULL) {
         printf("[THERMAL_SENSOR_READ] Failed to initialize.\n");
+    } else {
+        printf("[THERMAL_SENSOR_READ] Initialized successfully.\n");
     }
 }
 

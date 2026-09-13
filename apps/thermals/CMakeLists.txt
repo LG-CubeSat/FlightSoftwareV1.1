@@ -3,7 +3,11 @@ add_executable(thermals_sim
     src/freertos_hooks.c
     src/thermal_data.c
     src/thermal_sensor.c
+    src/communication/command_handler.c
+    src/tasks/command_task.c
+    src/tasks/housekeeping_task.c
     src/tasks/sensor_read_task.c
+    src/tasks/telemetry_task.c
     src/tasks/thermal_write_task.c
 )
 
@@ -14,4 +18,4 @@ target_include_directories(thermals_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(thermals_sim PRIVATE freertos_kernel pthread platform)
+target_link_libraries(thermals_sim PRIVATE freertos_kernel pthread platform csp_interface)

@@ -26,7 +26,7 @@ Every board is its own CSP node on a shared I2C bus (SPI and CAN were retired �
 | OBC | 1 | — | — | done (SIM) |
 | ADCS | 2 | 10 | 20 | **done** |
 | EPS | 3 | 11 | 21 | reserved, not built |
-| THERMALS | 4 | 12 | 22 | reserved, not built |
+| THERMALS | 4 | 12 | 22 | scaffolded |
 | CAMERA | 5 | 13 | 23 | reserved, not built |
 | COMMS | 6 | 14 | 24 | reserved, not built |
 

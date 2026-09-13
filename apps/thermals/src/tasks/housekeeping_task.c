@@ -35,6 +35,8 @@ void housekeeping_task_init(void)
     if (xHousekeepingHandle == NULL)
     {
         printf("[HOUSEKEEPING] Failed to initialize.\n");
+    } else {
+        printf("[HOUSEKEEPING] Initialized successfully.\n");
     }
 }
 

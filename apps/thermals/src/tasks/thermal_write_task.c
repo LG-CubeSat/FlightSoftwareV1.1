@@ -35,6 +35,8 @@ void thermal_write_task_init(void)
 
     if (xThermalWriteHandle == NULL) {
         printf("[THERMAL_WRITE_TASK] Failed to initialize.\n");
+    } else {
+        printf("[THERMAL_WRITE_TASK] Initialized successfully.\n");
     }
 
 }

@@ -7,6 +7,9 @@ Decodes them and updates manager
 #ifndef COMMAND_TASK_H
 #define COMMAND_TASK_H
 
+#define THERMAL_CMD_SET_GOAL_TEMP 1
+#define THERMAL_CMD_REQUEST_TELEMETRY 2
+
 #include "FreeRTOS.h"
 #include "task.h"
 
@@ -15,6 +18,7 @@ typedef struct
 {
     uint32_t command;
     uint32_t parameter;
+
 } CommandMessage_t;
 
 void command_task_init(void);
