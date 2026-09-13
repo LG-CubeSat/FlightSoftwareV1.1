@@ -14,7 +14,7 @@
 #define THERMAL_WRITE_TASK_STACK_SIZE (1024)
 #define THERMAL_WRITE_TASK_PERIOD_MS (100)
 
-#define THERMAL_TOLERANCE (1.5) //degres C
+#define THERMAL_TOLERANCE (1.5) //degrees C
 
 static StackType_t xThermalWriteTaskStack[THERMAL_WRITE_TASK_STACK_SIZE];
 static StaticTask_t xThermalWriteTaskBuffer;
