@@ -16,6 +16,7 @@ static const ingest_route_t routes[] = {
     { ADCS_TELEM_PORT, ROLE_MISSION, "adcs telemetry" },
     { EPS_TELEM_PORT, ROLE_MISSION, "eps telemetry" },
     { ADCS_STATUS_PORT, ROLE_FDIR, "adcs reset notice" },
+    { TIME_SYNC_REQUEST_PORT, ROLE_TIME, "time sync request" }
     // new board comes online -> add one line here, nothing else changes
 };
 
@@ -26,8 +27,6 @@ static const ingest_route_t *find_route(uint8_t port)
     }
     return NULL;
 }
-
-
 
 int ingest_thread_init()
 {

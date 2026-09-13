@@ -75,6 +75,16 @@ static void * command_handler_rx_loop(void * param)
                         reply.status = ACK;
                         board_shutdown();
                         break;
+                    case CMD_POINT_TO_SUN:
+                        printf("[COMMAND HANDLER] Point to sun command received. \n");
+                        fflush(stdout);
+                        reply.status = ACK;
+                        break;
+                    case CMD_TIME_SYNC:
+                        printf("[COMMAND HANDLER] Time sync command received. \n");
+                        fflush(stdout);
+                        reply.status = ACK;
+                        break;
                     default:
                         reply.status = NACK;
                         break;

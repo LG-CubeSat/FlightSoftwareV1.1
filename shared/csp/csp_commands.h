@@ -28,6 +28,7 @@ ADCS telemetry = 20).
 #define THERMALS_TELEM_PORT 22
 
 #define ADCS_STATUS_PORT 25 // board-initiated reset notices, telemetry range (20-29)
+#define TIME_SYNC_REQUEST_PORT 26
 
 typedef struct {
     uint8_t command_id;
@@ -36,10 +37,15 @@ typedef struct {
 
 /* Here is where you add more CMDs */
 typedef enum {
-    CMD_MOVE_TO_POSITION = 1,
+    CMD_MOVE_TO_POSITION = 1, // TODO: remove, its studded
     CMD_RESET = 2,
-    CMD_SHUTDOWN = 3
+    CMD_SHUTDOWN = 3,
+    CMD_TIME_SYNC = 4,
+    // ADCS COMMANDS
+    CMD_POINT_TO_SUN = 5
 } command_id_t;
+
+// ------
 
 typedef enum {
     RESET_REASON_OUT_OF_BOUNDS = 1,
@@ -89,5 +95,13 @@ typedef struct {
 } thermals_telemetry_t;
 
 
+typedef struct {
+    command_envelope_t envelope;
+    int64_t unix_time_sec;
+} time_sync_command_t; // OBC -> board, sent to the board's own CMD Port
+
+typedef struct {
+    uint8_t requester_addr; // e.g. ADCS_ADRESS
+} time_sync_request_t;
 
 #endif

@@ -2,6 +2,7 @@ add_executable(obc_commands
     src/main.c
     src/ingest.c
     src/relay.c
+    src/heartbeat.c
 )
 
 target_include_directories(obc_commands PRIVATE
