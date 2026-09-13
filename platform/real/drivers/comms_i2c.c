@@ -83,7 +83,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length) {
     }
     if (length > MAX_FRAME_PAYLOAD) {
         fprintf(stderr, "[COMMS BUS] send: payload length %u exceeds limit\n", length);
-        return -1
+        return -1;
     }
 
     // create the actual frame
