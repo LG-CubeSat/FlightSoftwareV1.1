@@ -178,6 +178,20 @@ boards (ADCS, Thermals) — each needing different real backends and different t
    can target a different slave address) rather than the fixed-address `I2C_SLAVE` ioctl, since
    OBC talks to two different slaves (ADCS, Thermals) on one bus. The wire frame format
    (`shared/interfaces/frame.c`) doesn't change — only the transport underneath.
+   Bring-up steps (OS-level, before any of this code): `docs/obc_i2c_bringup.md`.
+
+   **Open design question this driver has to resolve, not just implement:** the current
+   `comms_bus_receive(src_addr_out, buffer, max_length)` contract assumes a broadcast/listen
+   model (matches the SIM transport, where every frame goes to every node and each one filters
+   by address) — but real I2C is master-driven: the master can only read from an address *it*
+   chooses, there's no "receive from whoever sends next." Two ways to reconcile this:
+   1. Keep the existing function signature and have the real `receive()` round-robin poll each
+      known slave address internally, returning the first one with data — most idiomatic for
+      I2C, no call-site changes needed above `comms_bus.h`.
+   2. Change the contract to take a target address explicitly, pushing the polling loop up into
+      `csp_network.c`/callers instead of hiding it inside `receive()`.
+   Option 1 keeps the abstraction OBC-side callers already rely on; decide before writing code,
+   not while writing it.
 5. **Real radio driver (`platform/real/drivers/radio.c` — doesn't exist yet, not even
    referenced in `platform/CMakeLists.txt`'s HW_MODE branch).**
    - Configure the Pi's UART (likely needs `enable_uart=1` and `dtoverlay=disable-bt` in
