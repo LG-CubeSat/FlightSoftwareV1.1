@@ -1,15 +1,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "FreeRTOS.h"
+#include "../../../rtos/kernels/include/FreeRTOS.h"
 #include "task.h"
 
-#include "tasks/command_task.h"
-#include "tasks/control_task.h"
-#include "tasks/estimation_task.h"
-#include "tasks/housekeeping_task.h"
-#include "tasks/sensor_task.h"
-#include "tasks/telemetry_task.h"
+#include "command_task.h"
+#include "control_task.h"
+#include "estimation_task.h"
+#include "housekeeping_task.h"
+#include "sensor_task.h"
+#include "telemetry_task.h"
 
 #include "communication/command_handler.h"
 
