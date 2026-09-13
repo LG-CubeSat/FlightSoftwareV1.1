@@ -8,11 +8,9 @@ FlightSoftwareV1/
 ├── README.md                   # Project overview and getting started guide
 ├── AGENTS.md                   # Kilo agent instructions (curriculum, architecture)
 ├── docs/                       # Architecture and design documents
-│   ├── architecture.md         # System topology, modes, CSP protocol
-│   ├── data_flow.md            # End-to-end command and telemetry paths
+│   ├── satellite_architecture.md # Confirmed physical hardware + CSP node/address table
 │   ├── api_contracts.md        # Public API for every subsystem
 │   ├── testing.md               # Test harness docs (comms_bus_test, position_command_test)
-│   ├── roadmap.md               # Full satellite development roadmap (phased task list)
 │   └── directory_conventions.md # This file
 ├── rtos/                       # Real-Time Operating System layer
 │   ├── CMakeLists.txt          # Builds FreeRTOS kernel + ports
@@ -27,9 +25,8 @@ FlightSoftwareV1/
 │       │   ├── port.c
 │       │   ├── portmacro.h
 │       │   └── utils/
-│       └── hw/                 # Hardware BSP (STM32, etc.)
+│       └── hw/                 # Hardware BSP
 │           ├── adcs/
-│           ├── comms/
 │           └── thermals/
 ├── shared/                     # Code shared across OBC and MCU
 │   ├── CMakeLists.txt
@@ -62,10 +59,10 @@ FlightSoftwareV1/
 │       ├── CMakeLists.txt
 │       └── src/
 │           ├── main.c
-│           ├── ci.c            # Command Ingest (to be created, roadmap.md Phase 3)
-│           ├── to.c            # Telemetry Output (to be created, roadmap.md Phase 3)
-│           ├── tts.c           # Time-Tagged Scheduler (to be created, roadmap.md Phase 3)
-│           └── lc.c            # Limit Checker (to be created, roadmap.md Phase 3)
+│           ├── ci.c            # Command Ingest (to be created)
+│           ├── to.c            # Telemetry Output (to be created)
+│           ├── tts.c           # Time-Tagged Scheduler (to be created)
+│           └── lc.c            # Limit Checker (to be created)
 ├── sys/                        # System-level services
 ├── tests/                      # Sanity + integration tests (CTest-registered)
 │   ├── test_comms_bus.c        # comms_bus_test -- transport sanity check
@@ -76,18 +73,16 @@ FlightSoftwareV1/
 ### A note on `comms_bus` vs. SPI naming you'll still see in the tree above
 
 `shared/interfaces/comms_bus.h` and both `platform/{real,sim}/drivers/comms_i2c.c`
-files were renamed off their old `v_bus`/SPI-flavored names (`roadmap.md` tasks
-1.1-1.3) — that part is done. Two things are **deliberately** still SPI-named,
-because renaming them would misrepresent code that hasn't changed yet:
+files were renamed off their old `v_bus`/SPI-flavored names — that part is done. Two
+things are **deliberately** still SPI-named, because renaming them would misrepresent
+code that hasn't changed yet:
 
-- `shared/csp/csp_if_spi.c/.h` — the CSP-to-transport glue layer. `roadmap.md`
-  task 1.8 creates a real `csp_if_i2c.c` later, after the I2C SIM transport is
-  actually designed (`roadmap.md` 1.6-1.7). Until then this file still does.
-- `platform/real/drivers/comms_i2c.c`'s HW-mode branch — still literal STM32
+- `shared/csp/csp_if_spi.c/.h` — the CSP-to-transport glue layer. A real `csp_if_i2c.c`
+  is planned once the I2C SIM transport work is complete. Until then this file still does.
+- `platform/real/drivers/comms_i2c.c`'s HW-mode branch — still literal vendor
   SPI HAL calls (`HAL_SPI_Init`, `SPI1`, `SPI_MODE_MASTER`, ...). I2C doesn't
   even have some of the fields this code sets (`CLKPolarity`, `NSS`), so this
-  needs real driver work, not a rename, once real hardware bring-up starts
-  (`roadmap.md` Phase 6).
+  needs real driver work, not a rename, once real hardware bring-up starts.
 
 ## Naming Conventions
 
@@ -129,7 +124,7 @@ To add a new subsystem (e.g., `thermals`):
 
 ## Adding a New Peripheral Driver
 
-To add a new SPI-attached sensor driver (e.g., `magnetometer`, per `roadmap.md` 1.13-1.17):
+To add a new SPI-attached sensor driver (e.g., `magnetometer`):
 
 1. Create `shared/interfaces/<peripheral>.h` — pure interface, no hardware-specific types
 2. Create `platform/sim/drivers/<peripheral>_mock.c` — believable fake values, logs every call
@@ -148,18 +143,20 @@ To add a new SPI-attached sensor driver (e.g., `magnetometer`, per `roadmap.md` 
 
 ## CSP Port Assignment Convention
 
-See `roadmap.md`'s CSP Address & Port Table for the authoritative, current
-assignment (OBC=1, ADCS=2, EPS=3, THERMALS=4, CAMERA=5, COMMS=6). The pattern:
+See `satellite_architecture.md`'s CSP node/address table for the authoritative, current
+assignment (OBC=1, ADCS=2, EPS=3 [reserved, not a real board], THERMALS=4). Camera and
+Comms are OBC-local peripherals (USB/UART), not CSP nodes — see that document. The port
+pattern:
 
-- **OBC → MCU commands:** Ports 10–19 (command port = 10 + node's CSP address - 2 for the four FreeRTOS subsystems, per the table)
+- **OBC → MCU commands:** Ports 10–19 (command port = 10 + node's CSP address - 2 for the FreeRTOS subsystems, per the table)
 - **MCU → OBC telemetry:** Ports 20–29 (telemetry port = command port + 10)
-- **Ground link:** Port 30
+- **Ground link:** handled directly by the OBC's UART-attached radio, not a CSP port
 
 ## Queue & Handler File Placement
 
 ### FreeRTOS Queues (MCU)
 Queue creation and management lives in the **IPC Router** module (to be
-created per `roadmap.md` Phase 2's `command_handler` task):
+created alongside each subsystem's `command_handler` task):
 
 - **Queue declarations:** `apps/<subsystem>/src/tasks/ipc_router.c` — `QueueHandle_t <subsystem>_command_queue;` etc.
 - **Queue creation:** `ipc_router_initialize()` calls `xQueueCreate()` for each queue.
