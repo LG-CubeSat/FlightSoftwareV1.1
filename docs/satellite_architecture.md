@@ -140,7 +140,121 @@ changed as part of this documentation pass — noted here so they aren't lost:
 
 ---
 
-## 4. Open Items / TBD
+## 4. Path to HW_MODE — Bring-Up TODO
+
+**Status:** none of this is done yet. `-DHW_MODE=ON` doesn't even compile today (see A.1).
+This section assumes each board's task/control logic (ADCS/Thermals FreeRTOS application code)
+is handled separately — everything here is communication, drivers, and build infrastructure:
+the plumbing that has to exist before any of that task logic can run on real silicon and talk
+to anything else.
+
+The core problem: `HW_MODE=ON` is currently one flag assumed to mean one thing, but it now has
+to cover three genuinely different targets — a Linux SBC (OBC) and two bare-metal Cortex-M
+boards (ADCS, Thermals) — each needing different real backends and different toolchains.
+
+### A. Blocking fix — do this first, no hardware required
+
+1. **Fix `platform/real/drivers/comms_i2c.c`'s stale signatures.** It still matches the
+   pre-addressing `comms_bus.h` contract (`initialize(int)`, `send(data, length)`,
+   `receive(buffer, length)` — no address parameters), so it's a straight compile error
+   against the current header, not just an unimplemented stub. `-DHW_MODE=ON` fails to build
+   at all until this is fixed, independent of everything else below.
+
+### B. Split "HW_MODE" into its real per-target backends (build system)
+
+2. **Split the real I2C backend in two.** One file/target for OBC-as-master (Linux, talks to
+   `/dev/i2c-N`) and one for ADCS/Thermals-as-slave (bare-metal STM32 peripheral) — not one
+   `platform/real/drivers/comms_i2c.c` trying to be both. Pick the right one per build target
+   in CMake.
+3. **Wire an ARM cross-compilation toolchain for ADCS/Thermals.** OBC keeps building natively
+   (it's Linux ARM — no cross-compiler needed, same as running it on any dev machine). ADCS and
+   Thermals need a real `arm-none-eabi-gcc` toolchain + a CMake toolchain file targeting the
+   actual STM32 part once it's confirmed (see Open Items). Neither exists in this repo yet.
+
+### C. OBC-side real peripheral drivers (Raspberry Pi)
+
+4. **Real I2C master driver.** Implement `comms_bus_initialize`/`send`/`receive` against Linux
+   `i2c-dev` (`/dev/i2c-N`), using per-transaction addressing (`I2C_RDWR` ioctl so each message
+   can target a different slave address) rather than the fixed-address `I2C_SLAVE` ioctl, since
+   OBC talks to two different slaves (ADCS, Thermals) on one bus. The wire frame format
+   (`shared/interfaces/frame.c`) doesn't change — only the transport underneath.
+5. **Real radio driver (`platform/real/drivers/radio.c` — doesn't exist yet, not even
+   referenced in `platform/CMakeLists.txt`'s HW_MODE branch).**
+   - Configure the Pi's UART (likely needs `enable_uart=1` and `dtoverlay=disable-bt` in
+     `config.txt` on a Pi Zero 2 W, so the E22 gets the full PL011 UART instead of the
+     limited mini-UART shared with Bluetooth).
+   - Drive the E22's `M0`/`M1` mode-select pins and read its `AUX` status pin over GPIO
+     (recommend `libgpiod` over the deprecated sysfs GPIO interface) alongside the UART data
+     path.
+   - Implement the actual E22 send/receive protocol (transparent vs. configuration mode,
+     channel/address setup) — blocked on confirming the exact module variant (Open Items).
+6. **Real camera driver (`platform/real/drivers/camera.c` is currently a bare `TODO` stub).**
+   - Confirm whether the Arducam enumerates as a standard UVC device (→ straightforward V4L2
+     `/dev/videoN` capture) or needs Arducam's own vendor SDK (more work) — blocked on
+     confirming the exact model (Open Items).
+   - SSDV needs valid JPEG input — if the camera doesn't produce JPEG natively (e.g. MJPEG over
+     UVC), a JPEG-encode step (e.g. `libjpeg`) has to happen before handing frames to `compute`.
+
+### D. MCU-side bring-up (ADCS + Thermals boards)
+
+7. **Real I2C slave driver.** The current real backend is vestigial SPI HAL code, not even
+   I2C-shaped (it sets fields like `CLKPolarity`/`NSS` that I2C doesn't have) — needs an actual
+   STM32 I2C peripheral driven in slave mode, address-matched to that board's assigned I2C
+   address (distinct from its CSP address — see D.12).
+8. **Startup code, linker script, and vector table for the actual STM32 part.** None of this
+   exists in-repo yet. Blocked on the exact part number (Open Items).
+9. **FreeRTOS port matching the STM32's Cortex-M core variant.** The repo currently only has a
+   working POSIX port (used for SIM); the hardware port needs picking/wiring per the actual
+   core (M0/M3/M4/M4F/M7 — depends on the part).
+10. **Real watchdog.** `apps/adcs/src/manager/fault_manager.c`'s watchdog thread is
+    `pthread`-based today (POSIX-only) — real hardware needs the STM32's IWDG peripheral kicked
+    directly. Separate from `board_reset.c`/`board_shutdown.c`, which are already genuinely
+    hardware-ready (ARM-architectural registers, not vendor-specific) and just need real-silicon
+    testing, not new code.
+11. **Flash/debug tooling.** Decide the ST-Link + OpenOCD/STM32CubeProgrammer flow (or
+    equivalent) and, ideally, wire it into a CMake/script target rather than a manual process
+    everyone re-derives.
+12. **Assign real I2C slave addresses.** Pick a 7-bit I2C address per board (a different
+    concept from the CSP address already in `csp_commands.h`) and wire it into each board's
+    real backend init.
+
+### E. Physical bus / integration (needs answers from Open Items below)
+
+13. Confirm I2C bus speed and pull-up placement/values once wiring is finalized.
+14. Confirm what powers ADCS/Thermals — the same 5V rail as the Pi, or their own regulation —
+    since it affects buck-converter sizing.
+
+### F. Small code cleanup so the real bus doesn't carry dead traffic
+
+15. `time_sync.c`'s `known_boards[]` and `autonomy.c`'s target table still include EPS —
+    harmless today (fire-and-forget sends that just go nowhere), but worth pruning once real
+    boards are wired up so nothing periodically addresses a board that will never exist.
+16. `csp_commands.h`'s unused `CAMERA`/`COMMS` address constants (see §3) — fine to leave for
+    now, but worth removing once you're confident nothing will reference them, so a future
+    contributor doesn't mistake them for real bus nodes.
+
+### G. Validation strategy
+
+17. **There is currently zero automated test coverage under `HW_MODE=ON`.** Root
+    `CMakeLists.txt` gates `BUILD_TESTS` with `AND NOT HW_MODE`, so none of the existing
+    sabotage-verified integration tests build against the real backends at all. Decide a bench
+    validation plan (even a manual bring-up checklist) before boards arrive — the SIM test
+    suite proves the logic once real drivers exist, but proves nothing about the drivers
+    themselves.
+18. **Decide how `obc_supervisor` actually starts on the real Pi** (systemd unit vs. manual
+    launch) — a small ops task, but worth deciding before "does the ecosystem come up on
+    power-on" is a question anyone needs to answer under time pressure.
+
+### Suggested order
+
+A.1 unblocks everything and needs nothing else first. B.2/B.3, C (OBC drivers), and D (MCU
+bring-up) can then proceed in parallel by different owners — they don't depend on each other,
+only on A.1. E and F can happen any time. G should start as soon as any real driver exists, not
+after all of them do.
+
+---
+
+## 5. Open Items / TBD
 
 Flagged explicitly rather than guessed at — more specs are expected:
 
