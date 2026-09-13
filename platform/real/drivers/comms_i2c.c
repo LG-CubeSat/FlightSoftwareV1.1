@@ -53,7 +53,7 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
 
     bus_fd = open(I2C_BUS_PATH, O_RDWR); // read/write
     if (bus_fd < 0) {
-        fprintf(stderr, "[COMMS BUS open(%s) failed: %s\n", I2C_BUS_PATH, strerror(errno));
+        fprintf(stderr, "[COMMS BUS] open(%s) failed: %s\n", I2C_BUS_PATH, strerror(errno));
         return COMMS_BUS_ERROR;
     }
     
