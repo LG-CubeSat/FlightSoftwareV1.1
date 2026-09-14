@@ -1,96 +1,121 @@
-/*
-Telemetry Task
-1-10HZ
-Collects everything
-Sends out data using CSP
-*/
-
-#include "../../include/tasks/telemetry_task.h"
-
-#include "FreeRTOS.h"
-#include "task.h"
+#include "tasks/telemetry_task.h"
 
 #include <stdio.h>
 #include <string.h>
 
 #include <csp/csp.h>
 
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include "communication/telemetry.h"
+#include "control/control_math.h"
 #include "csp_commands.h"
+#include "manager/adcs_manager.h"
 
-#define TELEMETRY_TASK_PRIORITY (1)
-#define TELEMETRY_TASK_STACK_SIZE (1024)
-#define TELEMETRY_TASK_PERIOD_MS (1000)
+#define TELEMETRY_TASK_PRIORITY 1
+#define TELEMETRY_TASK_STACK_SIZE 1792
+#define TELEMETRY_TASK_PERIOD_MS 200
 
-static StackType_t xTelemetryTaskStack[TELEMETRY_TASK_STACK_SIZE];
-static StaticTask_t xTelemetryTaskBuffer;
+static StackType_t telemetry_task_stack[TELEMETRY_TASK_STACK_SIZE];
+static StaticTask_t telemetry_task_buffer;
 
-TaskHandle_t xTelemetryHandle = NULL;
+TaskHandle_t xTelemetryHandle;
 
-// reports the current position back to the OBC over CSP
-static void telemetry_send_position(int32_t current_position)
-{
-    csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, OBC_ADDRESS, ADCS_TELEM_PORT, 1000, CSP_O_NONE);
-    if (conn == NULL) {
-        printf("[TELEMETRY] Failed to connect to OBC\n");
-        fflush(stdout);
+static void telemetry_send_legacy_position(int32_t current_position) {
+    csp_conn_t *connection = csp_connect(
+        CSP_PRIO_NORM,
+        OBC_ADDRESS,
+        ADCS_TELEM_PORT,
+        100,
+        CSP_O_NONE);
+    csp_packet_t *packet;
+    position_telemetry_t telemetry;
+
+    if (connection == NULL) {
         return;
     }
-
-    csp_packet_t * packet = csp_buffer_get(0);
+    packet = csp_buffer_get(0);
     if (packet == NULL) {
-        printf("[TELEMETRY] Failed to get CSP buffer\n");
-        fflush(stdout);
-        csp_close(conn);
+        csp_close(connection);
         return;
     }
-
-    position_telemetry_t telem = { .current_position = current_position };
-    memcpy(packet->data, &telem, sizeof(telem));
-    packet->length = sizeof(telem);
-
-    csp_send(conn, packet);
-    csp_close(conn);
+    telemetry.current_position = current_position;
+    memcpy(packet->data, &telemetry, sizeof(telemetry));
+    packet->length = sizeof(telemetry);
+    csp_send(connection, packet);
+    csp_close(connection);
 }
 
-void telemetry_task_init(void)
-{
+void telemetry_task_init(void) {
+    adcs_telemetry_init();
     xTelemetryHandle = xTaskCreateStatic(
         telemetry_task,
-        "telemetry",
+        "Telemetry",
         TELEMETRY_TASK_STACK_SIZE,
         NULL,
         TELEMETRY_TASK_PRIORITY,
-        xTelemetryTaskStack,
-        &xTelemetryTaskBuffer
-    );
-
+        telemetry_task_stack,
+        &telemetry_task_buffer);
     if (xTelemetryHandle == NULL) {
-        printf("[TELEMTRY] Failed to initialize.\n");
+        printf("[TELEMETRY] Task creation failed.\n");
     }
 }
 
-void telemetry_task(void *pvParameters)
-{
-    (void) pvParameters;
+void telemetry_task(void *parameters) {
+    TickType_t last_wake_time = xTaskGetTickCount();
+    uint32_t diagnostic_divider = 0U;
 
-    TickType_t lastWakeTime = xTaskGetTickCount();
+    (void)parameters;
+    for (;;) {
+        adcs_manager_state_t snapshot;
+        adcs_telemetry_packet_t telemetry;
+        uint32_t notification;
 
-    for (;;)
-    {
-        // do some stuff
-
-        uint32_t notified_value;
-        if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
-        {
-            int32_t target_position = (int32_t)notified_value;
-            printf("[TELEMETRY] Reporting new position to OBC: %d\n", target_position);
-            fflush(stdout);
-            telemetry_send_position(target_position);
+        adcs_manager_get_state(&snapshot);
+        memset(&telemetry, 0, sizeof(telemetry));
+        telemetry.timestamp_us = snapshot.latest_sensors.timestamp_us;
+        telemetry.mode = snapshot.mode;
+        telemetry.sensors = snapshot.latest_sensors;
+        telemetry.attitude = snapshot.latest_attitude;
+        telemetry.target = snapshot.guidance_target;
+        telemetry.control = snapshot.latest_control;
+        telemetry.health = snapshot.health;
+        if (adcs_telemetry_send(&telemetry) != ADCS_TELEMETRY_OK) {
+            adcs_manager_note_dropped_message();
         }
 
-        xTaskDelayUntil(
-            &lastWakeTime,
-            pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS)
-        );
+        if (++diagnostic_divider >= 5U) {
+            diagnostic_divider = 0U;
+            printf("[ADCS] mode=%s rate=%.4f q=[%.3f %.3f %.3f %.3f] "
+                   "target=[%.3f %.3f %.3f %.3f] error=%.3f "
+                   "wheel=[%.2e %.2e %.2e] dipole=[%.3f %.3f %.3f]\n",
+                   adcs_manager_mode_name(snapshot.mode),
+                   adcs_vector_norm(snapshot.latest_attitude.angular_rate_rad_s),
+                   snapshot.latest_attitude.quaternion[0],
+                   snapshot.latest_attitude.quaternion[1],
+                   snapshot.latest_attitude.quaternion[2],
+                   snapshot.latest_attitude.quaternion[3],
+                   snapshot.guidance_target.target_quaternion[0],
+                   snapshot.guidance_target.target_quaternion[1],
+                   snapshot.guidance_target.target_quaternion[2],
+                   snapshot.guidance_target.target_quaternion[3],
+                   snapshot.latest_control.pointing_error_rad,
+                   snapshot.latest_control.reaction_wheel_torque_nm[0],
+                   snapshot.latest_control.reaction_wheel_torque_nm[1],
+                   snapshot.latest_control.reaction_wheel_torque_nm[2],
+                   snapshot.latest_control.requested_dipole_a_m2[0],
+                   snapshot.latest_control.requested_dipole_a_m2[1],
+                   snapshot.latest_control.requested_dipole_a_m2[2]);
+            fflush(stdout);
+        }
+
+        if (xTaskNotifyWait(0U, UINT32_MAX, &notification, 0U) == pdTRUE) {
+            printf("[TELEMETRY] Reporting new position to OBC: %d\n",
+                   (int32_t)notification);
+            fflush(stdout);
+            telemetry_send_legacy_position((int32_t)notification);
+        }
+        xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS));
     }
 }
