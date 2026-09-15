@@ -59,7 +59,7 @@ adcs_result_t adcs_vector_limit(
     float output[ADCS_VECTOR_LENGTH],
     uint8_t *was_limited);
 
-/* Normalizes a cglm [x, y, z, w] versor and rejects degenerate inputs. */
+/* Normalizes a local [x, y, z, w] quaternion and rejects degenerate inputs. */
 adcs_result_t adcs_quaternion_normalize(
     const versor input,
     versor output);

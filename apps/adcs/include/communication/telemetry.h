@@ -13,7 +13,7 @@
 /*
  * Version 1 is big-endian and begins with "ADCS", version, mode, reserved,
  * sequence, and timestamp. It then contains validity/fault masks; current and
- * target cglm versors; estimated rate and bias; magnetic, Sun, temperature,
+ * target quaternions; estimated rate and bias; magnetic, Sun, temperature,
  * and irradiance measurements; control vectors/error/flags; and health
  * counters. Use adcs_telemetry_encode rather than copying native structures.
  */

@@ -64,7 +64,8 @@ Task rates are intentionally conventional for this simulation:
 
 ## Quaternion and frame convention
 
-All attitudes use cglm's `versor`, whose storage order is `[x, y, z, w]`.
+All attitudes use the local quaternion type, whose storage order is
+`[x, y, z, w]`.
 The quaternion rotates an ECI vector into the spacecraft body frame. Current
 attitude lives in `latest_attitude.quaternion`; commanded attitude lives in
 `guidance_target.target_quaternion`.
@@ -86,7 +87,7 @@ The implemented mode set is:
   magnetorquers.
 - `SUN_POINTING`: maintain the Sun target with reaction-wheel control.
 - `EARTH_POINTING`: continuously regenerate a nadir target and hold it.
-- `SLEWING`: move toward a commanded cglm attitude or vector target.
+- `SLEWING`: move toward a commanded quaternion attitude or vector target.
 - `TARGET_POINTING`: hold the target after the slew settles.
 - `SCIENCE`: hold the commanded target using the precise controller.
 

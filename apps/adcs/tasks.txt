@@ -2,7 +2,7 @@ ADCS SOFTWARE-IN-THE-LOOP CHECKLIST
 
 COMPLETE FOR THE SIMULATION MVP
 [x] Define task messages and one manager-owned ADCS state/context.
-[x] Store current and target attitudes as cglm versors [x, y, z, w].
+[x] Store current and target attitudes as local quaternions [x, y, z, w].
 [x] Implement BOOT, SAFE, DETUMBLE, SUN_ACQUISITION, SUN_POINTING,
     EARTH_POINTING, SLEWING, TARGET_POINTING, and SCIENCE modes.
 [x] Implement autonomous startup, mode prerequisites, dwell, and SAFE fallback.

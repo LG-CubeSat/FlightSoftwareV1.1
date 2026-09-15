@@ -29,11 +29,10 @@ target_include_directories(adcs_sim PRIVATE
     ${CMAKE_SOURCE_DIR}/rtos/ports/posix
     ${CMAKE_SOURCE_DIR}/rtos/config
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/libs/cglm/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/manager
 )
 
-target_link_libraries(adcs_sim PRIVATE freertos_kernel pthread platform csp_interface cglm m)
+target_link_libraries(adcs_sim PRIVATE freertos_kernel pthread platform csp_interface m)
 
 if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(adcs_sim PRIVATE -Wall -Wextra -Wpedantic)

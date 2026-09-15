@@ -7,7 +7,7 @@
  * never leak onto the bus.
  *
  * Coordinate conventions used throughout ADCS:
- *   - quaternions use cglm versor layout [x, y, z, w] and rotate ECI into body
+ *   - quaternions use the local [x, y, z, w] layout and rotate ECI into body
  *   - sensor/estimate/control timestamps are monotonic microseconds since boot
  *   - angular rates are body-frame radians/second
  *   - magnetic fields are body- or ECI-frame tesla as named
@@ -20,11 +20,12 @@
 #define ADCS_COMMUNICATION_MESSAGE_H
 
 #include <stdint.h>
-#include <cglm/types.h>
 
 #define ADCS_VECTOR_LENGTH             3U
 #define ADCS_ERROR_STATE_LENGTH        6U
 #define ADCS_COVARIANCE_ELEMENT_COUNT 36U
+
+typedef float versor[4];
 
 typedef enum {
     ADCS_RESULT_OK = 0,
