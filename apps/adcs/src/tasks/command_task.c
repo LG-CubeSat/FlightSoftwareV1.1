@@ -1,119 +1,173 @@
-/*
-Command Task
-Continously waits for ground messages or messages from other boards
-Decodes them and updates manager
-*/
+#include "tasks/command_task.h"
 
-#include "../../include/tasks/command_task.h"
+#include <math.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "FreeRTOS.h"
-#include "task.h"
 #include "queue.h"
-#include "event_groups.h"
+#include "task.h"
 
-#include <stdio.h>
+#include "guidance/target_generator.h"
+#include "manager/adcs_manager.h"
+#include "simulation/adcs_simulator.h"
+#include "tasks/control_task.h"
+#include "tasks/estimation_task.h"
+#include "tasks/sensor_task.h"
+#include "tasks/telemetry_task.h"
 
-#include "../../include/tasks/control_task.h"
-#include "../../include/tasks/estimation_task.h"
-#include "../../include/tasks/sensor_task.h"
-#include "../../include/tasks/telemetry_task.h"
+#define COMMAND_TASK_PRIORITY 2
+#define COMMAND_TASK_STACK_SIZE 1536
+#define COMMAND_QUEUE_LENGTH 8
+#define COMMAND_DEFAULT_MAXIMUM_RATE_RAD_S 0.08F
+#define COMMAND_PI_F 3.14159265358979323846F
 
-#define COMMAND_TASK_PRIORITY (2)
-#define COMMAND_TASK_STACK_SIZE (1024)
-#define COMMAND_QUEUE_LENGTH (8)
+static StackType_t command_task_stack[COMMAND_TASK_STACK_SIZE];
+static StaticTask_t command_task_buffer;
+static StaticQueue_t command_queue_buffer;
+static uint8_t command_queue_storage[COMMAND_QUEUE_LENGTH * sizeof(adcs_command_t)];
+static TaskHandle_t command_handle;
+static QueueHandle_t command_queue;
 
-static StackType_t xCommandTaskStack[COMMAND_TASK_STACK_SIZE];
-static StaticTask_t xCommandTaskBuffer;
-
-static StaticQueue_t xCommandQueueBuffer;
-static uint8_t xCommandQueueStorage[
-    COMMAND_QUEUE_LENGTH * sizeof(CommandMessage_t)
-];
-
-static TaskHandle_t xCommandHandle = NULL;
-static QueueHandle_t xCommandQueue = NULL;
-
-int command_task_send(const CommandMessage_t *message)
-{
-    if (xCommandQueue == NULL)
-    {
-        return 0; // failed
+int command_task_send(const adcs_command_t *message) {
+    if (command_queue == NULL || message == NULL) {
+        return 0;
     }
-
-    /* command_task_send() is called from command_handler.c's rx thread,
-     * which is a plain POSIX pthread, not a FreeRTOS task -- the regular
-     * xQueueSend() assumes a task context (a valid pxCurrentTCB) and hangs
-     * when called from a foreign thread. The FromISR variant is the
-     * documented way to feed a FreeRTOS queue from any non-task context. */
-    return xQueueSendFromISR(
-        xCommandQueue,
-        message,
-        NULL
-    ) == pdPASS;
+    if (xQueueSendFromISR(command_queue, message, NULL) != pdPASS) {
+        adcs_manager_note_dropped_message();
+        return 0;
+    }
+    return 1;
 }
 
-void command_task_init(void)
-{
-    // initalize the queue
-    xCommandQueue = xQueueCreateStatic(
+void command_task_init(void) {
+    command_queue = xQueueCreateStatic(
         COMMAND_QUEUE_LENGTH,
-        sizeof(CommandMessage_t),
-        xCommandQueueStorage,
-        &xCommandQueueBuffer
-    );
-
-    if (xCommandQueue == NULL)
-    {
+        sizeof(adcs_command_t),
+        command_queue_storage,
+        &command_queue_buffer);
+    if (command_queue == NULL) {
         printf("[COMMAND] Queue creation failed.\n");
         return;
     }
-    
-    // initialize the task
-    xCommandHandle = xTaskCreateStatic(
+
+    command_handle = xTaskCreateStatic(
         command_task,
         "Command",
         COMMAND_TASK_STACK_SIZE,
         NULL,
         COMMAND_TASK_PRIORITY,
-        xCommandTaskStack,
-        &xCommandTaskBuffer
-    );
-
-    if (xCommandHandle == NULL)
-    {
-        printf("[COMMAND] Task Creation failed.\n");
-        return;
+        command_task_stack,
+        &command_task_buffer);
+    if (command_handle == NULL) {
+        printf("[COMMAND] Task creation failed.\n");
     }
 }
 
-// superloop of the task
-void command_task(void *pvParameters)
-{
-    (void) pvParameters;
+static void dispatch_legacy_position(const adcs_command_t *command) {
+    adcs_guidance_target_t target;
+    float angle = (float)command->parameter.legacy_position *
+                  COMMAND_PI_F / 180.0F;
+    versor quaternion = {
+        0.0F,
+        0.0F,
+        -sinf(0.5F * angle),
+        cosf(0.5F * angle)
+    };
+    uint32_t notification = (uint32_t)command->parameter.legacy_position;
 
-    CommandMessage_t message;
+    printf("[COMMAND] Dispatching position command: target=%d\n",
+           command->parameter.legacy_position);
+    fflush(stdout);
+    if (adcs_guidance_target_from_attitude(
+            ADCS_MODE_SLEWING,
+            quaternion,
+            COMMAND_DEFAULT_MAXIMUM_RATE_RAD_S,
+            &target) == ADCS_RESULT_OK) {
+        adcs_manager_set_guidance_target(&target);
+        adcs_manager_set_legacy_position(command->parameter.legacy_position);
+        adcs_manager_request_mode(ADCS_MODE_SLEWING);
+    }
 
-    for (;;)
-    {
-        if (xQueueReceive(
-            xCommandQueue,
-            &message,
-            portMAX_DELAY))
-        {
-            // decode command
-            int32_t target_position = (int32_t)message.parameter;
-            printf("[COMMAND] Dispatching position command: target=%d\n", target_position);
-            fflush(stdout);
+    (void)xTaskNotify(xControlHandle, notification, eSetValueWithOverwrite);
+    (void)xTaskNotify(xEstimationHandle, notification, eSetValueWithOverwrite);
+    (void)xTaskNotify(xSensorHandle, notification, eSetValueWithOverwrite);
+    (void)xTaskNotify(xTelemetryHandle, notification, eSetValueWithOverwrite);
+}
 
-            // update managers -- notify every task the position command
-            // affects (Housekeeping is intentionally excluded)
-            xTaskNotify(xControlHandle, (uint32_t)target_position, eSetValueWithOverwrite);
-            xTaskNotify(xEstimationHandle, (uint32_t)target_position, eSetValueWithOverwrite);
-            xTaskNotify(xSensorHandle, (uint32_t)target_position, eSetValueWithOverwrite);
-            xTaskNotify(xTelemetryHandle, (uint32_t)target_position, eSetValueWithOverwrite);
+static void execute_command(const adcs_command_t *command) {
+    adcs_guidance_target_t target;
 
-            // send responses -- Telemetry reports the new position back to
-            // the OBC once it wakes up and processes the notification above
+    switch (command->type) {
+        case ADCS_COMMAND_SET_MODE:
+            adcs_manager_request_mode(command->parameter.mode);
+            break;
+        case ADCS_COMMAND_SET_ATTITUDE:
+            if (adcs_guidance_target_from_attitude(
+                    ADCS_MODE_SLEWING,
+                    command->parameter.attitude,
+                    COMMAND_DEFAULT_MAXIMUM_RATE_RAD_S,
+                    &target) == ADCS_RESULT_OK) {
+                adcs_manager_set_guidance_target(&target);
+                adcs_manager_request_mode(ADCS_MODE_SLEWING);
+            } else {
+                adcs_manager_note_rejected_command();
+            }
+            break;
+        case ADCS_COMMAND_SET_POINTING_VECTOR:
+            if (adcs_guidance_target_from_vector(
+                    ADCS_MODE_SLEWING,
+                    command->parameter.pointing.body_axis,
+                    command->parameter.pointing.inertial_direction,
+                    COMMAND_DEFAULT_MAXIMUM_RATE_RAD_S,
+                    &target) == ADCS_RESULT_OK) {
+                adcs_manager_set_guidance_target(&target);
+                adcs_manager_request_mode(ADCS_MODE_SLEWING);
+            } else {
+                adcs_manager_note_rejected_command();
+            }
+            break;
+        case ADCS_COMMAND_RESET_ESTIMATOR:
+            estimation_task_request_reset();
+            break;
+        case ADCS_COMMAND_DISABLE_ACTUATORS:
+            adcs_manager_set_actuators_inhibited(
+                command->parameter.actuators_inhibited);
+            break;
+        case ADCS_COMMAND_SET_UNIX_TIME:
+            if (command->parameter.unix_time_sec > 0) {
+                uint64_t seconds =
+                    (uint64_t)command->parameter.unix_time_sec;
+
+                if (seconds <= UINT64_MAX / 1000000ULL) {
+                    (void)adcs_simulator_set_unix_time(seconds * 1000000ULL);
+                } else {
+                    adcs_manager_note_rejected_command();
+                }
+            } else {
+                adcs_manager_note_rejected_command();
+            }
+            break;
+        case ADCS_COMMAND_SIMULATOR_FAULT:
+            adcs_simulator_set_faults(command->parameter.simulator_fault_mask);
+            break;
+        case ADCS_COMMAND_LEGACY_POSITION:
+            dispatch_legacy_position(command);
+            break;
+        case ADCS_COMMAND_NONE:
+        default:
+            adcs_manager_note_rejected_command();
+            break;
+    }
+}
+
+void command_task(void *parameters) {
+    adcs_command_t command;
+
+    (void)parameters;
+    for (;;) {
+        if (xQueueReceive(command_queue, &command, portMAX_DELAY) == pdPASS) {
+            execute_command(&command);
         }
     }
 }

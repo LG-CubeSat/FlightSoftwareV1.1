@@ -1,0 +1,31 @@
+ADCS SOFTWARE-IN-THE-LOOP CHECKLIST
+
+COMPLETE FOR THE SIMULATION MVP
+[x] Define task messages and one manager-owned ADCS state/context.
+[x] Store current and target attitudes as local quaternions [x, y, z, w].
+[x] Implement BOOT, SAFE, DETUMBLE, SUN_ACQUISITION, SUN_POINTING,
+    EARTH_POINTING, SLEWING, TARGET_POINTING, and SCIENCE modes.
+[x] Implement autonomous startup, mode prerequisites, dwell, and SAFE fallback.
+[x] Provide separate simulated IMU, magnetometer, Sun sensor, and thermistor reads.
+[x] Provide simulated magnetorquer and reaction-wheel actuator writes.
+[x] Simulate orbit, reference vectors, rigid-body attitude/rate, sensor noise,
+    wheel momentum limits, and deterministic faults.
+[x] Implement TRIAD initialization and a gyro/vector multiplicative estimator.
+[x] Recompute manager current pose as sensor data arrives.
+[x] Implement attitude/vector target generation for Sun, Earth, and commands.
+[x] Implement B-dot detumble and magnetic torque allocation.
+[x] Implement quaternion-to-rate control and three-axis PID with anti-windup.
+[x] Feed actuator outputs back into the simulator closed loop.
+[x] Implement sensor, estimation, control, command, telemetry, and health tasks.
+[x] Implement command validation plus current/target attitude telemetry.
+[x] Use attached/K&R braces throughout ADCS C and header files.
+
+DEFERRED UNTIL REAL HARDWARE OR HIGHER-FIDELITY HIL
+[ ] Replace simulator reads/writes with board drivers using the same messages.
+[ ] Characterize sensor axes/noise/bias, inertia, wheel limits, and rod polarity.
+[ ] Retune estimator and controller gains against measured hardware.
+[ ] Add magnetorquer quiet-window sampling and reaction-wheel desaturation.
+[ ] Replace low-order orbit/Sun/magnetic references with mission services/models.
+[ ] Add eclipse, actuator-failure, HIL, Monte Carlo, and mission-scenario coverage.
+[ ] Freeze a versioned, endian-explicit command protocol.
+[ ] Complete flight safety review and verification; this MVP is not flight-qualified.
