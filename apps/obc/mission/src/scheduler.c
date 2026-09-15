@@ -9,6 +9,7 @@
 
 #define ASCENT_WAIT_SEC 5400 // ~90 min: typical HAB ascent to burst altitude at ~5 m/s; tune once real ascent rate/fill is known
 #define PHOTO_PATH "/tmp/photos" // placeholder
+#define COMPRESSED_PHOTO_PATH "/tmp/photos.rice"
 
 /* Overridable so an integration test can run the full timeline in seconds
    instead of waiting out the real ~90 minute ascent. Production default is
@@ -25,6 +26,7 @@ static int get_ascent_wait_sec(void)
 typedef enum {
     MISSION_WAITING_FOR_ASCENT,
     MISSION_TAKING_PHOTO,
+    MISSION_COMPRESSING,
     MISSION_DOWNLINKING,
     MISSION_DONE
 } mission_state_t;
@@ -68,10 +70,14 @@ void *scheduler_thread(void *arg) {
                 break;
             case MISSION_TAKING_PHOTO:
                 payload_commander_take_photo(PHOTO_PATH);
+                current_state = MISSION_COMPRESSING;
+                break;
+            case MISSION_COMPRESSING:
+                payload_commander_compress_photo(PHOTO_PATH, COMPRESSED_PHOTO_PATH);
                 current_state = MISSION_DOWNLINKING;
                 break;
             case MISSION_DOWNLINKING:
-                payload_commander_downlink_photo(PHOTO_PATH);
+                payload_commander_downlink_photo(COMPRESSED_PHOTO_PATH);
                 current_state = MISSION_DONE;
                 break;
             case MISSION_DONE:

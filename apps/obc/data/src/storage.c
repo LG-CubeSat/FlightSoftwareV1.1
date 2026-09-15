@@ -26,22 +26,35 @@ void *storage_thread(void *arg)
 {
     (void)arg;
 
+    /* sized to the larger of the two request types this thread handles */
+    uint8_t buf[sizeof(data_write_chunk_t) > sizeof(data_read_request_t)
+                ? sizeof(data_write_chunk_t) : sizeof(data_read_request_t)];
+
     for (;;) {
         OBC_Roles_t src;
-        uint8_t buf[sizeof(data_read_request_t)];
         int len = IPC_receive(&src, buf, sizeof(buf));
 
-        data_read_request_t req;
+        if (len == sizeof(data_read_request_t)) {
+            data_read_request_t req;
+            memcpy(&req, buf, sizeof(req));
+            req.path[sizeof(req.path) - 1] = '\0';  // don't trust the sender to have NUL terminated it.
 
-        if (len != sizeof(data_read_request_t)) continue;
+            printf("[STORAGE] Streaming %s to role %d\n", req.path, src);
+            fflush(stdout);
 
-        memcpy(&req, buf, sizeof(req));
-        req.path[sizeof(req.path) - 1] = '\0';  // don't trust the sender to have NUL terminated it.
+            filesystem_stream_file(req.path, src);
+        } else if (len == sizeof(data_write_chunk_t)) {
+            data_write_chunk_t chunk;
+            memcpy(&chunk, buf, sizeof(chunk));
+            chunk.path[sizeof(chunk.path) - 1] = '\0';
 
-        printf("[STORAGE] Streaming %s to role %d\n", req.path, src);
-        fflush(stdout);
+            printf("[STORAGE] Writing %u bytes to %s (offset=%u, last=%d) for role %d\n",
+                   chunk.length, chunk.path, chunk.offset, chunk.is_last, src);
+            fflush(stdout);
 
-        filesystem_stream_file(req.path, src);
+            filesystem_write_chunk(chunk.path, chunk.offset, chunk.length, chunk.payload, src);
+        }
+        /* anything else: not a message this thread understands, drop it */
     }
 
     return NULL;

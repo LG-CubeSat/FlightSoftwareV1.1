@@ -2,7 +2,7 @@
 Shared CSP node addresses, ports, and wire structs for the
 OBC <-> ADCS position-command integration.
 
-Port numbers match docs/architecture.md (ADCS command = 10,
+Port numbers match docs/satellite_architecture.md (ADCS command = 10,
 ADCS telemetry = 20).
 */
 #ifndef CSP_COMMANDS_H
@@ -13,7 +13,7 @@ ADCS telemetry = 20).
 #define OBC_ADDRESS      1
 #define ADCS_ADDRESS     2
 #define EPS_ADDRESS      3
-#define THERMALS         4
+#define THERMALS_ADDRESS 4
 #define CAMERA           5
 #define COMMS            6
 

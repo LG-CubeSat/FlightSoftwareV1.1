@@ -1,5 +1,5 @@
 /*
-comms_bus API contract (docs/directory_conventions.md, docs/architecture.md).
+comms_bus API contract (docs/directory_conventions.md, docs/satellite_architecture.md).
 
 This is the ONE interface both mediums implement:
   - platform/sim/drivers/comms_i2c.c  -- Unix domain socket, for HW_MODE=OFF
