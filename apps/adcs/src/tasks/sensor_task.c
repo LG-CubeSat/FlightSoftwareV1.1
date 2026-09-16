@@ -10,7 +10,7 @@
 #include "manager/adcs_manager.h"
 #include "simulation/adcs_simulator.h"
 
-#define SENSOR_TASK_PRIORITY 3
+#define SENSOR_TASK_PRIORITY 4
 #define SENSOR_TASK_STACK_SIZE 1536
 #define SENSOR_TASK_PERIOD_MS 10
 #define SENSOR_QUEUE_LENGTH 1
