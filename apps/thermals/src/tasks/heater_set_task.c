@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-
 #define HEATER_SET_TASK_PRIORITY (2)
 #define HEATER_SET_TASK_STACK_SIZE (1024)
 #define HEATER_SET_TASK_PERIOD_MS (100)
@@ -47,21 +46,23 @@ void heater_set_task(void *pvParameters) {
 
     TickType_t lastWakeTime = xTaskGetTickCount();
 
-    float current_temp;
-    float target_temp;
+    ThermalData_t thermal_data = get_thermal_data();
+
+    float average_temp = thermal_data.average_temp;
+    float target_temp = thermal_data.target_temp;
 
     for (;;) {
 
-        current_temp = get_thermal_data().current_temp;
-        target_temp = get_thermal_data().target_temp;
+        ThermalData_t thermal_data = get_thermal_data();
 
-        if (fabs(target_temp - current_temp) > ERROR_TOLERANCE) {
+        float average_temp = thermal_data.average_temp;
+        float target_temp = thermal_data.target_temp;
 
-        //to be implimented w/ hardware
-        //sets heater to get closer to goal temp
-
-
-
+        if (fabs(target_temp - average_temp) > ERROR_TOLERANCE)
+        {
+            // Heater control will be implemented here.
+            //Logic is going to be implemented either here or on the OBC, (tbd)
+            //We will have a shut off or heat system along with accelerated heating to get to ideal tempeartures faster
         }
 
         xTaskDelayUntil(

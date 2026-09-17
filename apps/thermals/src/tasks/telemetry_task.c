@@ -40,9 +40,15 @@ static void telemetry_send_thermal_values(ThermalData_t thermalData)
     }
 
     thermals_telemetry_t telem = {
-    .target_temp = thermalData.target_temp,
-    .current_temp = thermalData.current_temp
+    .average_temp = thermalData.average_temp,
+    .target_temp = thermalData.target_temp
 };
+
+memcpy(
+    telem.current_temps,
+    thermalData.temperatures,
+    sizeof(telem.current_temps)
+);
     memcpy(packet->data, &telem, sizeof(telem));
     packet->length = sizeof(telem);
 
@@ -81,8 +87,24 @@ void telemetry_task(void *pvParameters)
         uint32_t notified_value;
         if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
         {
-            printf("[TELEMETRY] Reporting new goal temp to OBC: %f\n", thermalData.target_temp);
-            printf("[TELEMETRY] Reporting current temp to OBC: %f\n", thermalData.current_temp);
+            for (uint8_t i = 0; i < MAX_SENSORS; i++)
+                {
+                    printf(
+                        "[TELEMETRY] Reporting Sensor %u temperature: %.2f C\n",
+                        (unsigned int)(i + 1),
+                        thermalData.temperatures[i]
+                    );
+                }
+                printf(
+                    "[TELEMETRY] Reporting average temperature: %.2f C\n",
+                    thermalData.average_temp
+                );
+
+                printf(
+
+                    "[TELEMETRY] Reporting target temperature: %.2f C\n",
+                    thermalData.target_temp
+                );
             //this should return the value of thermalData (impliment once we have hardware)
             printf("[TELEMETRY] Thermals functions to change to temperature initialized\n");
             fflush(stdout);

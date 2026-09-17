@@ -41,20 +41,29 @@ void sensor_read_task_init(void)
     sensors[1].sensor_id = SENSOR_2_ID;
 
     for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
+    
+        int sensor_init_status = thermal_sensor_init(
+        &sensors[i],
+        sensors[i].address);
 
-        int sensor_init_status = thermal_sensor_init(&sensors[i],sensors[i].address);
-
-        if (sensor_init_status == -1)
+     if (sensor_init_status == -1)
     {
-        printf("[THERMALS] Sensor #%u initialization failed. Invalid Address\n",
-        (unsigned int)sensors[i].sensor_id);
+        printf(
+            "[THERMALS] Sensor #%u initialization failed: invalid address\n",
+            (unsigned int)sensors[i].sensor_id
+        );
         fflush(stdout);
-        
-    }  
-    else if (sensor_init_status == -2) {
-        printf("[THERMALS] Sensor #%u initialization failed. Max sensors already initialized\n",
-        (unsigned int)sensors[i].sensor_id);
+        return;
+    }
+    else if (sensor_init_status == -2)
+    {
+        printf(
+            "[THERMALS] Sensor #%u initialization failed: "
+            "maximum sensors already initialized\n",
+            (unsigned int)sensors[i].sensor_id
+        );
         fflush(stdout);
+        return;
     }
 }
 
@@ -90,8 +99,8 @@ void sensor_read_task(void *pvParameters) {
         for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
 
             read_status = thermal_sensor_read(&sensors[i], &currentTemp);
-
-                if (read_status < 0) {
+                if (read_status < 0){
+                    thermals_invalidate_sensor(sensors[i].sensor_id);
                     printf(
                         "[THERMALS] ERROR OCCURRED WHILE READING SENSOR\n"
                         "FAULTY SENSOR ADDRESS = %u\n"
@@ -101,19 +110,23 @@ void sensor_read_task(void *pvParameters) {
                     fflush(stdout);}
                 else { //executes if sensor read is succsessful
 
-                if (currentTemp < MIN_VALID_TEMPERATURE_C || currentTemp > MAX_VALID_TEMPERATURE_C) {
-                    printf("[THERMAL_SENSOR_READ] ERROR: Likely Invalid temperature reading: %.2f°C\n", currentTemp);
-                    fflush(stdout);
-                } else {
+                if (currentTemp < MIN_VALID_TEMPERATURE_C ||
+                    currentTemp > MAX_VALID_TEMPERATURE_C){
+                        thermals_invalidate_sensor(sensors[i].sensor_id);
+                        printf(
+                            "[THERMAL_SENSOR_READ] Invalid temperature reading: %.2f C\n",
+                            currentTemp);
+                        fflush(stdout);} 
+                    else {
                     // Update the global thermal data structure with the new temperature reading
-                    thermals_set_current(currentTemp);
+                    thermals_set_current(currentTemp, sensors[i].sensor_id);
                 }
 
             }
         }
-    }
-    xTaskDelayUntil(
+        xTaskDelayUntil(
         &lastWakeTime,
         pdMS_TO_TICKS(SENSOR_READ_TASK_PERIOD_MS)
     );
+    }
 }
