@@ -97,7 +97,16 @@ void command_task(void *pvParameters)
                 fflush(stdout);
             } else if (message.command == THERMAL_CMD_REQUEST_TELEMETRY) /*Obc requests current temp and goal temp, send via telem*/{
 
-                xTaskNotify(xTelemetryHandle, 0, eNoAction);
+                if (xTelemetryHandle == NULL)
+                {
+                    printf("[THERMALS COMMAND] Telemetry task is unavailable\n");
+                    fflush(stdout);
+                }
+                else if (xTaskNotify(xTelemetryHandle, 0, eNoAction) != pdPASS)
+                {
+                    printf("[THERMALS COMMAND] Failed to notify telemetry task\n");
+                    fflush(stdout);
+                }
 
              } else {
                 printf("[THERMALS COMMAND] Unknown command received: %lu\n",(unsigned long)message.command);
