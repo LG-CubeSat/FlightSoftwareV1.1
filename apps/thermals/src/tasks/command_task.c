@@ -2,6 +2,8 @@
 #include "task.h"
 #include "queue.h"
 
+#include <math.h>
+
 
 #include "thermal_data.h"
 #include "tasks/heater_set_task.h"

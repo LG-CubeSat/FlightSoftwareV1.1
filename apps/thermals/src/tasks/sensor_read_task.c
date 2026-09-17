@@ -9,15 +9,13 @@
 
 #include "thermal_data.h"
 
-#define SENSOR_COUNT (2u)
-
 #define SENSOR_1_ADDRESS (0x48u)
 #define SENSOR_2_ADDRESS (0x49u)
 
 #define SENSOR_1_ID (1u)
 #define SENSOR_2_ID (2u)
 
-static thermal_sensor_t sensors[SENSOR_COUNT]; //sensors is an array that contains a list of sensors mainly for init
+static thermal_sensor_t sensors[MAX_SENSORS]; //sensors is an array that contains a list of sensors mainly for init
 
 #define MIN_VALID_TEMPERATURE_C (-40.0f)
 #define MAX_VALID_TEMPERATURE_C (125.0f)
@@ -40,7 +38,7 @@ void sensor_read_task_init(void)
     sensors[1].address = SENSOR_2_ADDRESS;
     sensors[1].sensor_id = SENSOR_2_ID;
 
-    for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
+    for (uint8_t i = 0; i < MAX_SENSORS; i++) {
     
         int sensor_init_status = thermal_sensor_init(
         &sensors[i],
@@ -96,7 +94,7 @@ void sensor_read_task(void *pvParameters) {
 
     for (;;) {
 
-        for (uint8_t i = 0; i < SENSOR_COUNT; i++) {
+        for (uint8_t i = 0; i < MAX_SENSORS; i++) {
 
             read_status = thermal_sensor_read(&sensors[i], &currentTemp);
                 if (read_status < 0){
