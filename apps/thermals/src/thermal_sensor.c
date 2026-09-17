@@ -18,18 +18,22 @@ int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address) {
 
 }
 
-float thermal_sensor_read(thermal_sensor_t *sensor) {
+int thermal_sensor_read(
+    const thermal_sensor_t *sensor,
+    float *temperature_out) {
 
     if (sensor -> sensor_id == 1) {
         // call read task for sensor 1
-        return 0;
+        *temperature_out = 0.00f; //0 is placeholder for data from sensor 1
+        return 1; //succsessful read
     }
     else if (sensor -> sensor_id == 2) {
         // call read task for sensor 2
-        return 0;
+        *temperature_out = 0; //0 is placeholder for data from sensor 2
+        return 1; //succsessful read
     }
     else {
-        return -1.0; // invalid sensor
+        return -1.0; // error occured
     }
 
 

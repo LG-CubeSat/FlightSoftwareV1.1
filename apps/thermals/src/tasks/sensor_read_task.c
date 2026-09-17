@@ -65,10 +65,23 @@ void sensor_read_task(void *pvParameters) {
 //move this to sensor_init and check for errors in the function decleration 
  
     static float currentTemp;
+    int read_status;
 
     for (;;) {
 
-        currentTemp = thermal_sensor_read(&sensor);
+        read_status = thermal_sensor_read(&sensor, &currentTemp);
+
+        if (read_status < 0) {
+            printf(
+                "[THERMALS] ERROR OCCURRED WHILE READING SENSOR\n"
+                "SENSOR ADDRESS = %u\n"
+                "SENSOR ID = %u\n",
+                (unsigned int)sensor.address,
+                (unsigned int)sensor.sensor_id
+            );
+    fflush(stdout);
+        }
+        else { //executes if sensor read is succsessful
 
         if (currentTemp < -40.0 || currentTemp > 125.0) {
             printf("[THERMAL_SENSOR_READ] ERROR: Likely Invalid temperature reading: %.2f°C\n", currentTemp);
@@ -83,5 +96,5 @@ void sensor_read_task(void *pvParameters) {
             pdMS_TO_TICKS(SENSOR_READ_TASK_PERIOD_MS)
         );
     }
-
+}
 }
