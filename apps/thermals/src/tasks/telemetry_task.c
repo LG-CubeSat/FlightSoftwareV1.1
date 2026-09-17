@@ -11,6 +11,12 @@
 #include "csp_commands.h"
 #include "thermal_data.h"
 
+_Static_assert(
+    MAX_SENSORS == THERMALS_TELEMETRY_SENSOR_COUNT,
+    "Thermals sensor count must match the CSP telemetry packet"
+);
+//generates error if the csp_commands and thermal_data MAX_SENSORS values are different
+
 
 #define TELEMETRY_TASK_PRIORITY (1)
 #define TELEMETRY_TASK_STACK_SIZE (1024)
@@ -40,6 +46,7 @@ static void telemetry_send_thermal_values(ThermalData_t thermalData)
     }
 
     thermals_telemetry_t telem = {
+    .valid_sensor_mask = thermalData.valid_sensor_mask,
     .average_temp = thermalData.average_temp,
     .target_temp = thermalData.target_temp
 };

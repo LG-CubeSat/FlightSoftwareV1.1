@@ -30,7 +30,7 @@ ADCS telemetry = 20).
 #define ADCS_STATUS_PORT 25 // board-initiated reset notices, telemetry range (20-29)
 #define TIME_SYNC_REQUEST_PORT 26
 
-#define MAX_SENSORS (2) //used for thermal data struct, may need to adjust according to the number of sensors
+#define THERMALS_TELEMETRY_SENSOR_COUNT (2)
 
 typedef struct {
     uint8_t command_id;
@@ -92,7 +92,8 @@ typedef struct {
 
 /* THERMALS -> OBC, port THERMALS_TELEM_PORT */
 typedef struct {
-    float current_temps[MAX_SENSORS];
+    float current_temps[THERMALS_TELEMETRY_SENSOR_COUNT];
+    uint32_t valid_sensor_mask;
     float average_temp;
     float target_temp;
 } thermals_telemetry_t;
