@@ -14,6 +14,8 @@ this file is the practical "clone it, build it, run it" reference for the softwa
 | OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. CCSDS 121.0 (ground-station packetization/link) is a separate, in-progress effort tracked outside this repo's `compute` process. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. Real I2C HAL backend is still a stub (see Known gaps). |
 | Thermals | CSP/FreeRTOS simulation scaffold builds successfully. Command handling, sensor collection, and on-demand telemetry are present; hardware drivers, closed-loop heater control, FDIR, and hardware testing remain. |
+| Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. **OBC's real backend now exists** (`platform/real/drivers/comms_i2c.c` — Linux `i2c-dev`/`ioctl`, round-robin polls known boards since real I2C can't do broadcast-and-listen like the SIM transport does), verified to compile against real Linux/i2c-dev headers, but only exercised via Docker so far — no physical bus yet. MCU-side (ADCS/Thermals real I2C slave) is still a stub, and the OBC/MCU split into separate real backends hasn't happened yet (see Known gaps). |
+| Thermals | Not yet scaffolded as a CSP board — same pattern as ADCS, not started. |
 | EPS | Not a CSP board at all — real hardware is a passive buck converter with no MCU. Address reserved in code in case future battery-monitoring hardware needs it. See `docs/satellite_architecture.md`. |
 | Camera / Comms (radio) | Not CSP boards — both are OBC-local peripherals (Arducam over USB-C, E22 LoRa module over UART). Their *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; real backends aren't written yet. |
 
@@ -314,10 +316,20 @@ run them at the same time as each other or as a manually-launched binary using t
 
 ## Known gaps
 
-- **`platform/real/drivers/comms_i2c.c` is stale.** It still matches the pre-addressing
-  `comms_bus.h` contract (2-argument `send`/`receive`, no `my_address`) and won't compile
-  against the current header. Real I2C HAL work is planned but not scheduled yet;
-  updating the stub's signatures to match is a prerequisite that hasn't been done yet.
+- **`platform/real/drivers/comms_i2c.c` is now a real OBC-side driver, not a stub — but it's
+  the only real backend, and it's OBC-shaped.** It implements `comms_bus_initialize`/`send`/
+  `receive` against Linux `i2c-dev` (`/dev/i2c-1`, `ioctl(I2C_RDWR)`), mapping CSP addresses
+  (`shared/csp/csp_commands.h`) to physical I2C addresses (`platform/real/include/i2c_addresses.h`
+  — **placeholder values, `0x42`/`0x43`, not yet confirmed against real wiring**). `receive()`
+  round-robin polls each known board rather than blocking on a broadcast, since real I2C has no
+  equivalent of the SIM transport's "every frame goes to everyone, filter by address" — see the
+  design note in `docs/satellite_architecture.md`'s Path to HW_MODE, item C.4. Verified so far
+  only by syntax/type-checking against real Linux kernel headers via Docker (macOS has no
+  `<linux/i2c-dev.h>` to compile against natively — see `docs/obc_i2c_bringup.md`); no physical
+  I2C bus has run this yet. **This file doesn't yet work for ADCS/Thermals** — `platform/CMakeLists.txt`
+  still compiles one `real/drivers/comms_i2c.c` for every `HW_MODE=ON` target, so an MCU build
+  today would get this Linux-only code instead of a real STM32 I2C slave implementation. Splitting
+  into separate OBC/MCU real backends (tracked in the Path to HW_MODE TODO) hasn't happened yet.
 - **The master's `receive()` reads connections one at a time, blocking per connection.**
   Fine for the current 2-3 node tests; will need `select()`/`poll()`-based multiplexing
   before many subsystems are simultaneously active and one shouldn't be able to stall
@@ -382,7 +394,8 @@ run them at the same time as each other or as a manually-launched binary using t
 
 ## Where to go for more
 
-- `docs/satellite_architecture.md` — the confirmed physical hardware (OBC, power, radio, camera, ADCS, Thermals) and the CSP node/address table
+- `docs/satellite_architecture.md` — the confirmed physical hardware (OBC, power, radio, camera, ADCS, Thermals), the CSP node/address table, and the Path to HW_MODE bring-up TODO
+- `docs/obc_i2c_bringup.md` — OS-level Raspberry Pi I2C setup/verification steps, and how to syntax-check real-backend code without Linux hardware (Docker)
 - `docs/api_contracts.md` — public API for every subsystem, built and planned
 - `docs/directory_conventions.md` — where new code goes and why
 - `docs/testing.md` — how each test works and how to read its output when it fails
