@@ -1,3 +1,6 @@
+//This file mainly just turns on and makes sure all thermal sensor(s) 
+//are working properly before letting other code features use them
+
 
 #include "thermal_sensor.h"
 #include "stdint.h"

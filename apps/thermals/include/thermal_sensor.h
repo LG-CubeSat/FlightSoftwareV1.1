@@ -25,7 +25,7 @@ returns negative if unsuccessful (e.g. address is invalid)
 takes in a pointer to thermal_sensor_t struct, along with the address of the sensor, this will initialize
 the sensor variable correlated with the struct with the actual address of the sensor
 */
-float thermal_sensor_read(const thermal_sensor_t *sensor, float *temperature_out);
+int thermal_sensor_read(const thermal_sensor_t *sensor, float *temperature_out);
 
 
 /*
