@@ -2,13 +2,14 @@
 #include "task.h"
 #include "queue.h"
 
+
 #include "thermal_data.h"
 #include "tasks/heater_set_task.h"
 #include "tasks/sensor_read_task.h"
 #include "tasks/telemetry_task.h"
 
 #include <stdio.h>
-#include "tasks/command_task.h"
+#include "../../include/tasks/command_task.h"
 
 #define COMMAND_TASK_PRIORITY (2)
 #define COMMAND_TASK_STACK_SIZE (1024)

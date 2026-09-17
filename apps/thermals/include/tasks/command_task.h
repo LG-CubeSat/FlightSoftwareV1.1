@@ -1,5 +1,5 @@
-#ifndef COMMAND_TASK_H
-#define COMMAND_TASK_H
+#ifndef THERMALS_COMMAND_TASK_H
+#define THERMALS_COMMAND_TASK_H
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -11,6 +11,7 @@ Command table
 2 - Obc requests current temp and goal temp, send via telem
 
 */
+
 
 #define THERMAL_CMD_SET_TARGET_TEMP 1
 #define THERMAL_CMD_REQUEST_TELEMETRY 2
@@ -29,4 +30,4 @@ void command_task(void *pvParameters);
 
 int command_task_send(const CommandMessage_t *message);
 
-#endif // COMMAND_TASK_H
+#endif // THERMALS_COMMAND_TASK_H
