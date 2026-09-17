@@ -1,5 +1,7 @@
 
 #include "thermal_data.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 
 static ThermalData_t thermal_data = {

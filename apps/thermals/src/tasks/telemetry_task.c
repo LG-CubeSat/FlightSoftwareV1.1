@@ -20,7 +20,6 @@ _Static_assert(
 
 #define TELEMETRY_TASK_PRIORITY (1)
 #define TELEMETRY_TASK_STACK_SIZE (1024)
-#define TELEMETRY_TASK_PERIOD_MS (1000)
 
 static StackType_t xTelemetryTaskStack[TELEMETRY_TASK_STACK_SIZE];
 static StaticTask_t xTelemetryTaskBuffer;
@@ -86,14 +85,17 @@ void telemetry_task(void *pvParameters)
 {
     (void) pvParameters;
 
-    TickType_t lastWakeTime = xTaskGetTickCount();
-
     for (;;)
     {
         uint32_t notified_value;
         ThermalData_t thermalData;
-        
-        if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
+
+        if (xTaskNotifyWait(
+        0,
+        UINT32_MAX,
+        &notified_value,
+        portMAX_DELAY
+    ) == pdTRUE)
         {
             ThermalData_t thermalData = get_thermal_data();
             for (uint8_t i = 0; i < MAX_SENSORS; i++)
@@ -119,10 +121,5 @@ void telemetry_task(void *pvParameters)
             fflush(stdout);
             telemetry_send_thermal_values(thermalData);
         }
-
-        xTaskDelayUntil(
-            &lastWakeTime,
-            pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS)
-        );
     }
 }
