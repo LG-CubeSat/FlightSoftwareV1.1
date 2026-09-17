@@ -12,7 +12,6 @@ typedef struct
    // sensor_id = GENERIC NAME FOR SENSOR.
    // e.g. "001" or "002" etc. This is used to identify which sensor is being used
 
-
 } thermal_sensor_t;
 
 

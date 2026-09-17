@@ -9,6 +9,11 @@
 
 #include "thermal_data.h"
 
+#define SENSOR_1_ADDRESS (0x48u)
+#define SENSOR_1_ID (1u)
+
+#define MIN_VALID_TEMPERATURE_C (-40.0f)
+#define MAX_VALID_TEMPERATURE_C (125.0f)
 
 #define SENSOR_READ_TASK_PRIORITY (2)
 #define SENSOR_READ_TASK_STACK_SIZE (1024)
@@ -19,8 +24,25 @@ static StaticTask_t xSensorReadTaskBuffer;
 
 TaskHandle_t xSensorReadHandle = NULL;
 
+static thermal_sensor_t sensor;
+
 void sensor_read_task_init(void)
 {
+
+    sensor.address = SENSOR_1_ADDRESS;
+    sensor.sensor_id = SENSOR_1_ID;
+
+    int sensor_init_status = thermal_sensor_init(&sensor,sensor.address);
+    if (sensor_init_status == -1)
+    {
+        printf("[THERMALS] Sensor initialization failed.\nInvalid Address\n");
+        fflush(stdout);
+} else if (sensor_init_status == -2){
+        printf("[THERMALS] Sensor initialization failed.\nMax sensors already initialized\n");
+        fflush(stdout);
+}
+
+
     xSensorReadHandle = xTaskCreateStatic(
         sensor_read_task,
         "sensor_read",
@@ -45,24 +67,6 @@ void sensor_read_task(void *pvParameters) {
 
     TickType_t lastWakeTime = xTaskGetTickCount();
 
-
-    //Placeholder address for sensors, fill in once we get the real hardware
-    thermal_sensor_t sensor;
-    sensor.address = 0x48;
-    sensor.sensor_id = 1;
-
-    int sensor_init_value = thermal_sensor_init(&sensor, sensor.address);
-    if (sensor_init_value == -1) {
-        printf("INVALID ADDRESS\n");
-        fflush(stdout);
-    } else if (sensor_init_value == -2) {
-        printf("1 SENSORS ALREADY INITIALIZED\n");
-        fflush(stdout);
-    } else if (sensor_init_value == 1) {
-        printf("SENSOR INITIALIZED SUCCESSFULLY\n");
-        fflush(stdout);
-    }
-//move this to sensor_init and check for errors in the function decleration 
  
     static float currentTemp;
     int read_status;
@@ -83,7 +87,7 @@ void sensor_read_task(void *pvParameters) {
         }
         else { //executes if sensor read is succsessful
 
-        if (currentTemp < -40.0 || currentTemp > 125.0) {
+        if (currentTemp < MIN_VALID_TEMPERATURE_C || currentTemp > MAX_VALID_TEMPERATURE_C) {
             printf("[THERMAL_SENSOR_READ] ERROR: Likely Invalid temperature reading: %.2f°C\n", currentTemp);
             fflush(stdout);
         } else {

@@ -2,6 +2,8 @@
 #include "thermal_sensor.h"
 #include "stdint.h"
 
+#define MAX_SENSORS (2)
+
 static uint8_t sensor_count = 0;
 
 int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address) {
@@ -9,7 +11,7 @@ int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address) {
     if (address > 0x7F) {
         return -1; // invalid address
     }
-    if (sensor_count >= 2) {
+    if (sensor_count >= MAX_SENSORS) {
         return -2; // two sensors (MAX) already initialized
     }
     else sensor->address = address;
