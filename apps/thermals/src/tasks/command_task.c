@@ -3,7 +3,7 @@
 #include "queue.h"
 
 #include "thermal_data.h"
-#include "tasks/thermal_write_task.h"
+#include "tasks/heater_set_task.h"
 #include "tasks/sensor_read_task.h"
 #include "tasks/telemetry_task.h"
 

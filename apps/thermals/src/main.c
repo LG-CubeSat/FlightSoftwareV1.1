@@ -2,7 +2,7 @@
 #include "stdio.h"
 
 #include "tasks/sensor_read_task.h"
-#include "tasks/thermal_write_task.h"
+#include "tasks/heater_set_task.h"
 #include "tasks/command_task.h"
 #include "tasks/housekeeping_task.h"
 #include "tasks/telemetry_task.h"
@@ -29,7 +29,7 @@ int main(void) {
     command_handler_init();
 
     sensor_read_task_init();
-    thermal_write_task_init();
+    heater_set_task_init();
     housekeeping_task_init();
     telemetry_task_init();
 

@@ -8,7 +8,7 @@ add_executable(thermals_sim
     src/tasks/housekeeping_task.c
     src/tasks/sensor_read_task.c
     src/tasks/telemetry_task.c
-    src/tasks/thermal_write_task.c
+    src/tasks/heater_set_task.c
 )
 
 target_include_directories(thermals_sim PRIVATE
