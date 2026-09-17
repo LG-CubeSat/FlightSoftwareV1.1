@@ -83,7 +83,7 @@ void telemetry_task(void *pvParameters)
         {
             printf("[TELEMETRY] Reporting new goal temp to OBC: %f\n", thermalData.goal_temp);
             printf("[TELEMETRY] Reporting current temp to OBC: %f\n", thermalData.current_temp);
-            //impliment once we have hardware this should call thermal_write_task
+            //this should return the value of thermalData (impliment once we have hardware)
             printf("[TELEMETRY] Thermals functions to change to temperature initialized\n");
             fflush(stdout);
             telemetry_send_thermal_values(thermalData);
