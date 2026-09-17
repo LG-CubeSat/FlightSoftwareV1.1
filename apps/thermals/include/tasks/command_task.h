@@ -12,13 +12,13 @@ Command table
 
 */
 
-#define THERMAL_CMD_SET_GOAL_TEMP 1
+#define THERMAL_CMD_SET_TARGET_TEMP 1
 #define THERMAL_CMD_REQUEST_TELEMETRY 2
 
 
 typedef struct
 {
-    uint32_t command; // THERMAL_CMD_SET_GOAL_TEMP or THERMAL_CMD_REQUEST_TELEMETRY
+    uint32_t command; // THERMAL_CMD_SET_TARGET_TEMP or THERMAL_CMD_REQUEST_TELEMETRY
     float parameter; // Signed float32 temperature in degrees Celsius
 
 } CommandMessage_t;

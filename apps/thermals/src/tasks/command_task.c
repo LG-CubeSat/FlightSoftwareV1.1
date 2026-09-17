@@ -88,9 +88,9 @@ void command_task(void *pvParameters)
             portMAX_DELAY))
         {
 
-            if (message.command == THERMAL_CMD_SET_GOAL_TEMP) { //@param parameter Recieved via obc, sets goal temperature to @param paramater
+            if (message.command == THERMAL_CMD_SET_TARGET_TEMP) { //@param parameter Recieved via obc, sets goal temperature to @param paramater
 
-                thermals_set_goal(message.parameter);
+                thermals_set_target(message.parameter);
 
                 printf("[THERMALS COMMAND] Setting goal temperature to %f C\n", message.parameter);
                 fflush(stdout);

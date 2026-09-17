@@ -85,13 +85,13 @@ typedef struct {
 /* OBC -> THERMALS, port THERMALS_CMD_PORT */
 typedef struct {
     command_envelope_t envelope;
-    float goal_temp;
+    float target_temp;
 } thermal_command_t;
 
 /* THERMALS -> OBC, port THERMALS_TELEM_PORT */
 typedef struct {
     float current_temp;
-    float goal_temp;
+    float target_temp;
 } thermals_telemetry_t;
 
 

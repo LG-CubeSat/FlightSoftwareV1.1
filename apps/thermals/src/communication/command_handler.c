@@ -39,7 +39,7 @@ static void *command_handler_rx_loop(void *param)
 
                 CommandMessage_t msg = {
                     .command = cmd.envelope.command_id,
-                    .parameter = cmd.goal_temp
+                    .parameter = cmd.target_temp
                 };
 
                 printf("[THERMALS COMMAND HANDLER] Received command=%u parameter=%.2f\n",

@@ -3,7 +3,7 @@
 static ThermalData_t thermal_data = {
 
     .current_temp = 0.00f,
-    .goal_temp = 0.00f,
+    .target_temp = 0.00f,
 
 };
 
@@ -16,9 +16,9 @@ void thermals_set_current(float temp) {
 }
 // sets the goal temperature
 
-void thermals_set_goal(float goal) {
+void thermals_set_target(float goal) {
 
-    thermal_data.goal_temp = goal;
+    thermal_data.target_temp = goal;
 
 }
 // returns thermals data

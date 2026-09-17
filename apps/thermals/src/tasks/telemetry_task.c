@@ -40,7 +40,7 @@ static void telemetry_send_thermal_values(ThermalData_t thermalData)
     }
 
     thermals_telemetry_t telem = {
-    .goal_temp = thermalData.goal_temp,
+    .target_temp = thermalData.target_temp,
     .current_temp = thermalData.current_temp
 };
     memcpy(packet->data, &telem, sizeof(telem));
@@ -81,7 +81,7 @@ void telemetry_task(void *pvParameters)
         uint32_t notified_value;
         if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
         {
-            printf("[TELEMETRY] Reporting new goal temp to OBC: %f\n", thermalData.goal_temp);
+            printf("[TELEMETRY] Reporting new goal temp to OBC: %f\n", thermalData.target_temp);
             printf("[TELEMETRY] Reporting current temp to OBC: %f\n", thermalData.current_temp);
             //this should return the value of thermalData (impliment once we have hardware)
             printf("[TELEMETRY] Thermals functions to change to temperature initialized\n");

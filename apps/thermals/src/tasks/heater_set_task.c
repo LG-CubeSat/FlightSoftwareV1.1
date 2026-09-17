@@ -48,14 +48,14 @@ void heater_set_task(void *pvParameters) {
     TickType_t lastWakeTime = xTaskGetTickCount();
 
     float current_temp;
-    float goal_temp;
+    float target_temp;
 
     for (;;) {
 
         current_temp = get_thermal_data().current_temp;
-        goal_temp = get_thermal_data().goal_temp;
+        target_temp = get_thermal_data().target_temp;
 
-        if (fabs(goal_temp - current_temp) > ERROR_TOLERANCE) {
+        if (fabs(target_temp - current_temp) > ERROR_TOLERANCE) {
 
         //to be implimented w/ hardware
         //sets heater to get closer to goal temp
