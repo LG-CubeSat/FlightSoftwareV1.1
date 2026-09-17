@@ -46,17 +46,17 @@ void heater_set_task(void *pvParameters) {
 
     TickType_t lastWakeTime = xTaskGetTickCount();
 
-    ThermalData_t thermal_data = get_thermal_data();
+    ThermalData_t thermal_data;
 
-    float average_temp = thermal_data.average_temp;
-    float target_temp = thermal_data.target_temp;
-
+    float average_temp;
+    float target_temp;
+    
     for (;;) {
 
-        ThermalData_t thermal_data = get_thermal_data();
+        thermal_data = get_thermal_data();
 
-        float average_temp = thermal_data.average_temp;
-        float target_temp = thermal_data.target_temp;
+        average_temp = thermal_data.average_temp;
+        target_temp = thermal_data.target_temp;
 
         if (fabs(target_temp - average_temp) > ERROR_TOLERANCE)
         {

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define MAX_SENSORS (2)
+#include "thermal_sensor.h"
 
 typedef struct {
 

@@ -1,6 +1,5 @@
-#include "thermal_data.h"
 
-#define MAX_SENSORS (2)
+#include "thermal_data.h"
 
 
 static ThermalData_t thermal_data = {

@@ -4,6 +4,8 @@
 #ifndef THERMAL_SENSOR_H
 #define THERMAL_SENSOR_H
 
+#define MAX_SENSORS (2)
+
 typedef struct
 {
    uint8_t address;
