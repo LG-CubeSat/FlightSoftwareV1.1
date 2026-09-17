@@ -90,10 +90,12 @@ void telemetry_task(void *pvParameters)
 
     for (;;)
     {
-        ThermalData_t thermalData = get_thermal_data();
         uint32_t notified_value;
+        ThermalData_t thermalData;
+        
         if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
         {
+            ThermalData_t thermalData = get_thermal_data();
             for (uint8_t i = 0; i < MAX_SENSORS; i++)
                 {
                     printf(
