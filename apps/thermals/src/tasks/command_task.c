@@ -93,10 +93,18 @@ void command_task(void *pvParameters)
 
             if (message.command == THERMAL_CMD_SET_TARGET_TEMP) { //@param parameter Recieved via obc, sets goal temperature to @param paramater
 
+                if (!isfinite(message.parameter))
+                {
+                    printf("[THERMALS COMMAND] Invalid target temperature received\n");
+                    fflush(stdout);
+                    continue;
+                }
+
                 thermals_set_target(message.parameter);
 
-                printf("[THERMALS COMMAND] Setting goal temperature to %f C\n", message.parameter);
+                printf("[THERMALS COMMAND] Setting target temperature to %f C\n", message.parameter);
                 fflush(stdout);
+                
             } else if (message.command == THERMAL_CMD_REQUEST_TELEMETRY) /*Obc requests current temp and goal temp, send via telem*/{
 
                 if (xTelemetryHandle == NULL)
