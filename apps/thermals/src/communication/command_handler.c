@@ -47,7 +47,15 @@ static void *command_handler_rx_loop(void *param)
                        msg.parameter);
                 fflush(stdout);
 
-                command_task_send(&msg);
+                if (!command_task_send(&msg)) {
+                    fprintf(
+                        stderr,
+                        "[THERMALS COMMAND HANDLER] Failed to queue command %u\n",
+                        (unsigned int)msg.command
+                    );
+                    fflush(stderr);
+                    fflsuh(stdout);
+                }
             }
 
             csp_buffer_free(packet);
