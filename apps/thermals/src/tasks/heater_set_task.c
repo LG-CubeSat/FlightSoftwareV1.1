@@ -10,7 +10,7 @@
 #include <stdio.h>
 
 
-#define HEATER_SET_TASK_PRIORITY (1)
+#define HEATER_SET_TASK_PRIORITY (2)
 #define HEATER_SET_TASK_STACK_SIZE (1024)
 #define HEATER_SET_TASK_PERIOD_MS (100)
 

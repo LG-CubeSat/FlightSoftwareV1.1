@@ -10,7 +10,7 @@
 #include "thermal_data.h"
 
 
-#define SENSOR_READ_TASK_PRIORITY (1)
+#define SENSOR_READ_TASK_PRIORITY (2)
 #define SENSOR_READ_TASK_STACK_SIZE (1024)
 #define SENSOR_READ_TASK_PERIOD_MS (100)
 
