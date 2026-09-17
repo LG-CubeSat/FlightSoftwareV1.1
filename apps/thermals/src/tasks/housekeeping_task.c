@@ -12,7 +12,7 @@ Stack usage, CPU usage, Temp, Task heartbeat
 
 #include <stdio.h>
 
-#define HOUSEKEEPING_TASK_PRIORTIY (1)
+#define HOUSEKEEPING_TASK_PRIORITY (1)
 #define HOUSEKEEPING_TASK_STACK_SIZE (1024)
 #define HOUSEKEEPING_TASK_PERIOD_MS (1000)
 
@@ -28,7 +28,7 @@ void housekeeping_task_init(void)
         "housekeeping",
         HOUSEKEEPING_TASK_STACK_SIZE,
         NULL,
-        HOUSEKEEPING_TASK_PRIORTIY,
+        HOUSEKEEPING_TASK_PRIORITY,
         xHousekeepingTaskStack,
         &xHousekeepingTaskBuffer
     );

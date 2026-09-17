@@ -1,6 +1,5 @@
 /*
-Shared CSP node addresses, ports, and wire structs for the
-OBC <-> ADCS position-command integration.
+Shared CSP node addresses, ports, and wire structs.
 
 Port numbers match docs/satellite_architecture.md (ADCS command = 10,
 ADCS telemetry = 20).
@@ -39,7 +38,7 @@ typedef struct {
 
 /* Here is where you add more CMDs */
 typedef enum {
-    CMD_MOVE_TO_POSITION = 1, // TODO: remove, its studded
+    CMD_MOVE_TO_POSITION = 1, // TODO: remove; this command is stubbed
     CMD_RESET = 2,
     CMD_SHUTDOWN = 3,
     CMD_TIME_SYNC = 4,
@@ -98,14 +97,13 @@ typedef struct {
     float target_temp;
 } thermals_telemetry_t;
 
-
 typedef struct {
     command_envelope_t envelope;
     int64_t unix_time_sec;
 } time_sync_command_t; // OBC -> board, sent to the board's own CMD Port
 
 typedef struct {
-    uint8_t requester_addr; // e.g. ADCS_ADRESS
+    uint8_t requester_addr; // e.g. ADCS_ADDRESS
 } time_sync_request_t;
 
 #endif

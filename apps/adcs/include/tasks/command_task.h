@@ -15,7 +15,6 @@ typedef struct
 {
     uint32_t command;
     uint32_t parameter;
-
 } CommandMessage_t;
 
 void command_task_init(void);

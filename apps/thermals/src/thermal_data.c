@@ -1,24 +1,14 @@
 
-#include "thermal_data.h"
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "thermal_data.h"
 
 static ThermalData_t thermal_data = {
-
-    .temperatures = {0.00f, 0.00f}, //may need to adjust according to the number of sensors
+    .temperatures = {0.00f, 0.00f},
     .valid_sensor_mask = 0u,
-        /*
-    * One validity bit per sensor:
-    * bit 0 = temperatures[0] contains a valid sensor 1 reading
-    * bit 1 = temperatures[1] contains a valid sensor 2 reading
-    *
-    * A set bit means that sensor has produced a valid reading.
-    * A cleared bit means its temperature must not be used.
-    */
     .average_temp = 0.00f,
     .target_temp = 0.00f,
-
 };
 
 
@@ -47,7 +37,7 @@ static void thermals_recalculate_average(void)
     }
 }
 
-// sets the current temperature(s)
+// Sets a sensor's current temperature and marks the reading valid.
 void thermals_set_current(float temp, unsigned int sensor_id)
 {
     if (sensor_id == 0 || sensor_id > MAX_SENSORS)
@@ -61,17 +51,15 @@ void thermals_set_current(float temp, unsigned int sensor_id)
     thermals_recalculate_average();
 }
 
-// sets the goal temperature
-
-void thermals_set_target(float target) {
-
+// Sets the target temperature.
+void thermals_set_target(float target)
+{
     thermal_data.target_temp = target;
-
 }
-// returns thermals data
 
-ThermalData_t get_thermal_data(void) {
-
+// Returns a snapshot of the current thermal data.
+ThermalData_t get_thermal_data(void)
+{
     return thermal_data;
 }
 

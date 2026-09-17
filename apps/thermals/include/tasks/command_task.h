@@ -5,10 +5,10 @@
 #include "task.h"
 
 /*
-Command table
+Command table:
 
-1 - @param parameter Recieved from obc, sets goal temperature to @param paramater
-2 - Obc requests current temp and goal temp, send via telem
+1 - Receives a target temperature from the OBC.
+2 - Receives an OBC request for thermal telemetry.
 
 */
 
@@ -20,8 +20,7 @@ Command table
 typedef struct
 {
     uint32_t command; // THERMAL_CMD_SET_TARGET_TEMP or THERMAL_CMD_REQUEST_TELEMETRY
-    float parameter; // Signed float32 temperature in degrees Celsius
-
+    float parameter;  // Signed float32 temperature in degrees Celsius
 } CommandMessage_t;
 
 void command_task_init(void);

@@ -6,7 +6,6 @@
 #include "thermal_sensor.h"
 
 typedef struct {
-
     float temperatures[MAX_SENSORS];
     uint32_t valid_sensor_mask;
     /*
@@ -24,10 +23,10 @@ typedef struct {
 
 void thermals_set_current(float temp, unsigned int sensor_id);
 
-void thermals_set_target(float goal);
+void thermals_set_target(float target);
 
 void thermals_invalidate_sensor(unsigned int sensor_id);
 
 ThermalData_t get_thermal_data(void);
 
-#endif //THERMAL_DATA_H
+#endif // THERMAL_DATA_H

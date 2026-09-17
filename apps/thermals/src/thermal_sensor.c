@@ -1,30 +1,31 @@
-//This file mainly just turns on and makes sure all thermal sensor(s) 
-//are working properly before letting other code features use them
+// Initializes thermal sensors and provides the sensor-reading interface.
 
 #include "thermal_sensor.h"
 
 #include <stddef.h>
-#include "stdint.h"
+#include <stdint.h>
 
 static uint8_t sensor_count = 0;
 
-int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address) {
-
+int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address)
+{
     if (sensor == NULL)
     {
         return -1;
     }
 
-    if (address > 0x7F) {
+    if (address > 0x7F)
+    {
         return -1; // invalid address
     }
-    if (sensor_count >= MAX_SENSORS) {
+    if (sensor_count >= MAX_SENSORS)
+    {
         return -2; // two sensors (MAX) already initialized
     }
-    else sensor->address = address;
+
+    sensor->address = address;
     sensor_count++;
     return 1; // successful initialization
-
 }
 /*
  * Reads the specified thermal sensor.
@@ -39,24 +40,27 @@ int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address) {
  */
 int thermal_sensor_read(
     const thermal_sensor_t *sensor,
-    float *temperature_out) {
-
-    if (sensor == NULL || temperature_out == NULL) {
+    float *temperature_out)
+{
+    if (sensor == NULL || temperature_out == NULL)
+    {
         return -1;
     }
-    if (sensor -> sensor_id == 1) {
+
+    if (sensor->sensor_id == 1)
+    {
         // call read task for sensor 1
-        *temperature_out = 0.00f; //0 is placeholder for data from sensor 1
-        return 1; //succsessful read
+        *temperature_out = 0.00f; // 0 is placeholder data from sensor 1
+        return 1; // successful read
     }
-    else if (sensor -> sensor_id == 2) {
+    else if (sensor->sensor_id == 2)
+    {
         // call read task for sensor 2
-        *temperature_out = 0.00f; //0 is placeholder for data from sensor 2
-        return 1; //succsessful read
+        *temperature_out = 0.00f; // 0 is placeholder data from sensor 2
+        return 1; // successful read
     }
-    else {
-        return -1; // error occured
+    else
+    {
+        return -1; // error occurred
     }
-
-
 }

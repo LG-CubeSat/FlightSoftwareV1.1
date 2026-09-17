@@ -13,7 +13,7 @@
 #define HEATER_SET_TASK_STACK_SIZE (1024)
 #define HEATER_SET_TASK_PERIOD_MS (100)
 
-#define ERROR_TOLERANCE (1.5) //degrees C
+#define ERROR_TOLERANCE (1.5f) // Degrees Celsius
 
 static StackType_t xHeaterSetTaskStack[HEATER_SET_TASK_STACK_SIZE];
 static StaticTask_t xHeaterSetTaskBuffer;
@@ -50,7 +50,7 @@ void heater_set_task(void *pvParameters) {
 
     float average_temp;
     float target_temp;
-    
+
     for (;;) {
 
         thermal_data = get_thermal_data();
@@ -62,7 +62,7 @@ void heater_set_task(void *pvParameters) {
         {
             // Heater control will be implemented here.
             //Logic is going to be implemented either here or on the OBC, (tbd)
-            //We will have a shut off or heat system along with accelerated heating to get to ideal tempeartures faster
+            // Final heater control and safety logic will be implemented later.
         }
 
         xTaskDelayUntil(

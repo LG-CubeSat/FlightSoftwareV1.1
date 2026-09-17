@@ -1,17 +1,13 @@
 #include "FreeRTOS.h"
-#include "task.h"
 #include "queue.h"
+#include "task.h"
 
 #include <math.h>
-
+#include <stdio.h>
 
 #include "thermal_data.h"
-#include "tasks/heater_set_task.h"
-#include "tasks/sensor_read_task.h"
+#include "tasks/command_task.h"
 #include "tasks/telemetry_task.h"
-
-#include <stdio.h>
-#include "../../include/tasks/command_task.h"
 
 #define COMMAND_TASK_PRIORITY (3)
 #define COMMAND_TASK_STACK_SIZE (1024)
@@ -72,7 +68,9 @@ void command_task_init(void)
     {
         printf("[THERMAL_COMMAND] Task creation failed.\n");
         return;
-    } else {
+    }
+    else
+    {
         printf("[THERMAL_COMMAND] Task created successfully.\n");
     }
 }
@@ -91,8 +89,8 @@ void command_task(void *pvParameters)
             portMAX_DELAY))
         {
 
-            if (message.command == THERMAL_CMD_SET_TARGET_TEMP) { //@param parameter Recieved via obc, sets goal temperature to @param paramater
-
+            if (message.command == THERMAL_CMD_SET_TARGET_TEMP)
+            {
                 if (!isfinite(message.parameter))
                 {
                     printf("[THERMALS COMMAND] Invalid target temperature received\n");
@@ -104,9 +102,9 @@ void command_task(void *pvParameters)
 
                 printf("[THERMALS COMMAND] Setting target temperature to %f C\n", message.parameter);
                 fflush(stdout);
-                
-            } else if (message.command == THERMAL_CMD_REQUEST_TELEMETRY) /*Obc requests current temp and goal temp, send via telem*/{
-
+            }
+            else if (message.command == THERMAL_CMD_REQUEST_TELEMETRY)
+            {
                 if (xTelemetryHandle == NULL)
                 {
                     printf("[THERMALS COMMAND] Telemetry task is unavailable\n");
@@ -117,12 +115,15 @@ void command_task(void *pvParameters)
                     printf("[THERMALS COMMAND] Failed to notify telemetry task\n");
                     fflush(stdout);
                 }
-
-             } else {
-                printf("[THERMALS COMMAND] Unknown command received: %lu\n",(unsigned long)message.command);
+            }
+            else
+            {
+                printf(
+                    "[THERMALS COMMAND] Unknown command received: %lu\n",
+                    (unsigned long)message.command
+                );
                 fflush(stdout);
-
-             }
+            }
+        }
     }
-}
 }

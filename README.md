@@ -13,7 +13,7 @@ this file is the practical "clone it, build it, run it" reference for the softwa
 | ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. Also self-monitors now: an independent watchdog thread and an out-of-bounds check can trigger a real local reset, and repeated resets can lead to an OBC-directed shutdown — see "OBC internal architecture" below. |
 | OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. CCSDS 121.0 (ground-station packetization/link) is a separate, in-progress effort tracked outside this repo's `compute` process. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. Real I2C HAL backend is still a stub (see Known gaps). |
-| Thermals | Not yet scaffolded as a CSP board — same pattern as ADCS, not started. |
+| Thermals | CSP/FreeRTOS simulation scaffold builds successfully. Command handling, sensor collection, and on-demand telemetry are present; hardware drivers, closed-loop heater control, FDIR, and hardware testing remain. |
 | EPS | Not a CSP board at all — real hardware is a passive buck converter with no MCU. Address reserved in code in case future battery-monitoring hardware needs it. See `docs/satellite_architecture.md`. |
 | Camera / Comms (radio) | Not CSP boards — both are OBC-local peripherals (Arducam over USB-C, E22 LoRa module over UART). Their *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; real backends aren't written yet. |
 
@@ -27,12 +27,8 @@ physical picture (why EPS/Camera/Comms aren't in this table):
 |---|---|---|---|---|
 | OBC | 1 | — | — | done (SIM) |
 | ADCS | 2 | 10 | 20 | **done** |
-| EPS | 3 | 11 | 21 | reserved, not built |
-| THERMALS | 4 | 12 | 22 | scaffolded |
-| CAMERA | 5 | 13 | 23 | reserved, not built |
-| COMMS | 6 | 14 | 24 | reserved, not built |
 | EPS | 3 | 11 | 21 | reserved — not a real board, see `docs/satellite_architecture.md` |
-| THERMALS | 4 | 12 | 22 | reserved, not built |
+| THERMALS | 4 | 12 | 22 | scaffolded (SIM) |
 
 **The bus contract** (`shared/interfaces/comms_bus.h`) is medium-agnostic: `initialize`,
 `send`, and `receive` don't change whether the backend is a Unix-socket simulation or real

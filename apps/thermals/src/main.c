@@ -1,5 +1,7 @@
-#include "stdint.h"
-#include "stdio.h"
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include <stdio.h>
 
 #include "tasks/sensor_read_task.h"
 #include "tasks/heater_set_task.h"
@@ -8,15 +10,11 @@
 #include "tasks/telemetry_task.h"
 #include "communication/command_handler.h"
 
-#include "thermal_data.h"
-
 #include "csp_network.h"
 #include "csp_commands.h"
 
-int main(void) {
-
-
-
+int main(void)
+{
     printf("\n");
     printf("_____________\n");
     printf("Thermals Initializing\n");
@@ -39,7 +37,5 @@ int main(void) {
     vTaskStartScheduler();
 
     printf("[Thermals] ERROR: Scheduler stopped!\n");
-
-
     return 0;
 }
