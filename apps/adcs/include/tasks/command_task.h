@@ -7,9 +7,6 @@ Decodes them and updates manager
 #ifndef COMMAND_TASK_H
 #define COMMAND_TASK_H
 
-#define THERMAL_CMD_SET_GOAL_TEMP 1
-#define THERMAL_CMD_REQUEST_TELEMETRY 2
-
 #include "FreeRTOS.h"
 #include "task.h"
 
