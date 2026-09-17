@@ -12,7 +12,7 @@ int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address) {
     if (sensor_count >= 2) {
         return -2; // two sensors (MAX) already initialized
     }
-    else sensor->ADDRESS = address;
+    else sensor->address = address;
     sensor_count++;
     return 1; // successful initialization
 
@@ -20,11 +20,11 @@ int thermal_sensor_init(thermal_sensor_t *sensor, uint8_t address) {
 
 float thermal_sensor_read(thermal_sensor_t *sensor) {
 
-    if (sensor -> SENSOR_GENERIC == 1) {
+    if (sensor -> sensor_id == 1) {
         // call read task for sensor 1
         return 0;
     }
-    else if (sensor -> SENSOR_GENERIC == 2) {
+    else if (sensor -> sensor_id == 2) {
         // call read task for sensor 2
         return 0;
     }

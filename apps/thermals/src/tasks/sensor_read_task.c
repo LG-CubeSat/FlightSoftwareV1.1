@@ -48,10 +48,10 @@ void sensor_read_task(void *pvParameters) {
 
     //Placeholder address for sensors, fill in once we get the real hardware
     thermal_sensor_t sensor;
-    sensor.ADDRESS = 0x48;
-    sensor.SENSOR_GENERIC = 1;
+    sensor.address = 0x48;
+    sensor.sensor_id = 1;
 
-    int sensor_init_value = thermal_sensor_init(&sensor, sensor.ADDRESS);
+    int sensor_init_value = thermal_sensor_init(&sensor, sensor.address);
     if (sensor_init_value == -1) {
         printf("INVALID ADDRESS\n");
         fflush(stdout);
