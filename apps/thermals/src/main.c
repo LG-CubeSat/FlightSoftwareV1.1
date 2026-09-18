@@ -21,7 +21,7 @@ int main(void)
     printf("_____________\n");
     fflush(stdout);
 
-    csp_network_init(THERMALS, 0);
+    csp_network_init(THERMALS_ADDRESS, 0);
 
     command_task_init();
     command_handler_init();
