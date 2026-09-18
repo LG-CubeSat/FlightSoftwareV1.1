@@ -99,12 +99,7 @@ void telemetry_task(void *pvParameters)
     {
         uint32_t notified_value;
 
-        if (xTaskNotifyWait(
-                0,
-                UINT32_MAX,
-                &notified_value,
-                portMAX_DELAY
-            ) == pdTRUE)
+        if (xTaskNotifyWait(0,UINT32_MAX,&notified_value,portMAX_DELAY) == pdTRUE)
         {
             ThermalData_t thermalData = get_thermal_data();
             for (uint8_t i = 0; i < MAX_SENSORS; i++)
