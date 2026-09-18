@@ -29,10 +29,10 @@ int main(void)
 
     fault_management_init();
 
-    command_handler_init();
-
     // Initialize tasks
     command_task_init();
+
+    command_handler_init();
 
     control_task_init();
 
