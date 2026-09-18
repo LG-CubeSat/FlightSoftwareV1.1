@@ -1,4 +1,4 @@
-/* Runs the deterministic rod/reaction-wheel control pipeline at 20 Hz. */
+/* Runs the deterministic magnetorquer control pipeline at 20 Hz. */
 #ifndef ADCS_TASKS_CONTROL_TASK_H
 #define ADCS_TASKS_CONTROL_TASK_H
 

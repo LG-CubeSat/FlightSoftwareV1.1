@@ -1,6 +1,6 @@
 /*
- * Local ADCS fault handling. Sensor, estimate, temperature, rate, and actuator
- * faults are latched for telemetry and mode fallback. The independent watchdog
+ * Local ADCS fault handling. Sensor, estimate, rate, and actuator faults are
+ * latched for telemetry and mode fallback. The independent watchdog
  * resets a genuinely hung process after a best-effort notice to the OBC.
  */
 #ifndef ADCS_FAULT_MANAGER_H
@@ -17,16 +17,13 @@ typedef enum {
     ADCS_FAULT_ATTITUDE_INVALID = 1U << 2,
     ADCS_FAULT_EXCESSIVE_RATE = 1U << 3,
     ADCS_FAULT_ACTUATOR = 1U << 4,
-    ADCS_FAULT_TASK_DEADLINE = 1U << 5,
-    ADCS_FAULT_BOARD_TEMPERATURE = 1U << 6
+    ADCS_FAULT_TASK_DEADLINE = 1U << 5
 } adcs_fault_t;
 
 typedef struct {
     float maximum_rate_rad_s;
     float minimum_magnetic_field_t;
     float maximum_magnetic_field_t;
-    float minimum_board_temperature_c;
-    float maximum_board_temperature_c;
     uint64_t sensor_stale_after_us;
     uint64_t estimate_stale_after_us;
 } adcs_fault_config_t;
@@ -34,6 +31,9 @@ typedef struct {
 /* Starts the independent watchdog thread. Call once from main(),
    before the FreeRTOS scheduler starts. */
 void fault_management_init(void);
+
+/* Prevents reset notices from touching CSP when ADCS runs standalone. */
+void fault_management_set_transport_enabled(uint8_t enabled);
 
 /* Loads ADCS-specific range and freshness thresholds before task startup. */
 void fault_management_configure(const adcs_fault_config_t *config);
@@ -43,8 +43,9 @@ void fault_management_configure(const adcs_fault_config_t *config);
    the watchdog thread treats as "the board is hung". */
 void fault_management_pet(void);
 
-/* Returns 1 if `position` is outside the allowed range. */
-int fault_management_check_bounds(int32_t position);
+/* Returns 1 only for a materially corrupted estimator state. */
+int fault_management_check_estimator_bounds(
+    const adcs_attitude_state_t *attitude);
 
 /* Evaluates sensor, estimator, and control outputs and returns a fault bitmask. */
 uint32_t fault_management_evaluate_adcs(

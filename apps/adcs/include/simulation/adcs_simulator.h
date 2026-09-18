@@ -9,7 +9,7 @@ typedef enum {
     ADCS_SIM_FAULT_IMU = 1U << 0,
     ADCS_SIM_FAULT_MAGNETOMETER = 1U << 1,
     ADCS_SIM_FAULT_SUN_SENSOR = 1U << 2,
-    ADCS_SIM_FAULT_THERMISTOR = 1U << 3,
+    /* Bit 3 remains reserved so existing actuator fault masks stay stable. */
     ADCS_SIM_FAULT_ACTUATOR = 1U << 4
 } adcs_simulator_fault_t;
 
@@ -19,8 +19,6 @@ typedef struct {
     float inertia_kg_m2[ADCS_VECTOR_LENGTH];
     float gyro_bias_rad_s[ADCS_VECTOR_LENGTH];
     float maximum_dipole_a_m2;
-    float maximum_reaction_wheel_torque_nm;
-    float maximum_reaction_wheel_momentum_nms;
     float orbit_altitude_m;
     float orbit_inclination_rad;
     uint64_t initial_unix_time_us;
@@ -35,8 +33,6 @@ typedef struct {
     float sun_vector_body[ADCS_VECTOR_LENGTH];
     adcs_orbit_state_t orbit;
     adcs_magnetorquer_command_t actuator;
-    adcs_reaction_wheel_command_t reaction_wheels;
-    float reaction_wheel_momentum_nms[ADCS_VECTOR_LENGTH];
 } adcs_simulator_truth_t;
 
 /* Initializes one deterministic spacecraft truth model. NULL selects defaults. */
@@ -57,17 +53,10 @@ adcs_result_t adcs_simulator_read_sun_sensor(
     uint64_t *timestamp_us,
     float sun_vector_body[ADCS_VECTOR_LENGTH],
     float *irradiance_w_m2);
-adcs_result_t adcs_simulator_read_thermistor(
-    uint64_t *timestamp_us,
-    float *temperature_c);
 
 /* Applies the commanded magnetic dipole to future rigid-body steps. */
 adcs_result_t adcs_simulator_set_magnetorquer(
     const adcs_magnetorquer_command_t *command);
-
-/* Applies a simple three-axis reaction-wheel body torque for precise modes. */
-adcs_result_t adcs_simulator_set_reaction_wheels(
-    const adcs_reaction_wheel_command_t *command);
 
 /* Copies truth/orbit for reference generation, tests, and diagnostics. */
 adcs_result_t adcs_simulator_get_truth(adcs_simulator_truth_t *truth);

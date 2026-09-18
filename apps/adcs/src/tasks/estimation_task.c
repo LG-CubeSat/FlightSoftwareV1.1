@@ -10,6 +10,7 @@
 #include "estimation/attitude_estimator.h"
 #include "estimation/reference_vectors.h"
 #include "manager/adcs_manager.h"
+#include "manager/fault_manager.h"
 #include "simulation/adcs_simulator.h"
 #include "tasks/sensor_task.h"
 
@@ -100,11 +101,16 @@ void estimation_task(void *parameters) {
             adcs_manager_note_estimator_reset();
         }
 
-        if (adcs_attitude_estimator_update(
+        adcs_result_t estimate_result = adcs_attitude_estimator_update(
                 &estimator,
                 &sensors,
                 &references,
-                &attitude) == ADCS_RESULT_OK) {
+                &attitude);
+        if (estimate_result == ADCS_RESULT_OUT_OF_RANGE ||
+            fault_management_check_estimator_bounds(&attitude) != 0) {
+            fault_management_trigger_reset(RESET_REASON_OUT_OF_BOUNDS);
+        }
+        if (estimate_result == ADCS_RESULT_OK) {
             adcs_manager_set_attitude(&attitude);
         } else if (attitude.timestamp_us != 0U) {
             attitude.valid = 0U;

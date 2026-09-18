@@ -26,7 +26,7 @@ static StackType_t command_task_stack[COMMAND_TASK_STACK_SIZE];
 static StaticTask_t command_task_buffer;
 static StaticQueue_t command_queue_buffer;
 static uint8_t command_queue_storage[COMMAND_QUEUE_LENGTH * sizeof(adcs_command_t)];
-static TaskHandle_t command_handle;
+TaskHandle_t xCommandHandle;
 static QueueHandle_t command_queue;
 
 int command_task_send(const adcs_command_t *message) {
@@ -51,7 +51,7 @@ void command_task_init(void) {
         return;
     }
 
-    command_handle = xTaskCreateStatic(
+    xCommandHandle = xTaskCreateStatic(
         command_task,
         "Command",
         COMMAND_TASK_STACK_SIZE,
@@ -59,14 +59,14 @@ void command_task_init(void) {
         COMMAND_TASK_PRIORITY,
         command_task_stack,
         &command_task_buffer);
-    if (command_handle == NULL) {
+    if (xCommandHandle == NULL) {
         printf("[COMMAND] Task creation failed.\n");
     }
 }
 
 static void dispatch_legacy_position(const adcs_command_t *command) {
     adcs_guidance_target_t target;
-    float angle = (float)command->parameter.legacy_position *
+    float angle = fmodf((float)command->parameter.legacy_position, 360.0F) *
                   COMMAND_PI_F / 180.0F;
     versor quaternion = {
         0.0F,
@@ -83,16 +83,27 @@ static void dispatch_legacy_position(const adcs_command_t *command) {
             ADCS_MODE_SLEWING,
             quaternion,
             COMMAND_DEFAULT_MAXIMUM_RATE_RAD_S,
-            &target) == ADCS_RESULT_OK) {
-        adcs_manager_set_guidance_target(&target);
-        adcs_manager_set_legacy_position(command->parameter.legacy_position);
-        adcs_manager_request_mode(ADCS_MODE_SLEWING);
+            &target) != ADCS_RESULT_OK) {
+        adcs_manager_note_rejected_command();
+        return;
     }
 
-    (void)xTaskNotify(xControlHandle, notification, eSetValueWithOverwrite);
-    (void)xTaskNotify(xEstimationHandle, notification, eSetValueWithOverwrite);
-    (void)xTaskNotify(xSensorHandle, notification, eSetValueWithOverwrite);
-    (void)xTaskNotify(xTelemetryHandle, notification, eSetValueWithOverwrite);
+    adcs_manager_set_guidance_target(&target);
+    adcs_manager_set_legacy_position(command->parameter.legacy_position);
+    adcs_manager_request_mode(ADCS_MODE_SLEWING);
+
+    if (xControlHandle != NULL) {
+        (void)xTaskNotify(xControlHandle, notification, eSetValueWithOverwrite);
+    }
+    if (xEstimationHandle != NULL) {
+        (void)xTaskNotify(xEstimationHandle, notification, eSetValueWithOverwrite);
+    }
+    if (xSensorHandle != NULL) {
+        (void)xTaskNotify(xSensorHandle, notification, eSetValueWithOverwrite);
+    }
+    if (xTelemetryHandle != NULL) {
+        (void)xTaskNotify(xTelemetryHandle, notification, eSetValueWithOverwrite);
+    }
 }
 
 static void execute_command(const adcs_command_t *command) {
@@ -140,7 +151,13 @@ static void execute_command(const adcs_command_t *command) {
                     (uint64_t)command->parameter.unix_time_sec;
 
                 if (seconds <= UINT64_MAX / 1000000ULL) {
-                    (void)adcs_simulator_set_unix_time(seconds * 1000000ULL);
+                    if (adcs_simulator_set_unix_time(seconds * 1000000ULL) ==
+                        ADCS_RESULT_OK) {
+                        printf("[COMMAND] Time sync command received.\n");
+                        fflush(stdout);
+                    } else {
+                        adcs_manager_note_rejected_command();
+                    }
                 } else {
                     adcs_manager_note_rejected_command();
                 }

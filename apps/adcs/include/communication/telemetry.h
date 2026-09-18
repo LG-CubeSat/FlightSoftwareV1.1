@@ -8,13 +8,15 @@
 #include "communication/message.h"
 
 #define ADCS_TELEMETRY_MAX_PAYLOAD_SIZE 256U
-#define ADCS_TELEMETRY_FORMAT_VERSION 1U
+#define ADCS_TELEMETRY_FORMAT_VERSION 3U
+#define ADCS_TELEMETRY_ATTITUDE_VALID_FLAG 1U
 
 /*
- * Version 1 is big-endian and begins with "ADCS", version, mode, reserved,
- * sequence, and timestamp. It then contains validity/fault masks; current and
- * target quaternions; estimated rate and bias; magnetic, Sun, temperature,
- * and irradiance measurements; control vectors/error/flags; and health
+ * Version 3 is big-endian and begins with "ADCS", version, mode, state flags,
+ * sequence, and timestamp. The state flags include attitude validity. It then
+ * contains sensor validity/fault masks; current and
+ * target quaternions; estimated rate and bias; magnetic, Sun, and irradiance
+ * measurements; control vectors/error/flags; and health
  * counters. Use adcs_telemetry_encode rather than copying native structures.
  */
 
@@ -30,6 +32,9 @@ void adcs_telemetry_init(void);
 
 /* Enables CSP transport, or keeps encoding/logging local for standalone SIM. */
 void adcs_telemetry_set_transport_enabled(uint8_t enabled);
+
+/* Returns whether CSP telemetry transport is enabled for this process. */
+uint8_t adcs_telemetry_transport_is_enabled(void);
 
 /*
  * Serializes one telemetry snapshot without copying native struct padding or

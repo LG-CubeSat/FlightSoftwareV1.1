@@ -36,6 +36,36 @@ static void rotation_matrix_to_quaternion(const float matrix[3][3], versor quate
     (void)adcs_quaternion_normalize(quaternion, quaternion);
 }
 
+static uint8_t filter_state_is_corrupt(
+    const adcs_kalman_filter_t *filter) {
+    float quaternion_norm_squared = 0.0F;
+
+    if (filter == NULL || filter->initialized == 0U ||
+        !adcs_values_are_finite(filter->quaternion, 4U) ||
+        !adcs_values_are_finite(
+            filter->gyro_bias_rad_s,
+            ADCS_VECTOR_LENGTH)) {
+        return 1U;
+    }
+    for (size_t index = 0U; index < 4U; ++index) {
+        quaternion_norm_squared +=
+            filter->quaternion[index] * filter->quaternion[index];
+    }
+    if (!isfinite(quaternion_norm_squared) ||
+        quaternion_norm_squared < 0.25F ||
+        quaternion_norm_squared > 2.25F) {
+        return 1U;
+    }
+    for (size_t index = 0U; index < ADCS_ERROR_STATE_LENGTH; ++index) {
+        float diagonal = filter->covariance[
+            index * ADCS_ERROR_STATE_LENGTH + index];
+        if (!isfinite(diagonal) || diagonal < 0.0F || diagonal > 1.0e6F) {
+            return 1U;
+        }
+    }
+    return 0U;
+}
+
 static adcs_result_t triad_attitude(
     const float first_body[ADCS_VECTOR_LENGTH],
     const float second_body[ADCS_VECTOR_LENGTH],
@@ -191,7 +221,13 @@ adcs_result_t adcs_attitude_estimator_update(
             sensors->angular_rate_rad_s,
             dt_s);
         if (result != ADCS_RESULT_OK) {
-            return result;
+            /* Consume the sample even when propagation rejects it. Otherwise
+               the same bad interval is retried forever with an ever-growing
+               dt and subsequent good samples are discarded too. */
+            estimator->previous_timestamp_us = sensors->timestamp_us;
+            return filter_state_is_corrupt(&estimator->filter) != 0U
+                ? ADCS_RESULT_OUT_OF_RANGE
+                : result;
         }
     }
     estimator->previous_timestamp_us = sensors->timestamp_us;
@@ -231,7 +267,9 @@ adcs_result_t adcs_attitude_estimator_update(
         sensors->angular_rate_rad_s,
         attitude);
     if (result != ADCS_RESULT_OK) {
-        return result;
+        return filter_state_is_corrupt(&estimator->filter) != 0U
+            ? ADCS_RESULT_OUT_OF_RANGE
+            : result;
     }
 
     if (estimator->has_absolute_solution == 0U) {

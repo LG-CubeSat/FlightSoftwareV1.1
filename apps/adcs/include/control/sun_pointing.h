@@ -22,6 +22,7 @@ adcs_result_t adcs_sun_pointing_update(
     const adcs_sensor_packet_t *sensors,
     const adcs_attitude_state_t *attitude,
     float requested_torque_nm[ADCS_VECTOR_LENGTH],
-    float *pointing_error_rad);
+    float *pointing_error_rad,
+    uint8_t *was_limited);
 
 #endif

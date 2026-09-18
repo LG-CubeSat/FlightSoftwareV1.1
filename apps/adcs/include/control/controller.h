@@ -32,8 +32,8 @@ void adcs_controller_init(
 void adcs_controller_reset(adcs_controller_t *controller);
 
 /*
- * Runs the controller selected by mode, uses rods for detumble/acquisition and
- * reaction-wheel torque for precise pointing, and fails to explicit safe output.
+ * Runs the controller selected by mode, routes every active-mode torque through
+ * the magnetorquer allocator, and fails to explicit safe output.
  */
 adcs_result_t adcs_controller_update(
     adcs_controller_t *controller,

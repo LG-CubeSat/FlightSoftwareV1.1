@@ -11,6 +11,7 @@ add_executable(adcs_sim
     src/tasks/telemetry_task.c
     src/communication/command_handler.c
     src/communication/telemetry.c
+    src/drivers/sim_adcs_drivers.c
     src/control/actuator_allocator.c
     src/control/bdot.c
     src/control/control_math.c

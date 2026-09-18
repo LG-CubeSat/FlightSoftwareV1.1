@@ -8,9 +8,9 @@
 
 #include "control/actuator_allocator.h"
 #include "control/controller.h"
+#include "magnetorquer.h"
 #include "manager/adcs_manager.h"
 #include "manager/fault_manager.h"
-#include "simulation/adcs_simulator.h"
 
 #define CONTROL_TASK_PRIORITY 4
 #define CONTROL_TASK_STACK_SIZE 2048
@@ -84,8 +84,7 @@ void control_task(void *parameters) {
     for (;;) {
         adcs_manager_state_t snapshot;
         adcs_control_output_t output;
-        adcs_magnetorquer_command_t command;
-        adcs_reaction_wheel_command_t wheel_command;
+        magnetorquer_command_t command;
         adcs_result_t result;
         uint32_t notification;
 
@@ -101,43 +100,28 @@ void control_task(void *parameters) {
             &output);
 
         memset(&command, 0, sizeof(command));
-        memset(&wheel_command, 0, sizeof(wheel_command));
-        command.timestamp_us = output.timestamp_us;
-        wheel_command.timestamp_us = output.timestamp_us;
         if (result == ADCS_RESULT_OK &&
             snapshot.actuators_inhibited == 0U &&
             output.actuators_enabled != 0U) {
-            if (output.reaction_wheels_enabled != 0U) {
-                memcpy(
-                    wheel_command.body_torque_nm,
-                    output.reaction_wheel_torque_nm,
-                    sizeof(wheel_command.body_torque_nm));
-                wheel_command.enabled = 1U;
-            } else {
-                memcpy(
-                    command.dipole_a_m2,
-                    output.requested_dipole_a_m2,
-                    sizeof(command.dipole_a_m2));
-                command.enabled = 1U;
-            }
+            memcpy(
+                command.dipole_a_m2,
+                output.requested_dipole_a_m2,
+                sizeof(command.dipole_a_m2));
+            command.enabled = 1U;
         } else {
             output.actuators_enabled = 0U;
-            output.reaction_wheels_enabled = 0U;
             memset(output.requested_dipole_a_m2, 0, sizeof(output.requested_dipole_a_m2));
-            memset(output.reaction_wheel_torque_nm, 0, sizeof(output.reaction_wheel_torque_nm));
             if (result != ADCS_RESULT_OK &&
                 snapshot.mode != ADCS_MODE_BOOT && snapshot.mode != ADCS_MODE_SAFE) {
                 adcs_manager_note_controller_error();
             }
         }
 
-        if (adcs_simulator_set_magnetorquer(&command) != ADCS_RESULT_OK ||
-            adcs_simulator_set_reaction_wheels(&wheel_command) != ADCS_RESULT_OK) {
+        if (magnetorquer_set(&command) != MAGNETORQUER_OK) {
             output.actuators_enabled = 0U;
             fault_management_report(ADCS_FAULT_ACTUATOR);
         }
         adcs_manager_set_control_output(&output);
-        adcs_manager_update();
 
         if (xTaskNotifyWait(0U, UINT32_MAX, &notification, 0U) == pdTRUE) {
             printf("[CONTROL] Slewing toward target position: %d\n",

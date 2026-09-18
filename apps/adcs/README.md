@@ -30,7 +30,7 @@ waits for the normal repository network setup.
 simulated orbit + rigid-body truth
               |
               v
- IMU / magnetometer / Sun / thermistor reads       command queue
+ IMU / magnetometer / Sun reads                    command queue
               |                                          |
               v                                          v
         sensor packet ---> reference vectors ---> ADCS manager context
@@ -40,10 +40,9 @@ simulated orbit + rigid-body truth
                                                    v
                                    B-dot / Sun acquisition / quaternion PID
                                                    |
-                              +--------------------+--------------------+
-                              v                                         v
-                       magnetorquers                           reaction wheels
-                              +--------------------+--------------------+
+                                           magnetic allocator
+                                                   |
+                                           magnetorquers
                                                    |
                                                    v
                                            simulated rigid body
@@ -85,7 +84,7 @@ The implemented mode set is:
 - `DETUMBLE`: B-dot magnetic damping until body rate remains below threshold.
 - `SUN_ACQUISITION`: turn the configured body Sun axis toward the Sun with
   magnetorquers.
-- `SUN_POINTING`: maintain the Sun target with reaction-wheel control.
+- `SUN_POINTING`: maintain the Sun target with magnetorquer control.
 - `EARTH_POINTING`: continuously regenerate a nadir target and hold it.
 - `SLEWING`: move toward a commanded quaternion attitude or vector target.
 - `TARGET_POINTING`: hold the target after the slew settles.
@@ -94,14 +93,15 @@ The implemented mode set is:
 Nominal startup requests Sun pointing and follows
 `BOOT -> SAFE -> DETUMBLE -> SUN_ACQUISITION -> SUN_POINTING`. The detumble
 step is used only while rate is above its entry threshold. A critical sensor,
-attitude, rate, temperature, or actuator fault forces `SAFE`.
+attitude, rate, or actuator fault forces `SAFE`.
 
 ## Estimation and guidance
 
-The simulator supplies a gyro, accelerometer, magnetometer, coarse Sun vector,
-irradiance, and board temperature through separate read functions. No function
-uses `_mock` in its name: these functions are the simulation implementation of
-the hardware-shaped boundary.
+The sensor task uses the shared IMU, magnetometer, and Sun-sensor contracts;
+the simulation driver in `src/drivers/sim_adcs_drivers.c` maps those calls to
+the deterministic simulator. The control task uses the shared magnetorquer
+contract in the same way. No function uses `_mock` in its name: these are the
+simulation implementations of the hardware-shaped boundary.
 
 Reference generation provides low-order Sun, magnetic-field, and nadir ECI
 vectors from simulation time and orbit position. Two non-collinear measured
@@ -117,17 +117,18 @@ a target `versor` or an inertial direction/body-axis pair.
 
 ## Control and actuators
 
-`DETUMBLE` uses B-dot control and magnetorquers. `SUN_ACQUISITION` calculates a
-Sun-pointing torque and projects the achievable part through
-`torque = dipole x magnetic_field`. Magnetic control cannot produce torque
-parallel to the local field, which is why it is not used for arbitrary precise
-three-axis holding.
+All active modes use magnetorquers. `DETUMBLE` uses B-dot control; Sun
+acquisition and the quaternion-based pointing modes calculate a requested
+body torque and pass it through the magnetic allocator. The allocator applies
+`torque = dipole x magnetic_field`, reports the achievable torque, and enforces
+per-axis dipole limits. Magnetic control cannot produce torque parallel to the
+local field, so precise three-axis pointing is inherently limited and requires
+mission-specific validation.
 
 Sun hold, Earth hold, commanded slew, target hold, and science modes use a
-quaternion-to-rate outer loop and three rate PID controllers. The result is a
-three-axis reaction-wheel body-torque command. Integral anti-windup, rate and
-torque limits, shortest-path quaternion errors, settle thresholds, wheel torque
-limits, and wheel momentum limits are represented.
+quaternion-to-rate outer loop and three rate PID controllers before magnetic
+allocation. Integral anti-windup, rate and dipole limits, shortest-path
+quaternion errors, and settle thresholds are represented.
 
 The simulator integrates diagonal-inertia Euler rigid-body dynamics. It also
 advances a circular inclined orbit, calculates simple Sun and tilted-dipole
@@ -162,24 +163,25 @@ fault injection. The legacy integer position command maps degrees about body Z
 to a real target quaternion so existing integration tests still exercise the
 new controller path.
 
-Telemetry format version 1 starts with `ADCS`, then carries mode, sequence,
-timestamp, validity/fault masks, current and target quaternions, rates, bias,
-sensors, requested/achievable control, actuator flags, and health counters in
-explicit big-endian form. Native C struct padding is never transmitted by the
+Telemetry format version 3 starts with `ADCS`, then carries mode, state flags,
+sequence, timestamp, sensor validity/fault masks, current and target
+quaternions, rates, bias, sensors, requested/achievable control, actuator
+flags, and health counters in explicit big-endian form. The state flags include
+attitude validity. Native C struct padding is never transmitted by the
 telemetry encoder.
 
 ## Before connecting hardware
 
 The simulation is a reasonable interface and control starting point. Hardware
-work should replace the simulator read/write calls behind drivers without
-changing the manager messages. Before flight or high-fidelity HIL testing:
+work should replace the simulation driver implementations behind those
+contracts without changing the manager messages. Before flight or high-fidelity
+HIL testing:
 
-- Measure inertia, sensor alignment, actuator polarity, wheel limits, noise,
+- Measure inertia, sensor alignment, actuator polarity, dipole limits, noise,
   bias stability, and timing; then retune every control/estimator parameter.
 - Replace the circular orbit, low-order Sun model, and dipole magnetic model
   with mission time/orbit services and validated reference models.
-- Add eclipse handling, magnetometer quiet sampling around rod actuation,
-  reaction-wheel momentum unloading, and wheel-fault handling.
+- Add eclipse handling and magnetometer quiet sampling around rod actuation.
 - Decide whether the mission accuracy requires a full MEKF and higher-order
   environment/actuator dynamics.
 - Define and version an explicitly encoded command wire format, as telemetry

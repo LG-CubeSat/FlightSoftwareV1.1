@@ -43,6 +43,8 @@ adcs_result_t adcs_slew_update(
     float target_maximum_rate_rad_s,
     float dt_s,
     float requested_torque_nm[ADCS_VECTOR_LENGTH],
-    uint8_t *is_settled);
+    uint8_t *is_settled,
+    float *pointing_error_rad,
+    uint8_t *was_limited);
 
 #endif

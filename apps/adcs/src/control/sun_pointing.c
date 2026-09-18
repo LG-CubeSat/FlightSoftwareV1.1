@@ -10,7 +10,8 @@ adcs_result_t adcs_sun_pointing_update(
     const adcs_sensor_packet_t *sensors,
     const adcs_attitude_state_t *attitude,
     float requested_torque_nm[ADCS_VECTOR_LENGTH],
-    float *pointing_error_rad) {
+    float *pointing_error_rad,
+    uint8_t *was_limited) {
     float sun_unit[ADCS_VECTOR_LENGTH];
     float axis_unit[ADCS_VECTOR_LENGTH];
     float cross[ADCS_VECTOR_LENGTH];
@@ -23,8 +24,12 @@ adcs_result_t adcs_sun_pointing_update(
     if (pointing_error_rad != NULL) {
         *pointing_error_rad = 0.0F;
     }
+    if (was_limited != NULL) {
+        *was_limited = 0U;
+    }
     if (config == NULL || sensors == NULL || attitude == NULL ||
         requested_torque_nm == NULL || pointing_error_rad == NULL ||
+        was_limited == NULL ||
         attitude->valid == 0U ||
         (sensors->valid_mask & ADCS_SENSOR_VALID_SUN) == 0U ||
         sensors->sun_irradiance_w_m2 < config->minimum_sun_irradiance_w_m2 ||
@@ -50,5 +55,5 @@ adcs_result_t adcs_sun_pointing_update(
         torque,
         config->maximum_torque_nm,
         requested_torque_nm,
-        NULL);
+        was_limited);
 }

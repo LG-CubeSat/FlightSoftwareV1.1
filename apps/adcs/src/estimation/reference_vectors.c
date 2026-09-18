@@ -10,6 +10,17 @@
 #define ADCS_EARTH_RADIUS_M 6371000.0F
 #define ADCS_EARTH_DIPOLE_FIELD_FACTOR 7.94e15F
 #define ADCS_SIDEREAL_DAY_S 86164.0905
+#define ADCS_REFERENCE_MIN_MODEL_ALTITUDE_M 100000.0F
+#define ADCS_REFERENCE_MAX_MODEL_ALTITUDE_M 2000000.0F
+#define ADCS_CUBE(value) ((value) * (value) * (value))
+/* The sanity band is derived from the dipole factor over the supported
+   100--2000 km model envelope, with a fourfold orientation/model margin. */
+#define ADCS_REFERENCE_MIN_FIELD_T \
+    (0.25F * ADCS_EARTH_DIPOLE_FIELD_FACTOR / \
+     ADCS_CUBE(ADCS_EARTH_RADIUS_M + ADCS_REFERENCE_MAX_MODEL_ALTITUDE_M))
+#define ADCS_REFERENCE_MAX_FIELD_T \
+    (4.0F * ADCS_EARTH_DIPOLE_FIELD_FACTOR / \
+     ADCS_CUBE(ADCS_EARTH_RADIUS_M + ADCS_REFERENCE_MIN_MODEL_ALTITUDE_M))
 
 adcs_result_t adcs_reference_sun_vector(
     uint64_t unix_time_us,
@@ -22,8 +33,11 @@ adcs_result_t adcs_reference_sun_vector(
     double obliquity_rad;
     float vector[ADCS_VECTOR_LENGTH];
 
-    if (sun_eci_unit == NULL || unix_time_us == 0U) {
+    if (sun_eci_unit == NULL) {
         return ADCS_RESULT_INVALID_ARGUMENT;
+    }
+    if (unix_time_us == 0U) {
+        return ADCS_RESULT_UNAVAILABLE;
     }
 
     julian_day = (double)unix_time_us / 86400000000.0 + 2440587.5;
@@ -56,10 +70,14 @@ adcs_result_t adcs_reference_magnetic_field(
     double earth_angle;
     float field_norm;
 
-    if (position_eci_m == NULL || magnetic_field_eci_t == NULL ||
-        unix_time_us == 0U ||
-        !adcs_values_are_finite(position_eci_m, ADCS_VECTOR_LENGTH)) {
+    if (position_eci_m == NULL || magnetic_field_eci_t == NULL) {
         return ADCS_RESULT_INVALID_ARGUMENT;
+    }
+    if (unix_time_us == 0U) {
+        return ADCS_RESULT_UNAVAILABLE;
+    }
+    if (!adcs_values_are_finite(position_eci_m, ADCS_VECTOR_LENGTH)) {
+        return ADCS_RESULT_INVALID_DATA;
     }
 
     radius = adcs_vector_norm(position_eci_m);
@@ -86,7 +104,9 @@ adcs_result_t adcs_reference_magnetic_field(
     }
 
     field_norm = adcs_vector_norm(magnetic_field_eci_t);
-    if (!isfinite(field_norm) || field_norm < 1.0e-6F || field_norm > 1.0e-3F) {
+    if (!isfinite(field_norm) ||
+        field_norm < ADCS_REFERENCE_MIN_FIELD_T ||
+        field_norm > ADCS_REFERENCE_MAX_FIELD_T) {
         memset(magnetic_field_eci_t, 0, sizeof(float) * ADCS_VECTOR_LENGTH);
         return ADCS_RESULT_OUT_OF_RANGE;
     }
@@ -117,6 +137,9 @@ adcs_result_t adcs_reference_vectors_compute(
 
     memset(references, 0, sizeof(*references));
     references->unix_time_us = unix_time_us;
+    if (unix_time_us == 0U) {
+        return ADCS_RESULT_UNAVAILABLE;
+    }
 
     if (adcs_reference_sun_vector(
             unix_time_us,

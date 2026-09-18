@@ -1,4 +1,4 @@
-/* Monitors task health, temperature, stack margins, and watchdog liveness. */
+/* Monitors task health, stack margins, and watchdog liveness. */
 #ifndef ADCS_TASKS_HOUSEKEEPING_TASK_H
 #define ADCS_TASKS_HOUSEKEEPING_TASK_H
 

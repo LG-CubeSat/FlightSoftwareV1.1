@@ -9,7 +9,7 @@
 
 /* ADCS-owned extensions to the repository's small shared command set. */
 typedef enum {
-    ADCS_WIRE_COMMAND_SET_MODE = 64,
+    ADCS_WIRE_COMMAND_SET_MODE = 64, // Numbers chosen mostly randomly. I don't think their documented, either.
     ADCS_WIRE_COMMAND_SET_ATTITUDE = 65,
     ADCS_WIRE_COMMAND_SET_POINTING_VECTOR = 66,
     ADCS_WIRE_COMMAND_RESET_ESTIMATOR = 67,

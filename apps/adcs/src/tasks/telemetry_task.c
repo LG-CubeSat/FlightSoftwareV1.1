@@ -23,15 +23,20 @@ static StaticTask_t telemetry_task_buffer;
 TaskHandle_t xTelemetryHandle;
 
 static void telemetry_send_legacy_position(int32_t current_position) {
-    csp_conn_t *connection = csp_connect(
+    csp_conn_t *connection;
+    csp_packet_t *packet;
+    position_telemetry_t telemetry;
+
+    if (adcs_telemetry_transport_is_enabled() == 0U) {
+        return;
+    }
+
+    connection = csp_connect(
         CSP_PRIO_NORM,
         OBC_ADDRESS,
         ADCS_TELEM_PORT,
         100,
         CSP_O_NONE);
-    csp_packet_t *packet;
-    position_telemetry_t telemetry;
-
     if (connection == NULL) {
         return;
     }
@@ -89,7 +94,7 @@ void telemetry_task(void *parameters) {
             diagnostic_divider = 0U;
             printf("[ADCS] mode=%s rate=%.4f q=[%.3f %.3f %.3f %.3f] "
                    "target=[%.3f %.3f %.3f %.3f] error=%.3f "
-                   "wheel=[%.2e %.2e %.2e] dipole=[%.3f %.3f %.3f]\n",
+                   "torque=[%.2e %.2e %.2e] dipole=[%.3f %.3f %.3f]\n",
                    adcs_manager_mode_name(snapshot.mode),
                    adcs_vector_norm(snapshot.latest_attitude.angular_rate_rad_s),
                    snapshot.latest_attitude.quaternion[0],
@@ -101,9 +106,9 @@ void telemetry_task(void *parameters) {
                    snapshot.guidance_target.target_quaternion[2],
                    snapshot.guidance_target.target_quaternion[3],
                    snapshot.latest_control.pointing_error_rad,
-                   snapshot.latest_control.reaction_wheel_torque_nm[0],
-                   snapshot.latest_control.reaction_wheel_torque_nm[1],
-                   snapshot.latest_control.reaction_wheel_torque_nm[2],
+                   snapshot.latest_control.requested_torque_nm[0],
+                   snapshot.latest_control.requested_torque_nm[1],
+                   snapshot.latest_control.requested_torque_nm[2],
                    snapshot.latest_control.requested_dipole_a_m2[0],
                    snapshot.latest_control.requested_dipole_a_m2[1],
                    snapshot.latest_control.requested_dipole_a_m2[2]);

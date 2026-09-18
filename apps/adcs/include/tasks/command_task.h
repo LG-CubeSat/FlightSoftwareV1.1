@@ -8,6 +8,8 @@
 #include "task.h"
 #include "communication/message.h"
 
+extern TaskHandle_t xCommandHandle;
+
 /* Creates the static command queue and FreeRTOS task. */
 void command_task_init(void);
 

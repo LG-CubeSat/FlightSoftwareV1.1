@@ -7,9 +7,13 @@
 #include "queue.h"
 #include "task.h"
 
+#include "imu.h"
+#include "magnetometer.h"
 #include "manager/adcs_manager.h"
 #include "simulation/adcs_simulator.h"
+#include "sun_sensor.h"
 
+// TODO: figure out real necesary size.
 #define SENSOR_TASK_PRIORITY 4
 #define SENSOR_TASK_STACK_SIZE 1536
 #define SENSOR_TASK_PERIOD_MS 10
@@ -62,7 +66,9 @@ void sensor_task(void *parameters) {
     (void)parameters;
     for (;;) {
         adcs_sensor_packet_t packet;
-        uint64_t sample_timestamp;
+        imu_sample_t imu_sample;
+        magnetometer_sample_t magnetometer_sample;
+        sun_sensor_sample_t sun_sample;
         uint32_t notification;
 
         memset(&packet, 0, sizeof(packet));
@@ -70,34 +76,40 @@ void sensor_task(void *parameters) {
         packet.sequence = ++sensor_sequence;
         packet.timestamp_us = adcs_simulator_get_time_us();
 
-        if (adcs_simulator_read_imu(
-                &sample_timestamp,
+        if (imu_read(&imu_sample) == IMU_OK) {
+            packet.timestamp_us = imu_sample.timestamp_us;
+            memcpy(
                 packet.angular_rate_rad_s,
-                packet.acceleration_m_s2) == ADCS_RESULT_OK) {
+                imu_sample.angular_rate_rad_s,
+                sizeof(packet.angular_rate_rad_s));
+            memcpy(
+                packet.acceleration_m_s2,
+                imu_sample.acceleration_m_s2,
+                sizeof(packet.acceleration_m_s2));
             packet.valid_mask |= ADCS_SENSOR_VALID_GYROSCOPE |
                                  ADCS_SENSOR_VALID_ACCELEROMETER;
         }
-        if (adcs_simulator_read_magnetometer(
-                &sample_timestamp,
-                packet.magnetic_field_t) == ADCS_RESULT_OK) {
+        if (magnetometer_read(&magnetometer_sample) == MAGNETOMETER_OK) {
+            memcpy(
+                packet.magnetic_field_t,
+                magnetometer_sample.magnetic_field_t,
+                sizeof(packet.magnetic_field_t));
             packet.valid_mask |= ADCS_SENSOR_VALID_MAGNETOMETER;
         }
-        if (adcs_simulator_read_sun_sensor(
-                &sample_timestamp,
+        if (sun_sensor_read(&sun_sample) == SUN_SENSOR_OK &&
+            sun_sample.visible != 0U) {
+            memcpy(
                 packet.sun_vector_body,
-                &packet.sun_irradiance_w_m2) == ADCS_RESULT_OK) {
+                sun_sample.sun_vector_body,
+                sizeof(packet.sun_vector_body));
+            packet.sun_irradiance_w_m2 = sun_sample.irradiance_w_m2;
             packet.valid_mask |= ADCS_SENSOR_VALID_SUN;
         }
-        if (adcs_simulator_read_thermistor(
-                &sample_timestamp,
-                &packet.board_temperature_c) == ADCS_RESULT_OK) {
-            packet.valid_mask |= ADCS_SENSOR_VALID_TEMPERATURE;
-        }
-
         adcs_manager_set_sensors(&packet);
-        if (xQueueOverwrite(sensor_queue, &packet) != pdPASS) {
+        if (uxQueueMessagesWaiting(sensor_queue) != 0U) {
             adcs_manager_note_dropped_message();
         }
+        (void)xQueueOverwrite(sensor_queue, &packet);
 
         if (xTaskNotifyWait(0U, UINT32_MAX, &notification, 0U) == pdTRUE) {
             printf("[SENSOR] Sampling sensors for move to position: %d\n",

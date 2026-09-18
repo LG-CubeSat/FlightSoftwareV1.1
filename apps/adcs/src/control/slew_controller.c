@@ -49,7 +49,9 @@ adcs_result_t adcs_slew_update(
     float target_maximum_rate_rad_s,
     float dt_s,
     float requested_torque_nm[ADCS_VECTOR_LENGTH],
-    uint8_t *is_settled) {
+    uint8_t *is_settled,
+    float *pointing_error_rad,
+    uint8_t *was_limited) {
     float attitude_error[ADCS_VECTOR_LENGTH];
     float desired_rate[ADCS_VECTOR_LENGTH];
     float limited_rate[ADCS_VECTOR_LENGTH];
@@ -64,8 +66,15 @@ adcs_result_t adcs_slew_update(
     if (is_settled != NULL) {
         *is_settled = 0U;
     }
+    if (pointing_error_rad != NULL) {
+        *pointing_error_rad = 0.0F;
+    }
+    if (was_limited != NULL) {
+        *was_limited = 0U;
+    }
     if (state == NULL || attitude == NULL || target_quaternion == NULL ||
         requested_torque_nm == NULL || is_settled == NULL ||
+        pointing_error_rad == NULL || was_limited == NULL ||
         attitude->valid == 0U || !isfinite(dt_s) || dt_s <= 0.0F ||
         !isfinite(target_maximum_rate_rad_s) ||
         target_maximum_rate_rad_s <= 0.0F ||
@@ -106,12 +115,13 @@ adcs_result_t adcs_slew_update(
             torque,
             state->config.maximum_torque_nm,
             requested_torque_nm,
-            NULL) != ADCS_RESULT_OK) {
+            was_limited) != ADCS_RESULT_OK) {
         return ADCS_RESULT_INVALID_DATA;
     }
 
     angle_error = adcs_vector_norm(attitude_error);
     body_rate = adcs_vector_norm(attitude->angular_rate_rad_s);
+    *pointing_error_rad = angle_error;
     if (angle_error <= state->config.settled_angle_rad &&
         body_rate <= state->config.settled_rate_rad_s) {
         if (state->settled_cycles < state->config.settled_cycles_required) {

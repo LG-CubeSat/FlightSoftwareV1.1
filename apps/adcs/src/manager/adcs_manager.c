@@ -190,7 +190,7 @@ void adcs_manager_update(void) {
     critical_faults = state.health.active_faults &
         (ADCS_FAULT_SENSOR_STALE | ADCS_FAULT_SENSOR_RANGE |
          ADCS_FAULT_ATTITUDE_INVALID | ADCS_FAULT_EXCESSIVE_RATE |
-         ADCS_FAULT_ACTUATOR | ADCS_FAULT_BOARD_TEMPERATURE);
+         ADCS_FAULT_ACTUATOR | ADCS_FAULT_TASK_DEADLINE);
     if (critical_faults != 0U) {
         enter_mode_locked(ADCS_MODE_SAFE);
         refresh_builtin_target_locked();

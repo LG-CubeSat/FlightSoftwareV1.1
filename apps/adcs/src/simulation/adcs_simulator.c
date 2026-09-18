@@ -24,20 +24,6 @@ typedef struct {
 static simulator_state_t simulator;
 static pthread_mutex_t simulator_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static void quaternion_multiply(const versor left, const versor right, versor output) {
-    versor value;
-
-    value[0] = left[3] * right[0] + left[0] * right[3] +
-               left[1] * right[2] - left[2] * right[1];
-    value[1] = left[3] * right[1] - left[0] * right[2] +
-               left[1] * right[3] + left[2] * right[0];
-    value[2] = left[3] * right[2] + left[0] * right[1] -
-               left[1] * right[0] + left[2] * right[3];
-    value[3] = left[3] * right[3] - left[0] * right[0] -
-               left[1] * right[1] - left[2] * right[2];
-    memcpy(output, value, sizeof(versor));
-}
-
 static void quaternion_rotate_vector(
     const versor quaternion,
     const float vector[ADCS_VECTOR_LENGTH],
@@ -75,8 +61,6 @@ static adcs_simulator_config_t default_config(void) {
     config.gyro_bias_rad_s[1] = -0.0002F;
     config.gyro_bias_rad_s[2] = 0.0001F;
     config.maximum_dipole_a_m2 = 0.20F;
-    config.maximum_reaction_wheel_torque_nm = 0.00002F;
-    config.maximum_reaction_wheel_momentum_nms = 0.005F;
     config.orbit_altitude_m = 500000.0F;
     config.orbit_inclination_rad = 51.6F * SIM_PI_F / 180.0F;
     config.initial_unix_time_us = SIM_DEFAULT_UNIX_TIME_US;
@@ -96,13 +80,9 @@ static uint8_t config_is_valid(const adcs_simulator_config_t *config) {
         !adcs_values_are_finite(config->inertia_kg_m2, ADCS_VECTOR_LENGTH) ||
         !adcs_values_are_finite(config->gyro_bias_rad_s, ADCS_VECTOR_LENGTH) ||
         !isfinite(config->maximum_dipole_a_m2) ||
-        !isfinite(config->maximum_reaction_wheel_torque_nm) ||
-        !isfinite(config->maximum_reaction_wheel_momentum_nms) ||
         !isfinite(config->orbit_altitude_m) ||
         !isfinite(config->orbit_inclination_rad) ||
         config->maximum_dipole_a_m2 <= 0.0F ||
-        config->maximum_reaction_wheel_torque_nm <= 0.0F ||
-        config->maximum_reaction_wheel_momentum_nms <= 0.0F ||
         config->orbit_altitude_m <= 100000.0F ||
         config->initial_unix_time_us == 0U) {
         return 0U;
@@ -174,7 +154,6 @@ adcs_result_t adcs_simulator_init(const adcs_simulator_config_t *config) {
         sizeof(simulator.truth.angular_rate_rad_s));
     simulator.truth.unix_time_us = selected.initial_unix_time_us;
     simulator.truth.actuator.enabled = 0U;
-    simulator.truth.reaction_wheels.enabled = 0U;
     simulator.initialized = 1U;
     update_environment_locked();
     pthread_mutex_unlock(&simulator_lock);
@@ -211,28 +190,6 @@ adcs_result_t adcs_simulator_step(float dt_s) {
         memset(torque, 0, sizeof(torque));
     }
 
-    if (simulator.truth.reaction_wheels.enabled != 0U &&
-        (simulator.faults & ADCS_SIM_FAULT_ACTUATOR) == 0U) {
-        for (size_t axis = 0U; axis < ADCS_VECTOR_LENGTH; ++axis) {
-            float wheel_torque = simulator.truth.reaction_wheels.body_torque_nm[axis];
-            float next_momentum =
-                simulator.truth.reaction_wheel_momentum_nms[axis] -
-                wheel_torque * dt_s;
-            float limited_momentum = adcs_clampf(
-                next_momentum,
-                -simulator.config.maximum_reaction_wheel_momentum_nms,
-                simulator.config.maximum_reaction_wheel_momentum_nms);
-
-            if (limited_momentum != next_momentum) {
-                wheel_torque =
-                    (simulator.truth.reaction_wheel_momentum_nms[axis] -
-                     limited_momentum) / dt_s;
-            }
-            simulator.truth.reaction_wheel_momentum_nms[axis] = limited_momentum;
-            torque[axis] += wheel_torque;
-        }
-    }
-
     for (size_t axis = 0U; axis < ADCS_VECTOR_LENGTH; ++axis) {
         momentum[axis] = simulator.config.inertia_kg_m2[axis] *
                          simulator.truth.angular_rate_rad_s[axis];
@@ -262,7 +219,7 @@ adcs_result_t adcs_simulator_step(float dt_s) {
         delta[1] = negative_rotation[1] * scale;
         delta[2] = negative_rotation[2] * scale;
         delta[3] = cosf(half_angle);
-        quaternion_multiply(delta, simulator.truth.quaternion, updated);
+        adcs_quaternion_multiply(delta, simulator.truth.quaternion, updated);
         (void)adcs_quaternion_normalize(updated, simulator.truth.quaternion);
     }
 
@@ -360,28 +317,6 @@ adcs_result_t adcs_simulator_read_sun_sensor(
     return ADCS_RESULT_OK;
 }
 
-adcs_result_t adcs_simulator_read_thermistor(
-    uint64_t *timestamp_us,
-    float *temperature_c) {
-    double phase;
-
-    if (timestamp_us == NULL || temperature_c == NULL) {
-        return ADCS_RESULT_INVALID_ARGUMENT;
-    }
-
-    pthread_mutex_lock(&simulator_lock);
-    if (simulator.initialized == 0U ||
-        (simulator.faults & ADCS_SIM_FAULT_THERMISTOR) != 0U) {
-        pthread_mutex_unlock(&simulator_lock);
-        return ADCS_RESULT_UNAVAILABLE;
-    }
-    phase = (double)simulator.truth.timestamp_us / 1000000.0;
-    *timestamp_us = simulator.truth.timestamp_us;
-    *temperature_c = 24.0F + 1.5F * (float)sin(phase / 600.0);
-    pthread_mutex_unlock(&simulator_lock);
-    return ADCS_RESULT_OK;
-}
-
 adcs_result_t adcs_simulator_set_magnetorquer(
     const adcs_magnetorquer_command_t *command) {
     if (command == NULL ||
@@ -412,44 +347,6 @@ adcs_result_t adcs_simulator_set_magnetorquer(
             simulator.truth.actuator.dipole_a_m2,
             0,
             sizeof(simulator.truth.actuator.dipole_a_m2));
-    }
-    pthread_mutex_unlock(&simulator_lock);
-    return ADCS_RESULT_OK;
-}
-
-adcs_result_t adcs_simulator_set_reaction_wheels(
-    const adcs_reaction_wheel_command_t *command) {
-    if (command == NULL ||
-        !adcs_values_are_finite(command->body_torque_nm, ADCS_VECTOR_LENGTH)) {
-        return ADCS_RESULT_INVALID_ARGUMENT;
-    }
-
-    pthread_mutex_lock(&simulator_lock);
-    if (simulator.initialized == 0U) {
-        pthread_mutex_unlock(&simulator_lock);
-        return ADCS_RESULT_NOT_INITIALIZED;
-    }
-    if ((simulator.faults & ADCS_SIM_FAULT_ACTUATOR) != 0U) {
-        memset(
-            &simulator.truth.reaction_wheels,
-            0,
-            sizeof(simulator.truth.reaction_wheels));
-        pthread_mutex_unlock(&simulator_lock);
-        return ADCS_RESULT_UNAVAILABLE;
-    }
-
-    simulator.truth.reaction_wheels = *command;
-    for (size_t axis = 0U; axis < ADCS_VECTOR_LENGTH; ++axis) {
-        simulator.truth.reaction_wheels.body_torque_nm[axis] = adcs_clampf(
-            simulator.truth.reaction_wheels.body_torque_nm[axis],
-            -simulator.config.maximum_reaction_wheel_torque_nm,
-            simulator.config.maximum_reaction_wheel_torque_nm);
-    }
-    if (command->enabled == 0U) {
-        memset(
-            simulator.truth.reaction_wheels.body_torque_nm,
-            0,
-            sizeof(simulator.truth.reaction_wheels.body_torque_nm));
     }
     pthread_mutex_unlock(&simulator_lock);
     return ADCS_RESULT_OK;
@@ -523,8 +420,7 @@ void adcs_simulator_set_faults(uint32_t fault_mask) {
     pthread_mutex_lock(&simulator_lock);
     simulator.faults = fault_mask &
         (ADCS_SIM_FAULT_IMU | ADCS_SIM_FAULT_MAGNETOMETER |
-         ADCS_SIM_FAULT_SUN_SENSOR | ADCS_SIM_FAULT_THERMISTOR |
-         ADCS_SIM_FAULT_ACTUATOR);
+         ADCS_SIM_FAULT_SUN_SENSOR | ADCS_SIM_FAULT_ACTUATOR);
     pthread_mutex_unlock(&simulator_lock);
 }
 

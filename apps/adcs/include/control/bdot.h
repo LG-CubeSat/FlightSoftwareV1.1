@@ -37,6 +37,7 @@ adcs_result_t adcs_bdot_update(
     adcs_bdot_state_t *state,
     const float magnetic_field_t[ADCS_VECTOR_LENGTH],
     float dt_s,
-    float dipole_a_m2[ADCS_VECTOR_LENGTH]);
+    float dipole_a_m2[ADCS_VECTOR_LENGTH],
+    uint8_t *was_limited);
 
 #endif

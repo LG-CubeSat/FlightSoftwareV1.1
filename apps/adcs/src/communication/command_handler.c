@@ -14,11 +14,16 @@ static command_ack_status_t enqueue_command(const adcs_command_t *command) {
     return command_task_send(command) != 0 ? ACK : NACK;
 }
 
+typedef enum {
+    COMMAND_ACTION_NONE = 0,
+    COMMAND_ACTION_RESET,
+    COMMAND_ACTION_SHUTDOWN
+} command_action_t;
+
 static command_ack_status_t decode_command(
     const csp_packet_t *packet,
     const command_envelope_t *envelope,
-    uint8_t *reset_requested,
-    uint8_t *shutdown_requested) {
+    command_action_t *action) {
     adcs_command_t command;
 
     memset(&command, 0, sizeof(command));
@@ -29,25 +34,20 @@ static command_ack_status_t decode_command(
             if (packet->length >= sizeof(position_command_t)) {
                 position_command_t payload;
                 memcpy(&payload, packet->data, sizeof(payload));
-                if (fault_management_check_bounds(payload.target_position)) {
-                    return NACK;
-                }
                 command.type = ADCS_COMMAND_LEGACY_POSITION;
                 command.parameter.legacy_position = payload.target_position;
                 return enqueue_command(&command);
             }
             return NACK;
         case CMD_RESET:
-            *reset_requested = 1U;
+            *action = COMMAND_ACTION_RESET;
             return ACK;
         case CMD_SHUTDOWN:
-            *shutdown_requested = 1U;
+            *action = COMMAND_ACTION_SHUTDOWN;
             return ACK;
         case CMD_POINT_TO_SUN:
             command.type = ADCS_COMMAND_SET_MODE;
             command.parameter.mode = ADCS_MODE_SUN_ACQUISITION;
-            printf("[COMMAND HANDLER] Point to sun command received. \n");
-            fflush(stdout);
             return enqueue_command(&command);
         case CMD_TIME_SYNC:
             if (packet->length >= sizeof(time_sync_command_t)) {
@@ -60,8 +60,6 @@ static command_ack_status_t decode_command(
                 }
                 command.type = ADCS_COMMAND_SET_UNIX_TIME;
                 command.parameter.unix_time_sec = payload.unix_time_sec;
-                printf("[COMMAND HANDLER] Time sync command received. \n");
-                fflush(stdout);
                 return enqueue_command(&command);
             }
             return NACK;
@@ -162,8 +160,7 @@ static void *command_handler_rx_loop(void *parameter) {
                 packet->length >= sizeof(command_envelope_t)) {
                 command_envelope_t envelope;
                 command_ack_t acknowledgement;
-                uint8_t reset_requested = 0U;
-                uint8_t shutdown_requested = 0U;
+                command_action_t action = COMMAND_ACTION_NONE;
 
                 memcpy(&envelope, packet->data, sizeof(envelope));
                 acknowledgement.ack_command_id = envelope.command_id;
@@ -171,20 +168,34 @@ static void *command_handler_rx_loop(void *parameter) {
                 acknowledgement.status = decode_command(
                     packet,
                     &envelope,
-                    &reset_requested,
-                    &shutdown_requested);
+                    &action);
                 send_ack(connection, &acknowledgement);
                 csp_buffer_free(packet);
 
-                if (reset_requested != 0U) {
-                    printf("[COMMAND HANDLER] Reset command received -- resetting now\n");
-                    fflush(stdout);
-                    fault_management_trigger_reset(RESET_REASON_WATCHDOG);
+                if (acknowledgement.status == ACK) {
+                    if (envelope.command_id == CMD_POINT_TO_SUN) {
+                        printf("[COMMAND HANDLER] Point to sun command received.\n");
+                        fflush(stdout);
+                    } else if (envelope.command_id == CMD_TIME_SYNC) {
+                        printf("[COMMAND HANDLER] Time sync command received.\n");
+                        fflush(stdout);
+                    }
                 }
-                if (shutdown_requested != 0U) {
-                    printf("[COMMAND HANDLER] Shutdown command received. Shutting down.\n");
-                    fflush(stdout);
-                    board_shutdown();
+
+                switch (action) {
+                    case COMMAND_ACTION_RESET:
+                        printf("[COMMAND HANDLER] Reset command received -- resetting now\n");
+                        fflush(stdout);
+                        fault_management_trigger_reset(RESET_REASON_WATCHDOG);
+                        break;
+                    case COMMAND_ACTION_SHUTDOWN:
+                        printf("[COMMAND HANDLER] Shutdown command received. Shutting down.\n");
+                        fflush(stdout);
+                        board_shutdown();
+                        break;
+                    case COMMAND_ACTION_NONE:
+                    default:
+                        break;
                 }
                 continue;
             }

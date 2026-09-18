@@ -54,6 +54,7 @@ adcs_result_t adcs_controller_update(
     float achievable_torque[ADCS_VECTOR_LENGTH] = {0.0F, 0.0F, 0.0F};
     float dipole[ADCS_VECTOR_LENGTH] = {0.0F, 0.0F, 0.0F};
     uint8_t saturated = 0U;
+    uint8_t controller_saturated = 0U;
     uint8_t settled = 0U;
     adcs_result_t result;
 
@@ -76,8 +77,7 @@ adcs_result_t adcs_controller_update(
     if (mode == ADCS_MODE_BOOT || mode == ADCS_MODE_SAFE) {
         return ADCS_RESULT_OK;
     }
-    if ((mode == ADCS_MODE_DETUMBLE || mode == ADCS_MODE_SUN_ACQUISITION) &&
-        (sensors->valid_mask & ADCS_SENSOR_VALID_MAGNETOMETER) == 0U) {
+    if ((sensors->valid_mask & ADCS_SENSOR_VALID_MAGNETOMETER) == 0U) {
         return ADCS_RESULT_UNAVAILABLE;
     }
 
@@ -86,7 +86,8 @@ adcs_result_t adcs_controller_update(
             &controller->bdot,
             sensors->magnetic_field_t,
             dt_s,
-            dipole);
+            dipole,
+            &saturated);
         if (result != ADCS_RESULT_OK) {
             return result;
         }
@@ -95,6 +96,7 @@ adcs_result_t adcs_controller_update(
         adcs_vector_cross(dipole, sensors->magnetic_field_t, achievable_torque);
         memcpy(output->achievable_torque_nm, achievable_torque, sizeof(achievable_torque));
         output->actuators_enabled = 1U;
+        output->saturated = saturated;
         return ADCS_RESULT_OK;
     }
 
@@ -104,7 +106,8 @@ adcs_result_t adcs_controller_update(
             sensors,
             attitude,
             requested_torque,
-            &output->pointing_error_rad);
+            &output->pointing_error_rad,
+            &controller_saturated);
     } else if (mode == ADCS_MODE_SLEWING ||
                mode == ADCS_MODE_TARGET_POINTING ||
                mode == ADCS_MODE_EARTH_POINTING ||
@@ -119,38 +122,15 @@ adcs_result_t adcs_controller_update(
             target->maximum_rate_rad_s,
             dt_s,
             requested_torque,
-            &settled);
-        if (result == ADCS_RESULT_OK) {
-            float error[ADCS_VECTOR_LENGTH];
-            if (adcs_quaternion_error_vector(
-                    attitude->quaternion,
-                    target->target_quaternion,
-                    error) == ADCS_RESULT_OK) {
-                output->pointing_error_rad = adcs_vector_norm(error);
-            }
-        }
+            &settled,
+            &output->pointing_error_rad,
+            &controller_saturated);
     } else {
         return ADCS_RESULT_INVALID_ARGUMENT;
     }
 
     if (result != ADCS_RESULT_OK) {
         return result;
-    }
-
-    if (mode != ADCS_MODE_SUN_ACQUISITION) {
-        memcpy(output->requested_torque_nm, requested_torque, sizeof(requested_torque));
-        memcpy(
-            output->reaction_wheel_torque_nm,
-            requested_torque,
-            sizeof(requested_torque));
-        memcpy(
-            output->achievable_torque_nm,
-            requested_torque,
-            sizeof(requested_torque));
-        output->actuators_enabled = 1U;
-        output->reaction_wheels_enabled = 1U;
-        output->target_settled = settled;
-        return ADCS_RESULT_OK;
     }
 
     result = adcs_actuator_allocate(
@@ -168,7 +148,7 @@ adcs_result_t adcs_controller_update(
     memcpy(output->requested_dipole_a_m2, actuator.dipole_a_m2, sizeof(actuator.dipole_a_m2));
     memcpy(output->achievable_torque_nm, achievable_torque, sizeof(achievable_torque));
     output->actuators_enabled = actuator.enabled;
-    output->saturated = saturated;
+    output->saturated = saturated != 0U || controller_saturated != 0U;
     output->target_settled = settled;
     return ADCS_RESULT_OK;
 }

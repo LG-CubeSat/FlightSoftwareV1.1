@@ -41,14 +41,19 @@ adcs_result_t adcs_bdot_update(
     adcs_bdot_state_t *state,
     const float magnetic_field_t[ADCS_VECTOR_LENGTH],
     float dt_s,
-    float dipole_a_m2[ADCS_VECTOR_LENGTH]) {
+    float dipole_a_m2[ADCS_VECTOR_LENGTH],
+    uint8_t *was_limited) {
     float raw_derivative[ADCS_VECTOR_LENGTH];
     float requested[ADCS_VECTOR_LENGTH];
 
     if (dipole_a_m2 != NULL) {
         memset(dipole_a_m2, 0, sizeof(float) * ADCS_VECTOR_LENGTH);
     }
+    if (was_limited != NULL) {
+        *was_limited = 0U;
+    }
     if (state == NULL || magnetic_field_t == NULL || dipole_a_m2 == NULL ||
+        was_limited == NULL ||
         !adcs_values_are_finite(magnetic_field_t, ADCS_VECTOR_LENGTH) ||
         !isfinite(dt_s) || dt_s < state->config.minimum_dt_s ||
         dt_s > state->config.maximum_dt_s ||
@@ -78,5 +83,5 @@ adcs_result_t adcs_bdot_update(
         requested,
         state->config.maximum_dipole_a_m2,
         dipole_a_m2,
-        NULL);
+        was_limited);
 }

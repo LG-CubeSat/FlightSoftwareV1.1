@@ -3,6 +3,7 @@
 #include <math.h>
 #include <pthread.h>
 #include <stdio.h>
+#include <stdatomic.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -14,37 +15,42 @@
 
 #define WATCHDOG_CHECK_PERIOD_SEC 1
 #define WATCHDOG_TIMEOUT_SEC 5
-#define POSITION_LIMIT 1000
 #define MAXIMUM_SIM_DIPOLE_A_M2 1.0F
+#define MAXIMUM_ESTIMATOR_RATE_RAD_S 100.0F
+#define MAXIMUM_ESTIMATOR_COVARIANCE 1.0e6F
 
 static pthread_mutex_t pet_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t fault_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct timespec last_pet;
 static adcs_fault_config_t fault_config;
 static uint32_t active_faults;
+static atomic_uchar transport_enabled = 1U;
 
 static adcs_fault_config_t default_config(void) {
     return (adcs_fault_config_t) {
         .maximum_rate_rad_s = 0.75F,
         .minimum_magnetic_field_t = 1.0e-6F,
         .maximum_magnetic_field_t = 1.0e-3F,
-        .minimum_board_temperature_c = -20.0F,
-        .maximum_board_temperature_c = 70.0F,
         .sensor_stale_after_us = 500000U,
         .estimate_stale_after_us = 500000U
     };
 }
 
 static void send_reset_notice(reset_reason_t reason) {
-    csp_conn_t *conn = csp_connect(
+    csp_conn_t *conn;
+    csp_packet_t *packet;
+    board_reset_notice_t notice;
+
+    if (atomic_load(&transport_enabled) == 0U) {
+        return;
+    }
+
+    conn = csp_connect(
         CSP_PRIO_NORM,
         OBC_ADDRESS,
         ADCS_STATUS_PORT,
         1000,
         CSP_O_NONE);
-    csp_packet_t *packet;
-    board_reset_notice_t notice;
-
     if (conn == NULL) {
         fprintf(stderr, "[FAULT MGMT] failed to notify OBC of reset\n");
         return;
@@ -114,16 +120,17 @@ void fault_management_init(void) {
     pthread_attr_destroy(&attributes);
 }
 
+void fault_management_set_transport_enabled(uint8_t enabled) {
+    atomic_store(&transport_enabled, enabled != 0U);
+}
+
 void fault_management_configure(const adcs_fault_config_t *config) {
     if (config == NULL || !isfinite(config->maximum_rate_rad_s) ||
         !isfinite(config->minimum_magnetic_field_t) ||
         !isfinite(config->maximum_magnetic_field_t) ||
-        !isfinite(config->minimum_board_temperature_c) ||
-        !isfinite(config->maximum_board_temperature_c) ||
         config->maximum_rate_rad_s <= 0.0F ||
         config->minimum_magnetic_field_t <= 0.0F ||
         config->maximum_magnetic_field_t <= config->minimum_magnetic_field_t ||
-        config->maximum_board_temperature_c <= config->minimum_board_temperature_c ||
         config->sensor_stale_after_us == 0U ||
         config->estimate_stale_after_us == 0U) {
         return;
@@ -140,8 +147,47 @@ void fault_management_pet(void) {
     pthread_mutex_unlock(&pet_lock);
 }
 
-int fault_management_check_bounds(int32_t position) {
-    return position > POSITION_LIMIT || position < -POSITION_LIMIT;
+int fault_management_check_estimator_bounds(
+    const adcs_attitude_state_t *attitude) {
+    float quaternion_norm_squared = 0.0F;
+    float rate_norm;
+
+    if (attitude == NULL || attitude->timestamp_us == 0U) {
+        return 0;
+    }
+    if (!adcs_values_are_finite(attitude->quaternion, 4U) ||
+        !adcs_values_are_finite(
+            attitude->angular_rate_rad_s,
+            ADCS_VECTOR_LENGTH) ||
+        !adcs_values_are_finite(
+            attitude->gyro_bias_rad_s,
+            ADCS_VECTOR_LENGTH) ||
+        !adcs_values_are_finite(
+            attitude->covariance_diagonal,
+            ADCS_ERROR_STATE_LENGTH) ||
+        !isfinite(attitude->confidence)) {
+        return 1;
+    }
+
+    for (size_t index = 0U; index < 4U; ++index) {
+        quaternion_norm_squared +=
+            attitude->quaternion[index] * attitude->quaternion[index];
+    }
+    rate_norm = adcs_vector_norm(attitude->angular_rate_rad_s);
+    if (!isfinite(quaternion_norm_squared) ||
+        quaternion_norm_squared < 0.25F ||
+        quaternion_norm_squared > 2.25F ||
+        !isfinite(rate_norm) || rate_norm > MAXIMUM_ESTIMATOR_RATE_RAD_S ||
+        attitude->confidence < 0.0F || attitude->confidence > 1.0F) {
+        return 1;
+    }
+    for (size_t index = 0U; index < ADCS_ERROR_STATE_LENGTH; ++index) {
+        if (attitude->covariance_diagonal[index] < 0.0F ||
+            attitude->covariance_diagonal[index] > MAXIMUM_ESTIMATOR_COVARIANCE) {
+            return 1;
+        }
+    }
+    return 0;
 }
 
 uint32_t fault_management_evaluate_adcs(
@@ -165,16 +211,14 @@ uint32_t fault_management_evaluate_adcs(
         faults |= ADCS_FAULT_SENSOR_STALE;
     } else {
         uint32_t required = ADCS_SENSOR_VALID_GYROSCOPE |
-                            ADCS_SENSOR_VALID_MAGNETOMETER |
-                            ADCS_SENSOR_VALID_TEMPERATURE;
+                            ADCS_SENSOR_VALID_MAGNETOMETER;
         if ((sensors->valid_mask & required) != required ||
             !adcs_values_are_finite(
                 sensors->angular_rate_rad_s,
                 ADCS_VECTOR_LENGTH) ||
             !adcs_values_are_finite(
                 sensors->magnetic_field_t,
-                ADCS_VECTOR_LENGTH) ||
-            !isfinite(sensors->board_temperature_c)) {
+                ADCS_VECTOR_LENGTH)) {
             faults |= ADCS_FAULT_SENSOR_RANGE;
         } else {
             magnetic_norm = adcs_vector_norm(sensors->magnetic_field_t);
@@ -182,12 +226,6 @@ uint32_t fault_management_evaluate_adcs(
                 magnetic_norm < config.minimum_magnetic_field_t ||
                 magnetic_norm > config.maximum_magnetic_field_t) {
                 faults |= ADCS_FAULT_SENSOR_RANGE;
-            }
-            if (sensors->board_temperature_c <
-                    config.minimum_board_temperature_c ||
-                sensors->board_temperature_c >
-                    config.maximum_board_temperature_c) {
-                faults |= ADCS_FAULT_BOARD_TEMPERATURE;
             }
         }
     }
@@ -220,10 +258,10 @@ uint32_t fault_management_evaluate_adcs(
 
     if (control != NULL && control->actuators_enabled != 0U) {
         if (!adcs_values_are_finite(
-                control->requested_dipole_a_m2,
+                control->requested_torque_nm,
                 ADCS_VECTOR_LENGTH) ||
             !adcs_values_are_finite(
-                control->reaction_wheel_torque_nm,
+                control->requested_dipole_a_m2,
                 ADCS_VECTOR_LENGTH) ||
             !adcs_values_are_finite(
                 control->achievable_torque_nm,
@@ -232,8 +270,7 @@ uint32_t fault_management_evaluate_adcs(
         }
         for (size_t axis = 0U; axis < ADCS_VECTOR_LENGTH; ++axis) {
             if (fabsf(control->requested_dipole_a_m2[axis]) >
-                    MAXIMUM_SIM_DIPOLE_A_M2 ||
-                fabsf(control->reaction_wheel_torque_nm[axis]) > 1.0e-3F) {
+                    MAXIMUM_SIM_DIPOLE_A_M2) {
                 faults |= ADCS_FAULT_ACTUATOR;
             }
         }

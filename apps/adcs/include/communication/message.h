@@ -12,7 +12,6 @@
  *   - angular rates are body-frame radians/second
  *   - magnetic fields are body- or ECI-frame tesla as named
  *   - control torques are body-frame newton-metres
- *   - reaction-wheel commands state torque applied to the spacecraft body
  *   - magnetorquer dipoles are body-frame ampere-square-metres
  *   - inertial vectors use Earth-centred inertial (ECI) coordinates
  */
@@ -22,7 +21,9 @@
 #include <stdint.h>
 
 #define ADCS_VECTOR_LENGTH             3U
+// Error state for kalman filter
 #define ADCS_ERROR_STATE_LENGTH        6U
+// 6x6 matrix for attitude uncertainty
 #define ADCS_COVARIANCE_ELEMENT_COUNT 36U
 
 typedef float versor[4];
@@ -54,8 +55,7 @@ typedef enum {
     ADCS_SENSOR_VALID_GYROSCOPE = 1U << 0,
     ADCS_SENSOR_VALID_ACCELEROMETER = 1U << 1,
     ADCS_SENSOR_VALID_MAGNETOMETER = 1U << 2,
-    ADCS_SENSOR_VALID_SUN = 1U << 3,
-    ADCS_SENSOR_VALID_TEMPERATURE = 1U << 4
+    ADCS_SENSOR_VALID_SUN = 1U << 3
 } adcs_sensor_validity_t;
 
 typedef enum {
@@ -85,7 +85,6 @@ typedef struct {
     float magnetic_field_t[ADCS_VECTOR_LENGTH];
     float sun_vector_body[ADCS_VECTOR_LENGTH];
     float sun_irradiance_w_m2;
-    float board_temperature_c;
     uint32_t valid_mask;
 } adcs_sensor_packet_t;
 
@@ -125,12 +124,10 @@ typedef struct {
 typedef struct {
     uint64_t timestamp_us;
     float requested_torque_nm[ADCS_VECTOR_LENGTH];
-    float reaction_wheel_torque_nm[ADCS_VECTOR_LENGTH];
     float requested_dipole_a_m2[ADCS_VECTOR_LENGTH];
     float achievable_torque_nm[ADCS_VECTOR_LENGTH];
     float pointing_error_rad;
     uint8_t actuators_enabled;
-    uint8_t reaction_wheels_enabled;
     uint8_t saturated;
     uint8_t target_settled;
 } adcs_control_output_t;
@@ -140,12 +137,6 @@ typedef struct {
     float dipole_a_m2[ADCS_VECTOR_LENGTH];
     uint8_t enabled;
 } adcs_magnetorquer_command_t;
-
-typedef struct {
-    uint64_t timestamp_us;
-    float body_torque_nm[ADCS_VECTOR_LENGTH];
-    uint8_t enabled;
-} adcs_reaction_wheel_command_t;
 
 typedef struct {
     uint64_t timestamp_us;

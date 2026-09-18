@@ -64,6 +64,12 @@ adcs_result_t adcs_quaternion_normalize(
     const versor input,
     versor output);
 
+/* Multiplies two local [x, y, z, w] quaternions without changing either input. */
+void adcs_quaternion_multiply(
+    const versor left,
+    const versor right,
+    versor output);
+
 /*
  * Produces the shortest-path physical body rotation, expressed in the current
  * body frame, from current attitude to target attitude.

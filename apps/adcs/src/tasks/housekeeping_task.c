@@ -10,6 +10,7 @@
 #include "manager/adcs_manager.h"
 #include "manager/fault_manager.h"
 #include "simulation/adcs_simulator.h"
+#include "tasks/command_task.h"
 #include "tasks/control_task.h"
 #include "tasks/estimation_task.h"
 #include "tasks/sensor_task.h"
@@ -21,8 +22,7 @@
 #define ALL_RECOVERABLE_FAULTS \
     (ADCS_FAULT_SENSOR_STALE | ADCS_FAULT_SENSOR_RANGE | \
      ADCS_FAULT_ATTITUDE_INVALID | ADCS_FAULT_EXCESSIVE_RATE | \
-     ADCS_FAULT_ACTUATOR | ADCS_FAULT_TASK_DEADLINE | \
-     ADCS_FAULT_BOARD_TEMPERATURE)
+     ADCS_FAULT_ACTUATOR | ADCS_FAULT_TASK_DEADLINE)
 
 static StackType_t housekeeping_task_stack[HOUSEKEEPING_TASK_STACK_SIZE];
 static StaticTask_t housekeeping_task_buffer;
@@ -48,6 +48,7 @@ static float minimum_stack_margin(void) {
         xSensorHandle,
         xEstimationHandle,
         xControlHandle,
+        xCommandHandle,
         xTelemetryHandle,
         xHousekeepingHandle
     };
@@ -94,8 +95,7 @@ void housekeeping_task(void *parameters) {
         health.active_faults = fault_management_get_active();
         health.sensors_healthy =
             (health.active_faults &
-             (ADCS_FAULT_SENSOR_STALE | ADCS_FAULT_SENSOR_RANGE |
-              ADCS_FAULT_BOARD_TEMPERATURE)) == 0U;
+             (ADCS_FAULT_SENSOR_STALE | ADCS_FAULT_SENSOR_RANGE)) == 0U;
         health.estimator_healthy =
             (health.active_faults & ADCS_FAULT_ATTITUDE_INVALID) == 0U;
         health.actuators_healthy =

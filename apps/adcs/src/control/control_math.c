@@ -19,8 +19,15 @@ static uint8_t pid_config_is_valid(const adcs_pid_config_t *config) {
            config->output_limit > 0.0F;
 }
 
-static void quaternion_multiply(const versor left, const versor right, versor output) {
+void adcs_quaternion_multiply(
+    const versor left,
+    const versor right,
+    versor output) {
     versor value;
+
+    if (left == NULL || right == NULL || output == NULL) {
+        return;
+    }
 
     value[0] = left[3] * right[0] + left[0] * right[3] +
                left[1] * right[2] - left[2] * right[1];
@@ -254,7 +261,7 @@ adcs_result_t adcs_quaternion_error_vector(
     current_conjugate[1] = -current_unit[1];
     current_conjugate[2] = -current_unit[2];
     current_conjugate[3] = current_unit[3];
-    quaternion_multiply(target_unit, current_conjugate, mapping_error);
+    adcs_quaternion_multiply(target_unit, current_conjugate, mapping_error);
 
     if (mapping_error[3] < 0.0F) {
         for (size_t index = 0U; index < 4U; ++index) {

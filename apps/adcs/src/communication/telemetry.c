@@ -1,5 +1,7 @@
 #include "communication/telemetry.h"
 
+#include <arpa/inet.h>
+#include <math.h>
 #include <stdatomic.h>
 #include <string.h>
 
@@ -26,15 +28,25 @@ static uint8_t put_u8(encoder_t *encoder, uint8_t value) {
 }
 
 static uint8_t put_u16(encoder_t *encoder, uint16_t value) {
-    return put_u8(encoder, (uint8_t)(value >> 8U)) &&
-           put_u8(encoder, (uint8_t)value);
+    uint16_t network_value = htons(value);
+
+    if (encoder->used + sizeof(network_value) > encoder->capacity) {
+        return 0U;
+    }
+    memcpy(&encoder->payload[encoder->used], &network_value, sizeof(network_value));
+    encoder->used += sizeof(network_value);
+    return 1U;
 }
 
 static uint8_t put_u32(encoder_t *encoder, uint32_t value) {
-    return put_u8(encoder, (uint8_t)(value >> 24U)) &&
-           put_u8(encoder, (uint8_t)(value >> 16U)) &&
-           put_u8(encoder, (uint8_t)(value >> 8U)) &&
-           put_u8(encoder, (uint8_t)value);
+    uint32_t network_value = htonl(value);
+
+    if (encoder->used + sizeof(network_value) > encoder->capacity) {
+        return 0U;
+    }
+    memcpy(&encoder->payload[encoder->used], &network_value, sizeof(network_value));
+    encoder->used += sizeof(network_value);
+    return 1U;
 }
 
 static uint8_t put_u64(encoder_t *encoder, uint64_t value) {
@@ -69,6 +81,10 @@ void adcs_telemetry_set_transport_enabled(uint8_t enabled) {
     atomic_store(&transport_enabled, enabled != 0U);
 }
 
+uint8_t adcs_telemetry_transport_is_enabled(void) {
+    return atomic_load(&transport_enabled) != 0U ? 1U : 0U;
+}
+
 adcs_telemetry_status_t adcs_telemetry_encode(
     const adcs_telemetry_packet_t *telemetry,
     uint8_t *payload,
@@ -81,6 +97,7 @@ adcs_telemetry_status_t adcs_telemetry_encode(
     };
     uint8_t control_flags;
     uint8_t health_flags;
+    uint16_t state_flags;
 
     if (telemetry == NULL || payload == NULL || encoded_size == NULL ||
         telemetry->mode < ADCS_MODE_BOOT || telemetry->mode >= ADCS_MODE_COUNT ||
@@ -94,25 +111,30 @@ adcs_telemetry_status_t adcs_telemetry_encode(
             ADCS_VECTOR_LENGTH) ||
         !adcs_values_are_finite(
             telemetry->control.requested_dipole_a_m2,
-            ADCS_VECTOR_LENGTH)) {
+            ADCS_VECTOR_LENGTH) ||
+        !isfinite(telemetry->attitude.confidence) ||
+        telemetry->attitude.confidence < 0.0F ||
+        telemetry->attitude.confidence > 1.0F) {
         return ADCS_TELEMETRY_INVALID_ARGUMENT;
     }
 
     control_flags = (uint8_t)(
         (telemetry->control.actuators_enabled != 0U ? 1U : 0U) |
         (telemetry->control.saturated != 0U ? 2U : 0U) |
-        (telemetry->control.target_settled != 0U ? 4U : 0U) |
-        (telemetry->control.reaction_wheels_enabled != 0U ? 8U : 0U));
+        (telemetry->control.target_settled != 0U ? 4U : 0U));
     health_flags = (uint8_t)(
         (telemetry->health.sensors_healthy != 0U ? 1U : 0U) |
         (telemetry->health.estimator_healthy != 0U ? 2U : 0U) |
         (telemetry->health.actuators_healthy != 0U ? 4U : 0U));
+    state_flags = telemetry->attitude.valid != 0U
+        ? ADCS_TELEMETRY_ATTITUDE_VALID_FLAG
+        : 0U;
 
     if (!put_u8(&encoder, 'A') || !put_u8(&encoder, 'D') ||
         !put_u8(&encoder, 'C') || !put_u8(&encoder, 'S') ||
         !put_u8(&encoder, ADCS_TELEMETRY_FORMAT_VERSION) ||
         !put_u8(&encoder, (uint8_t)telemetry->mode) ||
-        !put_u16(&encoder, 0U) ||
+        !put_u16(&encoder, state_flags) ||
         !put_u32(&encoder, telemetry->sequence) ||
         !put_u64(&encoder, telemetry->timestamp_us) ||
         !put_u32(&encoder, telemetry->sensors.valid_mask) ||
@@ -135,16 +157,11 @@ adcs_telemetry_status_t adcs_telemetry_encode(
             &encoder,
             telemetry->sensors.sun_vector_body,
             ADCS_VECTOR_LENGTH) ||
-        !put_float(&encoder, telemetry->sensors.board_temperature_c) ||
         !put_float(&encoder, telemetry->sensors.sun_irradiance_w_m2) ||
         !put_float(&encoder, telemetry->attitude.confidence) ||
         !put_float_array(
             &encoder,
             telemetry->control.requested_torque_nm,
-            ADCS_VECTOR_LENGTH) ||
-        !put_float_array(
-            &encoder,
-            telemetry->control.reaction_wheel_torque_nm,
             ADCS_VECTOR_LENGTH) ||
         !put_float_array(
             &encoder,
