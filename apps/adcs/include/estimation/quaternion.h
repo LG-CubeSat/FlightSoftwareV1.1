@@ -1,4 +1,0 @@
-/*
-Util for quaternions
-All math helper functions
-*/
