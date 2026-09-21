@@ -2,6 +2,7 @@ add_executable(adcs_sim
     src/main.c
     src/freertos_hooks.c
     src/manager/fault_manager.c
+    src/manager/adcs_manager.c
     src/tasks/command_task.c
     src/tasks/control_task.c
     src/tasks/estimation_task.c
@@ -9,6 +10,19 @@ add_executable(adcs_sim
     src/tasks/sensor_task.c
     src/tasks/telemetry_task.c
     src/communication/command_handler.c
+    src/communication/telemetry.c
+    src/drivers/sim_adcs_drivers.c
+    src/control/actuator_allocator.c
+    src/control/bdot.c
+    src/control/control_math.c
+    src/control/controller.c
+    src/control/slew_controller.c
+    src/control/sun_pointing.c
+    src/estimation/attitude_estimator.c
+    src/estimation/kalman_filter.c
+    src/estimation/reference_vectors.c
+    src/guidance/target_generator.c
+    src/simulation/adcs_simulator.c
 )
 
 target_include_directories(adcs_sim PRIVATE
@@ -19,4 +33,8 @@ target_include_directories(adcs_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/manager
 )
 
-target_link_libraries(adcs_sim PRIVATE freertos_kernel pthread platform csp_interface)
+target_link_libraries(adcs_sim PRIVATE freertos_kernel pthread platform csp_interface m)
+
+if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(adcs_sim PRIVATE -Wall -Wextra -Wpedantic)
+endif()
