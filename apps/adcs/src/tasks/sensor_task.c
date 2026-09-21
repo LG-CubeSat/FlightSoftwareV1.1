@@ -13,7 +13,7 @@
 #include "simulation/adcs_simulator.h"
 #include "sun_sensor.h"
 
-// TODO: figure out real necesary size.
+// TODO: figure out real necessary size.
 #define SENSOR_TASK_PRIORITY 4
 #define SENSOR_TASK_STACK_SIZE 1536
 #define SENSOR_TASK_PERIOD_MS 10

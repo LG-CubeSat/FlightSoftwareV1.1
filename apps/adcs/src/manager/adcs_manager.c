@@ -53,16 +53,16 @@ static uint8_t attitude_ready_locked(void) {
            quaternion_is_valid(state.latest_attitude.quaternion);
 }
 
-static uint8_t state_is_fresh_locked(void) {
-    uint64_t now = state.latest_sensors.timestamp_us;
-
-    if (now == 0U || state.latest_attitude.timestamp_us == 0U ||
-        state.latest_attitude.timestamp_us > now) {
+static uint8_t state_is_fresh_locked(uint64_t now_us) {
+    if (now_us == 0U || state.latest_sensors.timestamp_us == 0U ||
+        state.latest_attitude.timestamp_us == 0U ||
+        state.latest_sensors.timestamp_us > now_us ||
+        state.latest_attitude.timestamp_us > now_us) {
         return 0U;
     }
-    return now - state.latest_sensors.timestamp_us <=
+    return now_us - state.latest_sensors.timestamp_us <=
                manager_config.sensor_stale_after_us &&
-           now - state.latest_attitude.timestamp_us <=
+           now_us - state.latest_attitude.timestamp_us <=
                manager_config.estimate_stale_after_us;
 }
 
@@ -176,7 +176,7 @@ void adcs_manager_configure(const adcs_manager_config_t *config) {
     pthread_mutex_unlock(&manager_lock);
 }
 
-void adcs_manager_update(void) {
+void adcs_manager_update(uint64_t now_us) {
     uint32_t critical_faults;
     float body_rate;
 
@@ -187,10 +187,7 @@ void adcs_manager_update(void) {
     }
 
     state.health.active_faults = fault_management_get_active();
-    critical_faults = state.health.active_faults &
-        (ADCS_FAULT_SENSOR_STALE | ADCS_FAULT_SENSOR_RANGE |
-         ADCS_FAULT_ATTITUDE_INVALID | ADCS_FAULT_EXCESSIVE_RATE |
-         ADCS_FAULT_ACTUATOR | ADCS_FAULT_TASK_DEADLINE);
+    critical_faults = state.health.active_faults & ADCS_FAULT_ALL;
     if (critical_faults != 0U) {
         enter_mode_locked(ADCS_MODE_SAFE);
         refresh_builtin_target_locked();
@@ -200,7 +197,7 @@ void adcs_manager_update(void) {
 
     if (state.mode == ADCS_MODE_BOOT) {
         if (sensors_ready_locked() && attitude_ready_locked() &&
-            state_is_fresh_locked()) {
+            state_is_fresh_locked(now_us)) {
             enter_mode_locked(ADCS_MODE_SAFE);
         } else {
             pthread_mutex_unlock(&manager_lock);

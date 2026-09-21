@@ -20,6 +20,14 @@ typedef enum {
     ADCS_FAULT_TASK_DEADLINE = 1U << 5
 } adcs_fault_t;
 
+/* Every fault bit currently defined -- the single source of truth for the
+   "critical" mask in adcs_manager.c and the "recoverable" mask in
+   housekeeping_task.c, which must otherwise be hand-kept in sync. */
+#define ADCS_FAULT_ALL \
+    (ADCS_FAULT_SENSOR_STALE | ADCS_FAULT_SENSOR_RANGE | \
+     ADCS_FAULT_ATTITUDE_INVALID | ADCS_FAULT_EXCESSIVE_RATE | \
+     ADCS_FAULT_ACTUATOR | ADCS_FAULT_TASK_DEADLINE)
+
 typedef struct {
     float maximum_rate_rad_s;
     float minimum_magnetic_field_t;

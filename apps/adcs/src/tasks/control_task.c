@@ -11,6 +11,7 @@
 #include "magnetorquer.h"
 #include "manager/adcs_manager.h"
 #include "manager/fault_manager.h"
+#include "simulation/adcs_simulator.h"
 
 #define CONTROL_TASK_PRIORITY 4
 #define CONTROL_TASK_STACK_SIZE 2048
@@ -88,7 +89,7 @@ void control_task(void *parameters) {
         adcs_result_t result;
         uint32_t notification;
 
-        adcs_manager_update();
+        adcs_manager_update(adcs_simulator_get_time_us());
         adcs_manager_get_state(&snapshot);
         result = adcs_controller_update(
             &controller,

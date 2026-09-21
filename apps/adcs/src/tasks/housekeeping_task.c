@@ -19,10 +19,7 @@
 #define HOUSEKEEPING_TASK_PRIORITY 1
 #define HOUSEKEEPING_TASK_STACK_SIZE 1280
 #define HOUSEKEEPING_TASK_PERIOD_MS 1000
-#define ALL_RECOVERABLE_FAULTS \
-    (ADCS_FAULT_SENSOR_STALE | ADCS_FAULT_SENSOR_RANGE | \
-     ADCS_FAULT_ATTITUDE_INVALID | ADCS_FAULT_EXCESSIVE_RATE | \
-     ADCS_FAULT_ACTUATOR | ADCS_FAULT_TASK_DEADLINE)
+#define ALL_RECOVERABLE_FAULTS ADCS_FAULT_ALL
 
 static StackType_t housekeeping_task_stack[HOUSEKEEPING_TASK_STACK_SIZE];
 static StaticTask_t housekeeping_task_buffer;
@@ -102,7 +99,7 @@ void housekeeping_task(void *parameters) {
             (health.active_faults & ADCS_FAULT_ACTUATOR) == 0U;
         health.minimum_stack_margin_words = minimum_stack_margin();
         adcs_manager_set_health(&health);
-        adcs_manager_update();
+        adcs_manager_update(now_us);
         fault_management_pet();
         xTaskDelayUntil(&last_wake_time, pdMS_TO_TICKS(HOUSEKEEPING_TASK_PERIOD_MS));
     }

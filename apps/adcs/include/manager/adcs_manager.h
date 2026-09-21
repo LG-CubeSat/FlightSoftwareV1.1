@@ -56,8 +56,10 @@ void adcs_manager_init(void);
 /* Replaces default transition thresholds before the scheduler starts. */
 void adcs_manager_configure(const adcs_manager_config_t *config);
 
-/* Evaluates pending requests, sensor health, faults, and autonomous transitions. */
-void adcs_manager_update(void);
+/* Evaluates pending requests, sensor health, faults, and autonomous transitions.
+   now_us is a real wall/sim-clock timestamp, independent of sensor/attitude
+   timestamps, used to judge whether that data is actually fresh. */
+void adcs_manager_update(uint64_t now_us);
 
 /* Returns the active mode using the compatibility integer API. */
 int adcs_manager_get_mode(void);
