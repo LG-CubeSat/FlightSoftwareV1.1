@@ -42,11 +42,11 @@ Task:
 
 | **Command Task** | Receive commands from OBC/ground | Event | As Needed | N/A | **3** | `xQueueReceive(commandQueue)` | Sleeps until a command arrives. Updates ADCS manager. |
 
-| **Telemetry Task** | Send ADCS telemetry | Periodic | 5–10 Hz | 100–200 ms | **2** | `vTaskDelayUntil()` | Packages attitude, sensor data, mode, temperatures, etc. |
+| **Telemetry Task** | Send ADCS telemetry | Periodic | 5–10 Hz | 100–200 ms | **2** | `vTaskDelayUntil()` | Packages attitude, sensor data, mode, and health. |
 
 | **Camera Task** | Capture Earth images | Periodic/Event | 0.5–5 Hz | 200–2000 ms | **2** | `vTaskDelayUntil()` or event | Only active during imaging modes. Usually disabled otherwise. |
 
-| **Housekeeping Task** | Monitor software health | Periodic | 1 Hz | 1000 ms | **1** | `vTaskDelayUntil()` | Checks stack usage, CPU load, temperatures, watchdog, memory. |
+| **Housekeeping Task** | Monitor software health | Periodic | 1 Hz | 1000 ms | **1** | `vTaskDelayUntil()` | Checks stack usage, CPU load, watchdog, and memory. |
 
 | **Logging Task** *(Optional)* | Save logs to flash/SD | Queue | Event | N/A | **1** | `xQueueReceive(logQueue)` | Writes logs asynchronously so control isn't delayed. |
 

@@ -337,7 +337,7 @@ typedef struct {
 typedef enum {
     ADCS_OK = 0,
     ADCS_ERROR_SETPOINT = -1,
-    ADCS_ERROR_WHEEL = -2
+    ADCS_ERROR_ACTUATOR = -2
 } adcs_status_t;
 
 void adcs_task_entry(void *pvParameters);
@@ -350,7 +350,7 @@ adcs_state_t adcs_get_state(void);
 | Function | Description |
 |---|---|
 | `adcs_task_entry` | FreeRTOS task entry point. Runs at 50Hz. Blocks on `xQueueReceive(adcs_command_queue)` for setpoints from IPC Router. |
-| `adcs_apply_setpoint` | Computes PID outputs for reaction wheels to reach the target quaternion. |
+| `adcs_apply_setpoint` | Computes PID output and magnetorquer commands to reach the target quaternion as far as the local magnetic field permits. |
 | `adcs_get_state` | Returns current attitude quaternion and angular velocity. |
 
 ### Queue & Handler Logic
