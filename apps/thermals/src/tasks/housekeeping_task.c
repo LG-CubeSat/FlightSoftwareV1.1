@@ -4,7 +4,7 @@ Maintains basic homeostasis
 Stack usage, CPU usage, Temp, Task heartbeat
 */
 
-#include "../../include/tasks/housekeeping_task.h"
+#include "tasks/housekeeping_task.h"
 
 
 #include "FreeRTOS.h"
