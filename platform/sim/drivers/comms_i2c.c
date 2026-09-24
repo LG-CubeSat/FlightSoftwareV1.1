@@ -7,7 +7,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <arpa/inet.h>
 
 #include <pthread.h>
 #include "frame.h"
