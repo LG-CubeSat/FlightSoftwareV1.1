@@ -10,8 +10,6 @@
 #define KP (0.4f)
 #define KI (0.2f)
 
-#define formula (1) //1 is placeholder, once we have heater pelase fill this in with degrees * formula = volts needed
-
 static float integral = 0.0f;
 static int initialized = 0; 
 
