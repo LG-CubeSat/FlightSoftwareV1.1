@@ -108,12 +108,11 @@ Camera and Comms are OBC-local peripherals (USB/UART), not I2C/CSP nodes.
 | OBC | 1 | — | — | done (SIM); real I2C HAL still stale, see README's Known Gaps |
 | ADCS | 2 | 10 | 20 | **done** (reference implementation) |
 | EPS | 3 | 11 | 21 | **reserved, not a real board** — kept only in case future battery-monitoring hardware is added to that PCB; no software targets this today |
-| THERMALS | 4 | 12 | 22 | reserved, not built — same scaffolding pattern as ADCS, not started |
+| THERMALS | 4 | 12 | 22 | scaffolded (SIM) — command handling, sensor collection, and on-demand telemetry are present; hardware drivers, closed-loop heater control, and FDIR remain |
 
 These addresses and ports match what's already defined in `shared/csp/csp_commands.h`
-(`OBC_ADDRESS`, `ADCS_ADDRESS`, `EPS_ADDRESS`, `THERMALS`). Port numbers for Thermals (12/20)
-follow the same `10 + (address - 2)` / `+10` pattern already used for ADCS/EPS and aren't yet
-wired into any code.
+(`OBC_ADDRESS`, `ADCS_ADDRESS`, `EPS_ADDRESS`, `THERMALS`). Port numbers for Thermals (12/22)
+follow the same `10 + (address - 2)` / `+10` pattern already used for ADCS/EPS.
 
 **Camera and Comms are not in this table.** `csp_commands.h` still defines unused `CAMERA` (5)
 and `COMMS` (6) address constants left over from the earlier, incorrect board-per-peripheral
