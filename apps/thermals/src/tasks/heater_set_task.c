@@ -60,9 +60,7 @@ void heater_set_task(void *pvParameters) {
 
         if (fabs(target_temp - average_temp) > ERROR_TOLERANCE)
         {
-            // Heater control will be implemented here.
-            //Logic is going to be implemented either here or on the OBC, (tbd)
-            // Final heater control and safety logic will be implemented later.
+            // call PI loop and use the pass the return from the PI loop into ther heater interface
         }
 
         xTaskDelayUntil(
