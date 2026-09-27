@@ -10,6 +10,11 @@
 #define ASCENT_WAIT_SEC 5400 // ~90 min: typical HAB ascent to burst altitude at ~5 m/s; tune once real ascent rate/fill is known
 #define PHOTO_PATH "/tmp/photos" // placeholder
 #define COMPRESSED_PHOTO_PATH "/tmp/photos.rice"
+#define STEP_RETRY_LIMIT 3 // attempts per step before giving up on the cycle
+#define COOLDOWN_SEC 600 // 10 min between cycles, need to tune
+
+static int retry_count = 0; // reused across the steps for whichever one is active
+static struct timespec cooldown_start; // set when we enter MISSION_COOLDOWN
 
 /* Overridable so an integration test can run the full timeline in seconds
    instead of waiting out the real ~90 minute ascent. Production default is
@@ -28,10 +33,17 @@ typedef enum {
     MISSION_TAKING_PHOTO,
     MISSION_COMPRESSING,
     MISSION_DOWNLINKING,
-    MISSION_DONE
+    MISSION_COOLDOWN,
 } mission_state_t;
 
 mission_state_t current_state = MISSION_WAITING_FOR_ASCENT;
+
+static void enter_cooldown(void)
+{
+    clock_gettime(CLOCK_MONOTONIC, &cooldown_start);
+    current_state = MISSION_COOLDOWN;
+    retry_count = 0;
+}
 
 int init_scheduler_thread(void) {
     printf("[MISSION SCHEDULER] Attempting to create pthread.\n");
@@ -69,19 +81,42 @@ void *scheduler_thread(void *arg) {
                 }
                 break;
             case MISSION_TAKING_PHOTO:
-                payload_commander_take_photo(PHOTO_PATH);
-                current_state = MISSION_COMPRESSING;
+                if (payload_commander_take_photo(PHOTO_PATH) == 0) {
+                    current_state = MISSION_COMPRESSING;
+                    retry_count = 0; // reset for next step    
+                } else if (++retry_count >= STEP_RETRY_LIMIT) {
+                    fprintf(stderr, "[SCHEDULER] Photo capture failed %d times, abandoning this cycle\n", retry_count);
+                    enter_cooldown();
+                }
                 break;
             case MISSION_COMPRESSING:
-                payload_commander_compress_photo(PHOTO_PATH, COMPRESSED_PHOTO_PATH);
-                current_state = MISSION_DOWNLINKING;
+                if (payload_commander_compress_photo(PHOTO_PATH, COMPRESSED_PHOTO_PATH) == 0) {
+                    current_state = MISSION_DOWNLINKING;
+                    retry_count = 0; // reset for next step
+                } else if (++retry_count >= STEP_RETRY_LIMIT) {
+                    fprintf(stderr, "[SCHEDULER] Photo Compression failed %d times, abandoning this cycle\n", retry_count);
+                    enter_cooldown();
+                }
                 break;
             case MISSION_DOWNLINKING:
-                payload_commander_downlink_photo(COMPRESSED_PHOTO_PATH);
-                current_state = MISSION_DONE;
+                if (payload_commander_downlink_photo(COMPRESSED_PHOTO_PATH) == 0) {
+                    enter_cooldown(); // success also goes to cooldown. Next cycle starts after the pause
+                } else if (++retry_count >= STEP_RETRY_LIMIT) {
+                    fprintf(stderr, "[SCHEDULER] downlink failed %d times, abandoning this cylce\n", retry_count);
+                    enter_cooldown();
+                }
                 break;
-            case MISSION_DONE:
+            case MISSION_COOLDOWN: { // put brackers to keep scope of cooldown_elapsed local
+                // basically just waits and restarts back at mission taking photo.
+                double cooldown_elapsed = (now.tv_sec - cooldown_start.tv_sec) + (now.tv_nsec - cooldown_start.tv_nsec) / 1e9;
+                if (cooldown_elapsed >= COOLDOWN_SEC) {
+                    printf("[SCHEDULER] cooldown complete, starting next capture cycle\n");
+                    fflush(stdout);
+                    current_state = MISSION_TAKING_PHOTO;
+                    retry_count = 0;
+                }
                 break;
+            }
         }
 
         next.tv_sec += 1;
