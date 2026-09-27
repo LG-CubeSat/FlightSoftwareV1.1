@@ -36,3 +36,22 @@ target_link_libraries(thermals_sim PRIVATE
     platform
     csp_interface
 )
+
+add_executable(thermals_closed_loop_sim
+    tests/closed_loop_sim.c
+
+    src/data/thermal_sensor.c
+    src/heater/prop_int_controller.c
+    src/simulation/heater_sim.c
+    src/simulation/thermal_model.c
+)
+
+target_include_directories(thermals_closed_loop_sim PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/data
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/heater
+)
+
+target_link_libraries(thermals_closed_loop_sim PRIVATE
+    pthread
+)
