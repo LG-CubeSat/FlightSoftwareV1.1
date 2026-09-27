@@ -2,7 +2,6 @@
 #include "queue.h"
 #include "task.h"
 
-#include <math.h>
 #include <stdio.h>
 
 #include "thermal_data.h"
@@ -94,7 +93,7 @@ void command_task(void *pvParameters)
 
             if (message.type == THERMALS_COMMAND_SET_TARGET_TEMP)
             {
-                if (!isfinite(message.parameter.target_temp))
+                if (!thermals_set_target(message.parameter.target_temp))
                 {
                     printf("[THERMALS COMMAND] Invalid target temperature received\n");
                     fflush(stdout);
