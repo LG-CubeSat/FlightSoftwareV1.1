@@ -14,15 +14,14 @@
 #define HEATER_SET_TASK_STACK_SIZE (1024)
 #define HEATER_SET_TASK_PERIOD_MS (100)
 
-#define ERROR_TOLERANCE (1.5f) // Degrees Celsius
 
 /*
  * Temporary simulation gains.
  * TODO(SIM): tune using the completed thermal model.
  * TODO(HW): retune using measured thermal-bed behavior.
  */
-#define PI_PROPORTIONAL_GAIN (0.08f)
-#define PI_INTEGRAL_GAIN     (0.01f)
+#define PI_PROPORTIONAL_GAIN (0.2f)
+#define PI_INTEGRAL_GAIN     (0.004f)
 
 #define PI_STEP_SECONDS ((float)HEATER_SET_TASK_PERIOD_MS / 1000.0f)
 //basically delta-time
@@ -74,59 +73,48 @@ void heater_set_task_init(void)
 
 }
 
-void heater_set_task(void *pvParameters) {
-
+void heater_set_task(void *pvParameters)
+{
     (void) pvParameters;
 
     TickType_t lastWakeTime = xTaskGetTickCount();
-
     ThermalData_t thermal_data;
-
     float average_temp;
     float target_temp;
-
     float requested_power_fraction;
     int control_fault_reported = 0;
 
-    for (;;) {
-
+    for (;;)
+    {
         thermal_data = get_thermal_data();
 
-        if (thermal_data.valid_sensor_mask != 0u && thermal_data.target_temp_valid != 0u)
+        if (thermal_data.valid_sensor_mask != 0u &&
+            thermal_data.target_temp_valid != 0u)
         {
             average_temp = thermal_data.average_temp;
             target_temp = thermal_data.target_temp;
 
-            if ((target_temp - average_temp) > ERROR_TOLERANCE)
+            if (!prop_int_controller_update(
+                    target_temp,
+                    average_temp,
+                    PI_STEP_SECONDS,
+                    &requested_power_fraction) ||
+                !heater_set_power(requested_power_fraction))
             {
-                if (!prop_int_controller_update(
-                        target_temp,
-                        average_temp,
-                        PI_STEP_SECONDS,
-                        &requested_power_fraction) ||
-                    !heater_set_power(requested_power_fraction))
-                {
-                    prop_int_controller_reset();
-                    force_heater_off();
+                prop_int_controller_reset();
+                force_heater_off();
 
-                    if (control_fault_reported == 0)
-                    {
-                        printf(
-                            "[HEATER_SET_TASK] Heater control update failed.\n"
-                        );
-                        fflush(stdout);
-                        control_fault_reported = 1;
-                    }
-                }
-                else
+                if (control_fault_reported == 0)
                 {
-                    control_fault_reported = 0;
+                    printf(
+                        "[HEATER_SET_TASK] Heater control update failed.\n"
+                    );
+                    fflush(stdout);
+                    control_fault_reported = 1;
                 }
             }
             else
             {
-                prop_int_controller_reset();
-                force_heater_off();
                 control_fault_reported = 0;
             }
         }
@@ -137,9 +125,9 @@ void heater_set_task(void *pvParameters) {
             control_fault_reported = 0;
 
             /*
-            * TODO(HW): force the physical heater output off through
-            * the hardware heater driver.
-            */
+             * TODO(HW): force the physical heater output off through
+             * the hardware heater driver.
+             */
         }
 
         xTaskDelayUntil(
