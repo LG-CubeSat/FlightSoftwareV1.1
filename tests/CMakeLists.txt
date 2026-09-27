@@ -53,3 +53,16 @@ add_dependencies(compute_async_test obc_data obc_compute)
 
 add_test(NAME compute_async_test COMMAND compute_async_test)
 set_tests_properties(compute_async_test PROPERTIES TIMEOUT 30)
+
+add_executable(thermals_command_test test_thermals_command.c)
+target_link_libraries(thermals_command_test PRIVATE
+    csp_interface
+    pthread
+)
+target_compile_definitions(thermals_command_test PRIVATE
+    THERMALS_SIM_PATH="$<TARGET_FILE:thermals_sim>"
+)
+add_dependencies(thermals_command_test thermals_sim)
+
+add_test(NAME thermals_command_test COMMAND thermals_command_test)
+set_tests_properties(thermals_command_test PROPERTIES TIMEOUT 30)
