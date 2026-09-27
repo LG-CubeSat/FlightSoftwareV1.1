@@ -9,6 +9,7 @@
 #include "tasks/housekeeping_task.h"
 #include "tasks/telemetry_task.h"
 #include "communication/command_handler.h"
+#include "tasks/thermal_model_task.h"
 
 #include "csp_network.h"
 #include "csp_commands.h"
@@ -28,6 +29,9 @@ int main(void)
 
     sensor_read_task_init();
     heater_set_task_init();
+
+    thermal_model_task_init();
+
     housekeeping_task_init();
     telemetry_task_init();
 
