@@ -5,6 +5,7 @@
 #include "task.h"
 
 #include "thermal_data.h"
+#include <math.h>
 
 /* sensor_read_task, heater_set_task, telemetry_task, and command_task all
    read or write this struct from their own FreeRTOS tasks; the mutex keeps
@@ -16,9 +17,10 @@ static ThermalData_t thermal_data = {
     .valid_sensor_mask = 0u,
     .average_temp = 0.00f,
     .target_temp = 0.00f,
+    .target_temp_valid = 0u,
 };
 
-/* Caller must hold thermal_data_lock. */
+// Caller must hold thermal_data_lock.
 static void thermals_recalculate_average(void)
 {
     float sum = 0.0f;
@@ -61,11 +63,19 @@ void thermals_set_current(float temp, unsigned int sensor_id)
 }
 
 // Sets the target temperature.
-void thermals_set_target(float target)
+int thermals_set_target(float target)
 {
+
+    if (!isfinite(target) || target < THERMALS_MIN_TARGET_TEMP_C || target > THERMALS_MAX_TARGET_TEMP_C) {
+        return 0;
+        //invalid temperature
+    }
+
     pthread_mutex_lock(&thermal_data_lock);
     thermal_data.target_temp = target;
+    thermal_data.target_temp_valid = 1u; //validate the data
     pthread_mutex_unlock(&thermal_data_lock);
+    return 1;
 }
 
 // Returns a snapshot of the current thermal data.
