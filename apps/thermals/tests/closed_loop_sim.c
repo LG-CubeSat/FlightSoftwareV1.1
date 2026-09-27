@@ -10,9 +10,8 @@
 #define TEST_TIME_STEP_SECONDS     (0.1f)
 #define TEST_SIMULATION_STEPS      (8000)
 
-#define TEST_PI_KP (0.04f)
-#define TEST_PI_KI (0.01f)
-
+#define TEST_PI_KP (0.2f)
+#define TEST_PI_KI (0.006f)
 int main(void)
 {
     thermal_sensor_t sensor_1 = {
