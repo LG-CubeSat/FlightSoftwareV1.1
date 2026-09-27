@@ -6,11 +6,11 @@
 #include "simulation/thermal_model.h"
 #include "thermal_sensor.h"
 
-#define TEST_TARGET_TEMPERATURE_C  (10.0f)
+#define TEST_TARGET_TEMPERATURE_C  (0.0f)
 #define TEST_TIME_STEP_SECONDS     (0.1f)
-#define TEST_SIMULATION_STEPS      (10000)
+#define TEST_SIMULATION_STEPS      (100000)
 
-#define TEST_PI_KP (0.2f)
+#define TEST_PI_KP (0.251f)
 #define TEST_PI_KI (0.004f)
 int main(void)
 {

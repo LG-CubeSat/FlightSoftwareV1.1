@@ -2,6 +2,8 @@
 #include "queue.h"
 #include "task.h"
 
+#include "message.h"
+
 #include <stdio.h>
 
 #include "thermal_data.h"
@@ -99,8 +101,6 @@ void command_task(void *pvParameters)
                     fflush(stdout);
                     continue;
                 }
-
-                thermals_set_target(message.parameter.target_temp);
 
                 printf("[THERMALS COMMAND] Setting target temperature to %f C\n",message.parameter.target_temp);
                 fflush(stdout);

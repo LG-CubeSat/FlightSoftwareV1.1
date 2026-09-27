@@ -11,9 +11,9 @@
 #include <math.h>
 #include <pthread.h>
 
-#define SIM_INITIAL_TEMPERATURE_C       (40.0f)
-#define SIM_AMBIENT_TEMPERATURE_C       (5.0f)
-#define SIM_MAX_HEATER_POWER_W          (5.0f)
+#define SIM_INITIAL_TEMPERATURE_C       (5.0f)
+#define SIM_AMBIENT_TEMPERATURE_C       (-5.0f)
+#define SIM_MAX_HEATER_POWER_W          (15.0f)
 #define SIM_THERMAL_CAPACITY_J_PER_C    (100.0f)
 #define SIM_HEAT_LOSS_W_PER_C           (0.2f)
 #define SIM_MAX_STEP_SECONDS            (1.0f)
