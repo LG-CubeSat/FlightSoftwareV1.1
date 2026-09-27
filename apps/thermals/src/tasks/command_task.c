@@ -9,6 +9,8 @@
 #include "tasks/command_task.h"
 #include "tasks/telemetry_task.h"
 
+#include "communication/message.h"
+
 #define COMMAND_TASK_PRIORITY (3)
 #define COMMAND_TASK_STACK_SIZE (1024)
 #define COMMAND_QUEUE_LENGTH (8)
@@ -19,15 +21,15 @@ static StaticTask_t xCommandTaskBuffer;
 
 static StaticQueue_t xCommandQueueBuffer;
 static uint8_t xCommandQueueStorage[
-    COMMAND_QUEUE_LENGTH * sizeof(CommandMessage_t)
+    COMMAND_QUEUE_LENGTH * sizeof(thermals_command_t)
 ];
 
 static TaskHandle_t xCommandHandle = NULL;
 static QueueHandle_t xCommandQueue = NULL;
 
-int command_task_send(const CommandMessage_t *message)
+int command_task_send(const thermals_command_t *message)
 {
-    if (xCommandQueue == NULL)
+    if (xCommandQueue == NULL || message == NULL)
     {
         return 0;
     }
@@ -37,13 +39,14 @@ int command_task_send(const CommandMessage_t *message)
         message,
         NULL
     ) == pdPASS;
+
 }
 
 void command_task_init(void)
 {
     xCommandQueue = xQueueCreateStatic(
         COMMAND_QUEUE_LENGTH,
-        sizeof(CommandMessage_t),
+        sizeof(thermals_command_t),
         xCommandQueueStorage,
         &xCommandQueueBuffer
     );
@@ -79,7 +82,7 @@ void command_task(void *pvParameters)
 {
     (void) pvParameters;
 
-    CommandMessage_t message;
+    thermals_command_t message;
 
     for (;;)
     {
@@ -89,21 +92,21 @@ void command_task(void *pvParameters)
             portMAX_DELAY))
         {
 
-            if (message.command == THERMAL_CMD_SET_TARGET_TEMP)
+            if (message.type == THERMALS_COMMAND_SET_TARGET_TEMP)
             {
-                if (!isfinite(message.parameter))
+                if (!isfinite(message.parameter.target_temp))
                 {
                     printf("[THERMALS COMMAND] Invalid target temperature received\n");
                     fflush(stdout);
                     continue;
                 }
 
-                thermals_set_target(message.parameter);
+                thermals_set_target(message.parameter.target_temp);
 
-                printf("[THERMALS COMMAND] Setting target temperature to %f C\n", message.parameter);
+                printf("[THERMALS COMMAND] Setting target temperature to %f C\n",message.parameter.target_temp);
                 fflush(stdout);
             }
-            else if (message.command == THERMAL_CMD_REQUEST_TELEMETRY)
+            else if (message.type == THERMALS_COMMAND_REQUEST_TELEMETRY)
             {
                 if (xTelemetryHandle == NULL)
                 {
@@ -120,7 +123,7 @@ void command_task(void *pvParameters)
             {
                 printf(
                     "[THERMALS COMMAND] Unknown command received: %lu\n",
-                    (unsigned long)message.command
+                    (unsigned long)message.type
                 );
                 fflush(stdout);
             }

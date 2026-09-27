@@ -39,27 +39,51 @@ static void *command_handler_rx_loop(void *param)
                 packet->length >= sizeof(thermal_command_t))
             {
 
-                thermal_command_t cmd;
-                memcpy(&cmd, packet->data, sizeof(cmd));
+            thermal_command_t payload;
+            memcpy(&payload, packet->data, sizeof(payload));
 
-                CommandMessage_t msg = {
-                    .command = cmd.envelope.command_id,
-                    .parameter = cmd.target_temp
-                };
+            thermals_command_t message = {0};
 
-                printf("[THERMALS COMMAND HANDLER] Received command=%u parameter=%.2f\n",
-                       (unsigned int)msg.command,
-                       msg.parameter);
+            message.sequence = payload.envelope.seq;
+
+            switch (payload.envelope.command_id)
+            {
+                case THERMALS_WIRE_COMMAND_SET_TARGET_TEMP:
+                    message.type = THERMALS_COMMAND_SET_TARGET_TEMP;
+                    message.parameter.target_temp = payload.target_temp;
+                    break;
+
+                case THERMALS_WIRE_COMMAND_REQUEST_TELEMETRY:
+                    message.type = THERMALS_COMMAND_REQUEST_TELEMETRY;
+                    break;
+
+                default:
+                    printf(
+                        "[THERMALS COMMAND HANDLER] Unknown wire command: %u\n",
+                        (unsigned int)payload.envelope.command_id
+                    );
+                    fflush(stdout);
+                    break;
+            }
+
+            if (message.type != THERMALS_COMMAND_NONE)
+            {
+                printf(
+                    "[THERMALS COMMAND HANDLER] Decoded command=%u sequence=%lu\n",
+                    (unsigned int)message.type,
+                    (unsigned long)message.sequence
+                );
                 fflush(stdout);
 
-                if (!command_task_send(&msg))
+                if (!command_task_send(&message))
                 {
                     printf(
                         "[THERMALS COMMAND HANDLER] Failed to queue command %u\n",
-                        (unsigned int)msg.command
+                        (unsigned int)message.type
                     );
                     fflush(stdout);
                 }
+            }
             }
 
             csp_buffer_free(packet);
