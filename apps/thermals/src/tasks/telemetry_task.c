@@ -10,6 +10,7 @@
 
 #include "csp_commands.h"
 #include "thermal_data.h"
+#include "heater_interface.h"
 
 _Static_assert(
     MAX_SENSORS == THERMALS_TELEMETRY_SENSOR_COUNT,
@@ -52,9 +53,11 @@ static void telemetry_send_thermal_values(ThermalData_t thermalData)
     }
 
     thermals_telemetry_t telem = {
-        .valid_sensor_mask = thermalData.valid_sensor_mask,
-        .average_temp = thermalData.average_temp,
-        .target_temp = thermalData.target_temp
+    .valid_sensor_mask = thermalData.valid_sensor_mask,
+    .average_temp = thermalData.average_temp,
+    .target_temp = thermalData.target_temp,
+    .heater_power_fraction = get_applied_power(),
+    .target_temp_valid = thermalData.target_temp_valid
     };
 
     memcpy(
@@ -96,31 +99,70 @@ void telemetry_task(void *pvParameters)
     (void) pvParameters;
 
     for (;;)
-    {
-        uint32_t notified_value;
+{
+    uint32_t notified_value;
 
-        if (xTaskNotifyWait(0,UINT32_MAX,&notified_value,portMAX_DELAY) == pdTRUE)
+    if (xTaskNotifyWait(
+            0,
+            UINT32_MAX,
+            &notified_value,
+            portMAX_DELAY) == pdTRUE)
+    {
+        ThermalData_t thermalData = get_thermal_data();
+
+        for (uint8_t i = 0; i < MAX_SENSORS; i++)
         {
-            ThermalData_t thermalData = get_thermal_data();
-            for (uint8_t i = 0; i < MAX_SENSORS; i++)
+            uint32_t sensor_bit = (1u << i);
+
+            if ((thermalData.valid_sensor_mask & sensor_bit) != 0u)
             {
                 printf(
-                    "[TELEMETRY] Reporting Sensor %u temperature: %.2f C\n",
+                    "[TELEMETRY] Sensor %u temperature: %.2f C\n",
                     (unsigned int)(i + 1),
                     thermalData.temperatures[i]
                 );
             }
+            else
+            {
+                printf(
+                    "[TELEMETRY] Sensor %u temperature: INVALID\n",
+                    (unsigned int)(i + 1)
+                );
+            }
+        }
+
+        if (thermalData.valid_sensor_mask != 0u)
+        {
             printf(
-                "[TELEMETRY] Reporting average temperature: %.2f C\n",
+                "[TELEMETRY] Average temperature: %.2f C\n",
                 thermalData.average_temp
             );
+        }
+        else
+        {
+            printf("[TELEMETRY] Average temperature: INVALID\n");
+        }
 
+        if (thermalData.target_temp_valid != 0u)
+        {
             printf(
-                "[TELEMETRY] Reporting target temperature: %.2f C\n",
+                "[TELEMETRY] Target temperature: %.2f C\n",
                 thermalData.target_temp
             );
-            fflush(stdout);
-            telemetry_send_thermal_values(thermalData);
         }
+        else
+        {
+            printf("[TELEMETRY] Target temperature: NOT SET\n");
+        }
+
+        printf(
+            "[TELEMETRY] Applied heater power: %.1f%%\n",
+            get_applied_power() * 100.0f
+        );
+
+        fflush(stdout);
+
+        telemetry_send_thermal_values(thermalData);
     }
+}
 }

@@ -95,6 +95,8 @@ typedef struct {
     uint32_t valid_sensor_mask;
     float average_temp;
     float target_temp;
+    float heater_power_fraction;
+    uint8_t target_temp_valid;
 } thermals_telemetry_t;
 
 typedef struct {
