@@ -5,7 +5,7 @@
 
 #include "control/control_math.h"
 
-static void rotation_matrix_to_quaternion(const float matrix[3][3], versor quaternion) {
+static void rotation_matrix_to_quaternion(float matrix[3][3], versor quaternion) {
     float trace = matrix[0][0] + matrix[1][1] + matrix[2][2];
 
     if (trace > 0.0F) {

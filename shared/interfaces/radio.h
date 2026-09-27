@@ -6,4 +6,6 @@
 
 int radio_send(const uint8_t *data, size_t length);
 
+int radio_receive(uint8_t *buffer, uint16_t max_length);
+
 #endif
