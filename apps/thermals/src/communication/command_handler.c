@@ -36,7 +36,7 @@ static void *command_handler_rx_loop(void *param)
         while ((packet = csp_read(conn, 50)) != NULL)
         {
             if (csp_conn_dport(conn) == THERMALS_CMD_PORT &&
-                packet->length >= sizeof(thermal_command_t))
+                packet->length == sizeof(thermal_command_t))
             {
 
             thermal_command_t payload;
@@ -84,8 +84,16 @@ static void *command_handler_rx_loop(void *param)
                     fflush(stdout);
                 }
             }
-            }
-
+        }
+            else if (csp_conn_dport(conn) == THERMALS_CMD_PORT)
+                {
+                    printf(
+                        "[THERMALS COMMAND HANDLER] Invalid packet size: received=%u expected=%lu\n",
+                        (unsigned int)packet->length,
+                        (unsigned long)sizeof(thermal_command_t)
+                    );
+                    fflush(stdout);
+                }
             csp_buffer_free(packet);
         }
 
