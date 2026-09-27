@@ -34,12 +34,18 @@ target_include_directories(ssdv PUBLIC libs/ssdv)
 
 add_subdirectory(shared)
 add_subdirectory(sys)
-add_subdirectory(apps/adcs)
+
+# ADCS/EPS target an STM32 running FreeRTOS. On HW_MODE=ON they'd currently
+# link the Linux-only real I2C driver and the POSIX FreeRTOS port -- neither
+# of which is correct for real silicon -- so they're SIM-only until the ARM
+if (NOT HW_MODE)
+    add_subdirectory(apps/adcs)
+    add_subdirectory(apps/eps)
+endif()
 
 # so supervisor can launch all the programs
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 add_subdirectory(apps/obc)
-add_subdirectory(apps/eps)
 
 # toggle for the platform code
 add_subdirectory(platform)
