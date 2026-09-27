@@ -3,12 +3,17 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "thermal_data.h"
+
+#include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 
 #define HEATER_SET_TASK_PRIORITY (2)
 #define HEATER_SET_TASK_STACK_SIZE (1024)
 #define HEATER_SET_TASK_PERIOD_MS (100)
 
+#define ERROR_TOLERANCE (1.5f) // Degrees Celsius
 
 static StackType_t xHeaterSetTaskStack[HEATER_SET_TASK_STACK_SIZE];
 static StaticTask_t xHeaterSetTaskBuffer;
@@ -41,10 +46,22 @@ void heater_set_task(void *pvParameters) {
 
     TickType_t lastWakeTime = xTaskGetTickCount();
 
+    ThermalData_t thermal_data;
+
+    float average_temp;
+    float target_temp;
 
     for (;;) {
 
-        // heater control remains disabled until the controller and heater interface are implemented.
+        thermal_data = get_thermal_data();
+
+        average_temp = thermal_data.average_temp;
+        target_temp = thermal_data.target_temp;
+
+        if (fabs(target_temp - average_temp) > ERROR_TOLERANCE)
+        {
+            // call PI loop and use the pass the return from the PI loop into ther heater interface
+        }
 
         xTaskDelayUntil(
             &lastWakeTime,

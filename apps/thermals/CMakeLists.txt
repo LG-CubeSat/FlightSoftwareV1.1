@@ -3,6 +3,7 @@ add_executable(thermals_sim
     src/freertos_hooks.c
     src/thermal_data.c
     src/thermal_sensor.c
+    src/prop_int_controller.c
     src/communication/command_handler.c
     src/tasks/command_task.c
     src/tasks/housekeeping_task.c
