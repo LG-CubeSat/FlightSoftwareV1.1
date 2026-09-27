@@ -6,7 +6,6 @@
 #include "thermal_data.h"
 #include "heater_interface.h"
 
-#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 
