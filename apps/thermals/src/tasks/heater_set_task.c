@@ -45,6 +45,7 @@ void heater_set_task_init(void)
     );
 
     if (xHeaterSetTask == NULL) {
+        force_heater_off();
         printf("[HEATER_SET_TASK] Failed to initialize.\n");
     } else {
         printf("[HEATER_SET_TASK] Initialized successfully.\n");
@@ -67,25 +68,32 @@ void heater_set_task(void *pvParameters) {
 
         thermal_data = get_thermal_data();
 
-        if (thermal_data.valid_sensor_mask != 0u && thermal_data.target_temp_valid != 0u) {
-
-        average_temp = thermal_data.average_temp;
-        target_temp = thermal_data.target_temp;
-
-        } else {
-
-            printf("[THERMALS] thermal data rejected, heater will not adjust.");
-            /*
-            * TODO(SIM): command the simulated heater interface to 0.0 power.
-            * TODO(HW): force the physical heater output OFF.
-            */
-
-        }
-
-
-        if (fabs(target_temp - average_temp) > ERROR_TOLERANCE)
+        if (thermal_data.valid_sensor_mask != 0u && thermal_data.target_temp_valid != 0u) 
+        // is at least one sensor active and is the target temp valid?
         {
-            // call PI loop and use the pass the return from the PI loop into ther heater interface
+            average_temp = thermal_data.average_temp;
+            target_temp = thermal_data.target_temp;
+
+            if ((target_temp - average_temp) > ERROR_TOLERANCE)
+            {
+                force_heater_off();
+
+                /*
+                * TODO(SIM): replace this forced-off placeholder with
+                * PI-controller output.
+                */
+            }
+            else {
+                force_heater_off();
+            }
+        }
+        else
+        {
+            force_heater_off();
+            /*
+            * TODO(HW): the hardware heater driver must force the
+            * physical heater output off here.
+            */
         }
 
         xTaskDelayUntil(
