@@ -8,6 +8,7 @@ add_executable(thermals_sim
     src/heater/prop_int_controller.c
 
     src/simulation/heater_sim.c
+    src/simulation/thermal_model.c
 
     src/communication/command_handler.c
 
