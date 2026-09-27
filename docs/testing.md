@@ -140,3 +140,29 @@ holding `/tmp/comms_i2c.sock` (see below), then re-run.
   or whenever `obc_sim`/`adcs_sim` seem to not be talking to each other and
   you want to know in 5 seconds whether the bus itself is the problem before
   digging into FreeRTOS task logic.
+
+---
+
+## ccsds_test — compression and radio-packet utilities
+
+`tests/test_ccsds.c` is a host-side test with no radio or running OBC process.
+It checks the standalone `shared/ccsds` library:
+
+- the standard CRC-32 check value;
+- an exact, known CCSDS Space Packet primary header;
+- CCSDS 121 encode/decode of signed 12-bit samples;
+- rejection of nonzero unused sample bits;
+- mission-profile header parsing and corrupted-payload rejection;
+- byte-for-byte preservation of one 256-byte SSDV packet; and
+- reassembly when a UART supplies one byte at a time.
+
+Run it with:
+
+```bash
+cmake --build build --target ccsds_test
+ctest --test-dir build -R ccsds_test --output-on-failure
+```
+
+This test should be extended whenever a profile field, APID, supported CCSDS
+121 option, or receive-parser rule changes. A flight/ground profile change is
+not complete until the same new wire bytes are covered here.

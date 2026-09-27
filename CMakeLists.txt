@@ -46,6 +46,12 @@ add_subdirectory(platform)
 
 option(BUILD_TESTS "Build simple sanity/integration tests" ON)
 
+option(BUILD_TOOLS "Build host-side developer tools" ON)
+
+if (BUILD_TOOLS AND NOT HW_MODE)
+    add_subdirectory(tools)
+endif()
+
 if (BUILD_TESTS AND NOT HW_MODE)
     enable_testing()
     add_subdirectory(tests)

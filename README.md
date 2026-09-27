@@ -11,7 +11,7 @@ this file is the practical "clone it, build it, run it" reference for the softwa
 | Piece | State |
 |---|---|
 | ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. Also self-monitors now: an independent watchdog thread and an out-of-bounds check can trigger a real local reset, and repeated resets can lead to an OBC-directed shutdown — see "OBC internal architecture" below. |
-| OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. CCSDS 121.0 (ground-station packetization/link) is a separate, in-progress effort tracked outside this repo's `compute` process. |
+| OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. The standalone `shared/ccsds` library now provides CCSDS 121.0-B-3 telemetry compression and the bidirectional LG-CubeSat Space Packet profile; application/radio integration waits on the real radio contract. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. **OBC's real backend now exists** (`platform/real/drivers/comms_i2c.c` — Linux `i2c-dev`/`ioctl`, round-robin polls known boards since real I2C can't do broadcast-and-listen like the SIM transport does), verified to compile against real Linux/i2c-dev headers, but only exercised via Docker so far — no physical bus yet. MCU-side (ADCS/Thermals real I2C slave) is still a stub, and the OBC/MCU split into separate real backends hasn't happened yet (see Known gaps). |
 | Thermals | Not yet scaffolded as a CSP board — same pattern as ADCS, not started. |
 | EPS | Not a CSP board at all — real hardware is a passive buck converter with no MCU. Address reserved in code in case future battery-monitoring hardware needs it. See `docs/satellite_architecture.md`. |
@@ -157,11 +157,13 @@ responsive.
   dispatcher/worker split expects, so nothing else in `compute` needs to know SSDV's API is
   a state machine underneath. Verified byte-for-byte identical against the reference `ssdv`
   CLI tool's own output for the same input, and round-tripped through the reference
-  decoder, before being wired into the real dispatcher/worker pipeline. **CCSDS 121.0**
-  (`libs/CCSDS_121.0`, also a submodule) is reserved for ground-station packetization and
-  uplink/downlink framing — a separate, in-progress piece of work, not part of `compute`
-  today (the vendored build only ships precompiled x86-64 Linux binaries, no source, so
-  there's nothing for this repo to build against yet regardless).
+  decoder, before being wired into the real dispatcher/worker pipeline. CCSDS 121 is a
+  separate integer-sample compressor, not an SSDV replacement or a radio framing standard.
+  The `shared/ccsds` library wraps pinned, source-built `libs/libaec` for CCSDS 121.0-B-3
+  and combines it with one bidirectional CCSDS Space Packet mission profile. SSDV packets
+  bypass Rice compression and are preserved byte for byte. See
+  `docs/ccsds_radio_stack.md`; this library is not wired into `compute` or the unfinished
+  real radio driver yet.
 
 Every long-lived OBC role sends a periodic no-payload heartbeat ping to `supervisor`
 (`IPC_send(ROLE_SUPERVISOR, NULL, 0)`, see any role's `heartbeat.c`) — without it,
@@ -185,6 +187,7 @@ apps/
     └── ipc/                # Internal IPC shared by all 7
 
 shared/
+├── ccsds/                  # CCSDS 121 codec wrapper + Space Packet/Profile v1 utilities
 ├── interfaces/
 │   ├── comms_bus.h         # The medium-agnostic bus contract
 │   ├── board_reset.h       # Board self-reset, sim (re-exec) vs real (Cortex-M AIRCR) impl in platform/
@@ -203,9 +206,7 @@ docs/                       # satellite_architecture.md, api_contracts.md, direc
 libs/
 ├── libcsp/                 # CSP protocol implementation (git submodule)
 ├── ssdv/                   # SSDV image-packetization library (git submodule), linked into compute
-└── CCSDS_121.0/            # Reference CCSDS 121.0 tools (git submodule) -- precompiled x86-64
-                            # Linux binaries only, no source; reserved for a separate,
-                            # in-progress ground-station packetization effort, not built here
+└── libaec/                 # Pinned CCSDS 121.0-B-3 source codec (git submodule)
 rtos/                       # FreeRTOS kernel + POSIX/hardware ports
 ```
 
@@ -213,7 +214,7 @@ Full convention (naming, where new subsystems go, CMake patterns): `docs/directo
 
 ## Getting started
 
-### Clone (this repo uses git submodules for libcsp, ssdv, and CCSDS_121.0)
+### Clone (this repo uses git submodules for libcsp, ssdv, and libaec)
 
 ```bash
 git clone --recurse-submodules https://github.com/LG-CubeSat/FlightSoftwareV1.git
@@ -280,7 +281,7 @@ ctest --test-dir build --output-on-failure
 cached `OFF` sticks around across plain re-runs of `cmake -S . -B build`), pass
 `-DBUILD_TESTS=ON` explicitly once to pick it back up.
 
-All six tests build and pass. `position_command_test` and `command_ack_test` *are* the
+All seven tests build and pass. `position_command_test` and `command_ack_test` *are* the
 OBC's CSP node themselves (the same `csp_network_init(OBC_ADDRESS, 1)` call any real OBC
 role makes), talking to a real spawned `adcs_sim` — this tests ADCS's actual command/task
 pipeline over the real wire contract without depending on which internal OBC processes
@@ -296,6 +297,7 @@ launch would, alongside a real `adcs_sim`:
 | `command_ack_test` | ACK/NACK protocol edge cases `position_command_test` doesn't cover: an unrecognized command_id gets NACKed, an undersized `CMD_MOVE_TO_POSITION` (missing its target) gets NACKed, and a valid command right after both still gets ACKed — proving bad input doesn't wedge the handler. |
 | `full_constellation_test` | The only test that checks the processes actually work *together*, not just individually: every real role comes up, `autonomy`'s sun-pointing and `time`'s sync both reach ADCS, `mission`'s full scripted timeline runs end to end (ascent → photo → real SSDV compression → `data` streams it back → downlink), and `supervisor` never falsely restarts a healthy process. `MISSION_ASCENT_WAIT_SEC` and `TIME_SYNC_INTERVAL_SEC` env vars let it run the real ~90 min / 5 min timers in seconds — production defaults are untouched unless the var is set. |
 | `compute_async_test` | The two behaviors that make `compute` different from every other request/reply role: a second concurrent compress request gets `COMPUTE_STATUS_BUSY` (not queued) while one is running, and an in-flight job can be cancelled mid-run. Forks two real requester processes with different roles against real `obc_data`/`obc_compute` binaries, compressing a real (tiny, embedded) JPEG — `COMPUTE_CHUNK_DELAY_MS` widens the job's runtime so both checks land reliably. |
+| `ccsds_test` | CCSDS 121 compression/decompression, the CCSDS Space Packet primary header, profile CRC rejection, canonical narrow signed samples, SSDV byte preservation, and packet recovery from one-byte UART chunks. |
 
 Building `full_constellation_test` caught a real bug: `autonomy_thread` marked an action
 as "done" (updating `last_fired`) even when its `IPC_send` failed — so a transient startup
@@ -376,11 +378,11 @@ run them at the same time as each other or as a manually-launched binary using t
   real (tiny, embedded) JPEG rather than placeholder text — a real camera will produce real
   JPEG bytes too, so the mock now matches that contract instead of standing in for "some
   bytes."
-- **CCSDS 121.0 ground-station packetization/link work hasn't started in this repo.**
-  `libs/CCSDS_121.0` is vendored as a submodule (see Repository layout) but is reserved for
-  a separate, in-progress effort — it isn't wired into `compute` or any other OBC process
-  yet, and the vendored build is precompiled x86-64 Linux binaries with no source, so
-  nothing in this repo builds against it today regardless of host architecture.
+- **The CCSDS library is implemented but not connected to the radio path yet.**
+  `shared/ccsds` provides CCSDS 121.0-B-3 encode/decode, Space Packet build/parse, the
+  versioned LG-CubeSat profile, CRC checking, a UART chunk parser, tests, and a host tool.
+  Integration waits on the exact E22 mode, maximum payload, and receive contract; neither
+  the mock nor future real radio driver was changed by the CCSDS work.
 - **`compute`'s single job slot rejects a second concurrent request** (`COMPUTE_STATUS_BUSY`)
   rather than queuing it — right-sized for one photo per balloon flight; a queue/pool is
   straightforward to add later if `compute` ever needs to run more than one job at a time.
