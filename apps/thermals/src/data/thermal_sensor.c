@@ -1,9 +1,20 @@
-// Initializes thermal sensors and provides the sensor-reading interface.
+/*
+ * Simulation temperature-sensor implementation.
+ *
+ * TODO(HW): replace this source file with an STM32/I2C sensor driver
+ * in the hardware target.
+ */
 
 #include "thermal_sensor.h"
 
 #include <stddef.h>
 #include <stdint.h>
+#include <math.h>
+
+#include "simulation/thermal_model.h"
+
+#define SENSOR_1_SIM_OFFSET_C (-0.10f)
+#define SENSOR_2_SIM_OFFSET_C (0.10f)
 
 static uint8_t sensor_count = 0;
 
@@ -42,25 +53,42 @@ int thermal_sensor_read(
     const thermal_sensor_t *sensor,
     float *temperature_out)
 {
+    float model_temperature_c;
+
     if (sensor == NULL || temperature_out == NULL)
     {
         return -1;
     }
 
-    if (sensor->sensor_id == 1)
+    model_temperature_c = thermal_model_get_temperature();
+
+    if (!isfinite(model_temperature_c))
     {
-        // call read task for sensor 1
-        *temperature_out = 0.00f; // 0 is placeholder data from sensor 1
-        return 1; // successful read
+        return -2;
     }
-    else if (sensor->sensor_id == 2)
+
+    if (sensor->sensor_id == 1u)
     {
-        // call read task for sensor 2
-        *temperature_out = 0.00f; // 0 is placeholder data from sensor 2
-        return 1; // successful read
+        *temperature_out =
+            model_temperature_c + SENSOR_1_SIM_OFFSET_C;
+
+        return 1;
     }
-    else
+
+    if (sensor->sensor_id == 2u)
     {
-        return -1; // error occurred
+        *temperature_out =
+            model_temperature_c + SENSOR_2_SIM_OFFSET_C;
+
+        return 1;
     }
+
+    return -3;
 }
+
+/*
+-1 = invalid pointer
+-2 = thermal model produced an invalid temperature
+-3 = unknown sensor ID
+ 1 = successful sensor reading
+*/
