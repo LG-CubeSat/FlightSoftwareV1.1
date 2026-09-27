@@ -64,13 +64,7 @@ int prop_int_controller_update(
 
     error_c =
         target_temperature_c - current_temperature_c;
-
-    if (error_c <= 0.0f)
-    {
-        controller_integral_error = 0.0f;
-        return 1;
-    }
-
+  
     proportional_output =
         controller_proportional_gain * error_c;
 
@@ -81,6 +75,13 @@ int prop_int_controller_update(
     candidate_output =
         proportional_output +
         (controller_integral_gain * candidate_integral_error);
+
+
+    if (error_c <= 0.0f)
+    {
+        controller_integral_error = 0.0f;
+        return 1;
+    }
 
     if (candidate_output >= 1.0f)
     {
