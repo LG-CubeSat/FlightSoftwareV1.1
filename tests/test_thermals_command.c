@@ -81,12 +81,7 @@ int main(void)
     memcpy(packet->data, &command, sizeof(command));
     packet->length = sizeof(command);
 
-    if (!csp_send(connection, packet))
-    {
-        printf("[THERMALS COMMAND TEST] Command send failed.\n");
-        csp_close(connection);
-        goto cleanup;
-    }
+    csp_send(connection, packet);
 
     reply = csp_read(connection, 1000);
 
