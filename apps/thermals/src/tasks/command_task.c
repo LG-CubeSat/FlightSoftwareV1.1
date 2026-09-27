@@ -2,8 +2,6 @@
 #include "queue.h"
 #include "task.h"
 
-#include "message.h"
-
 #include <stdio.h>
 
 #include "thermal_data.h"
@@ -22,8 +20,7 @@ static StaticTask_t xCommandTaskBuffer;
 
 static StaticQueue_t xCommandQueueBuffer;
 static uint8_t xCommandQueueStorage[
-    COMMAND_QUEUE_LENGTH * sizeof(thermals_command_t)
-];
+    COMMAND_QUEUE_LENGTH * sizeof(thermals_command_t)];
 
 static TaskHandle_t xCommandHandle = NULL;
 static QueueHandle_t xCommandQueue = NULL;

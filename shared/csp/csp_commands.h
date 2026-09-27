@@ -46,6 +46,11 @@ typedef enum {
     CMD_POINT_TO_SUN = 5
 } command_id_t;
 
+typedef enum {
+    THERMALS_WIRE_COMMAND_SET_TARGET_TEMP = 80,
+    THERMALS_WIRE_COMMAND_REQUEST_TELEMETRY = 81
+} thermals_wire_command_id_t;
+
 // ------
 
 typedef enum {

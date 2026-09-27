@@ -9,6 +9,8 @@
 #include "csp_commands.h"
 #include "tasks/command_task.h"
 
+#include "thermal_data.h"
+
 static void *command_handler_rx_loop(void *param)
 {
     (void)param;

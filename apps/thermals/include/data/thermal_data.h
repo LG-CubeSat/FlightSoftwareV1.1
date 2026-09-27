@@ -36,6 +36,8 @@ int thermals_set_target(float target);
 * 0 = rejected target
 */
 
+int thermals_target_is_valid(float target);
+
 void thermals_invalidate_sensor(unsigned int sensor_id);
 
 ThermalData_t get_thermal_data(void);

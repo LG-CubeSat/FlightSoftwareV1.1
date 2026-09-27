@@ -66,16 +66,23 @@ void thermals_set_current(float temp, unsigned int sensor_id)
 int thermals_set_target(float target)
 {
 
-    if (!isfinite(target) || target < THERMALS_MIN_TARGET_TEMP_C || target > THERMALS_MAX_TARGET_TEMP_C) {
-        return 0;
-        //invalid temperature
-    }
+    if (!thermals_target_is_valid(target))
+        {
+            return 0; //invalid temp
+        }
 
     pthread_mutex_lock(&thermal_data_lock);
     thermal_data.target_temp = target;
     thermal_data.target_temp_valid = 1u; //validate the data
     pthread_mutex_unlock(&thermal_data_lock);
     return 1;
+}
+
+int thermals_target_is_valid(float target)
+{
+    return isfinite(target) &&
+           target >= THERMALS_MIN_TARGET_TEMP_C &&
+           target <= THERMALS_MAX_TARGET_TEMP_C;
 }
 
 // Returns a snapshot of the current thermal data.
