@@ -33,4 +33,4 @@ target_link_libraries(thermals_sim PRIVATE
     pthread
     platform
     csp_interface
-)
+)w

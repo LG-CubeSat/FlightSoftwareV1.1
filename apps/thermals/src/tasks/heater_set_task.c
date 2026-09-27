@@ -4,6 +4,7 @@
 #include "task.h"
 
 #include "thermal_data.h"
+#include "heater_interface.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -22,6 +23,17 @@ TaskHandle_t xHeaterSetTask = NULL;
 
 void heater_set_task_init(void)
 {
+    if (!heater_init()) {
+
+    force_heater_off();
+    printf("[THERMALS] Heater driver initialization failed!\n");
+    fflush(stdout);
+    return;
+
+    }
+    
+    force_heater_off();
+
     xHeaterSetTask = xTaskCreateStatic(
         heater_set_task,
         "heater_set",
