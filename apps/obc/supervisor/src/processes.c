@@ -21,6 +21,7 @@
 #define NUM_PROCESSES (sizeof(processes) / sizeof(processes[0]))
 #define HEARTBEAT_TIMEOUT_SEC 5
 #define SHUTDOWN_GRACE_SEC 3
+#define MAX_CRASH_RESTARTS 5
 
 static struct timespec last_heartbeat[ROLE_TIME + 1]; // indexed by OBC_Roles_t
 static pthread_mutex_t hb_lock = PTHREAD_MUTEX_INITIALIZER; // guards the heartbeat timestamp updates
@@ -49,7 +50,7 @@ static int obc_resolve_sibling(const char *sibling_name, char *out, size_t out_s
 #if defined(__APPLE__)
     uint32_t size = sizeof(self_path);
     if (_NSGetExecutablePath(self_path, &size) != 0) {
-        fprintf(stderr, "supervisor: executable path too long for buffer\n");
+        fprintf(stderr, "[SUPERVISOR] Executable path too long for buffer\n");
         return -1;
     }
 #else
@@ -73,7 +74,7 @@ int supervisor_resolve_paths(void)
     for (size_t i = 0; i < NUM_PROCESSES; i++) {
         if (obc_resolve_sibling(processes[i].exe_name, processes[i].resolved_path,
                                  sizeof(processes[i].resolved_path)) != 0) {
-            fprintf(stderr, "supervisor: failed to resolve path for %s\n", processes[i].name);
+            fprintf(stderr, "[OBC SUPERVISOR] Failed to resolve path for %s\n", processes[i].name);
             return -1;
         }
     }
@@ -93,7 +94,7 @@ int start_all_processes(void)
             NULL, NULL, argv, environ);
 
         if (rc != 0) {
-            fprintf(stderr, "supervisor: failed to spawn %s: %s\n", processes[i].name, strerror(rc));
+            fprintf(stderr, "[OBC SUPERVISOR] failed to spawn %s: %s\n", processes[i].name, strerror(rc));
             return -1;
         }
         supervisor_mark_alive(processes[i].role); // grace period before it's judged frozen
@@ -103,6 +104,7 @@ int start_all_processes(void)
 
 void supervisor_reap(obc_process_t *processes_to_reap, size_t n)
 {
+    // NOTE: supervisor reap checks if processes are alive or even running.
     for (size_t i = 0; i < n; i++) {
         pthread_mutex_lock(&proc_lock);
         pid_t pid = processes_to_reap[i].pid;
@@ -115,15 +117,28 @@ void supervisor_reap(obc_process_t *processes_to_reap, size_t n)
         if (rc == 0) continue; // process is alive
         if (rc < 0) { perror("waitpid"); continue; } // unusual (dead process are > 0)
 
-        if (WIFEXITED(status)) {
-            fprintf(stderr, "supervisor: %s exited, code %d\n", processes_to_reap[i].name, WEXITSTATUS(status));
-        } else if (WIFSIGNALED(status)) {
-            fprintf(stderr, "supervisor: %s killed by signal %d\n", processes_to_reap[i].name, WTERMSIG(status));
-        }
+        // in the case those previous if pass the process is Dead.
 
+        if (WIFEXITED(status)) {
+            fprintf(stderr, "[OBC SUPERVISOR] %s exited, code %d\n", processes_to_reap[i].name, WEXITSTATUS(status));
+        } else if (WIFSIGNALED(status)) {
+            fprintf(stderr, "[OBC SUPERVISOR] %s killed by signal %d\n", processes_to_reap[i].name, WTERMSIG(status));
+        }
+        
         pthread_mutex_lock(&proc_lock);
         processes_to_reap[i].pid = -1; // dead. ready to restart with backoff
         pthread_mutex_unlock(&proc_lock);
+
+        if (shutting_down) continue;
+        processes_to_reap[i].restart_count++;
+        // TODO: Will eventually want to reset restart count after prolonger healthy running.
+        if (processes_to_reap[i].restart_count > MAX_CRASH_RESTARTS) {
+            fprintf(stderr, "[OBC SUPERVISOR] %s crashed %d times, giving up\n", processes_to_reap[i].name, processes_to_reap[i].restart_count);
+            continue;
+        }
+
+        fprintf(stderr, "[OBC SUPERVISOR] Restarting %s after crash (attempt %d/%d)\n", processes_to_reap[i].name, processes_to_reap[i].restart_count, MAX_CRASH_RESTARTS);
+        supervisor_restart_process(&processes_to_reap[i]);
     }
 }
 
@@ -137,6 +152,7 @@ void supervisor_heartbeat(void)
    Already-dead slots are supervisor_reap's job, not this one's. */
 static void supervisor_check_frozen(void)
 {
+    // NOTE: supervisor check frozen sees if a process is hanging, or is frozen.
     if (shutting_down) {
         return;
     }
@@ -149,7 +165,7 @@ static void supervisor_check_frozen(void)
         if (pid <= 0) continue;
 
         if (supervisor_is_frozen(processes[i].role)) {
-            fprintf(stderr, "supervisor: %s appears frozen, restarting\n", processes[i].name);
+            fprintf(stderr, "[OBC SUPERVISOR] %s appears frozen, restarting\n", processes[i].name);
             supervisor_restart_process(&processes[i]);
         }
     }
@@ -212,7 +228,7 @@ int supervisor_shutdown_process(obc_process_t *proc)
         nanosleep(&poll_interval, NULL);
     }
 
-    fprintf(stderr, "supervisor: %s ignored SIGTERM, sending SIGKILL\n", proc->name);
+    fprintf(stderr, "[OBC SUPERVISOR] %s ignored SIGTERM, sending SIGKILL\n", proc->name);
     kill(pid, SIGKILL);
 
     int status;
@@ -234,7 +250,7 @@ int supervisor_restart_process(obc_process_t *proc)
     pid_t pid;
     int rc = posix_spawn(&pid, proc->resolved_path, NULL, NULL, argv, environ);
     if (rc != 0) {
-        fprintf(stderr, "supervisor: failed to restart %s: %s\n", proc->name, strerror(rc));
+        fprintf(stderr, "[OBC SUPERVISOR] Failed to restart %s: %s\n", proc->name, strerror(rc));
         return -1;
     }
 
@@ -244,7 +260,7 @@ int supervisor_restart_process(obc_process_t *proc)
 
     supervisor_mark_alive(proc->role); // grace period before it's judged frozen again
 
-    fprintf(stderr, "supervisor: restarted %s (pid %d)\n", proc->name, pid);
+    fprintf(stderr, "[OBC SUPERVISOR] Restarted %s (pid %d)\n", proc->name, pid);
     return 0;
 }
 

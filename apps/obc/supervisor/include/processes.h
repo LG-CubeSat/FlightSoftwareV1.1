@@ -15,6 +15,7 @@ typedef struct {
     char resolved_path[PATH_MAX];     // filled by supervisor_resolve_paths()
     pid_t pid;
     OBC_Roles_t role;
+    int restart_count; // consecutive crash-restarts since it last ran cleanly
 } obc_process_t;
 
 int supervisor_resolve_paths(void);

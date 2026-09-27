@@ -57,9 +57,7 @@ void *heartbeat_thread(void *arg)
     
     for(;;) {
 
-        supervisor_heartbeat();
-
-        // TODO: actually do something with the processes that fail heartbeat and frozen check
+        supervisor_heartbeat(); // within function the dead/hung processes are restarted
 
         next.tv_sec += PERIODIC_HEARTBEAT_SEC;
         obc_sleep_until(&next);
