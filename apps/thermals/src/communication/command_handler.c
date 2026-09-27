@@ -11,95 +11,150 @@
 
 #include "thermal_data.h"
 
+static command_ack_status_t enqueue_command(
+    const thermals_command_t *command)
+{
+    return command_task_send(command) != 0 ? ACK : NACK;
+}
+
+static command_ack_status_t decode_command(
+    const csp_packet_t *packet,
+    const command_envelope_t *envelope)
+{
+    thermals_command_t command;
+
+    memset(&command, 0, sizeof(command));
+    command.sequence = envelope->seq;
+
+    switch (envelope->command_id)
+    {
+        case THERMALS_WIRE_COMMAND_SET_TARGET_TEMP:
+        {
+            thermal_command_t payload;
+
+            if (packet->length < sizeof(payload))
+            {
+                return NACK;
+            }
+
+            memcpy(&payload, packet->data, sizeof(payload));
+
+            if (!thermals_target_is_valid(payload.target_temp))
+            {
+                return NACK;
+            }
+
+            command.type = THERMALS_COMMAND_SET_TARGET_TEMP;
+            command.parameter.target_temp = payload.target_temp;
+
+            return enqueue_command(&command);
+        }
+
+        case THERMALS_WIRE_COMMAND_REQUEST_TELEMETRY:
+            command.type = THERMALS_COMMAND_REQUEST_TELEMETRY;
+            return enqueue_command(&command);
+
+        default:
+            return NACK;
+    }
+}
+
+static void send_ack(
+    csp_conn_t *connection,
+    const command_ack_t *acknowledgement)
+{
+    csp_packet_t *reply = csp_buffer_get(0);
+
+    if (reply == NULL)
+    {
+        printf(
+            "[THERMALS COMMAND HANDLER] Failed to allocate ACK packet.\n"
+        );
+        fflush(stdout);
+        return;
+    }
+
+    memcpy(
+        reply->data,
+        acknowledgement,
+        sizeof(*acknowledgement)
+    );
+
+    reply->length = sizeof(*acknowledgement);
+    csp_send(connection, reply);
+}
+
 static void *command_handler_rx_loop(void *param)
 {
+    csp_socket_t socket = {0};
+
     (void)param;
 
-    csp_socket_t sock = {0};
-
-    if (csp_bind(&sock, THERMALS_CMD_PORT) != CSP_ERR_NONE)
+    if (csp_bind(&socket, THERMALS_CMD_PORT) != CSP_ERR_NONE)
     {
         printf("[THERMALS COMMAND HANDLER] csp_bind failed\n");
         fflush(stdout);
         return NULL;
     }
 
-    csp_listen(&sock, 5);
+    csp_listen(&socket, 5);
 
-    while (1)
+    for (;;)
     {
-        csp_conn_t *conn = csp_accept(&sock, 10000);
-        if (conn == NULL)
+        csp_conn_t *connection =
+            csp_accept(&socket, 10000);
+
+        if (connection == NULL)
         {
             continue;
         }
 
         csp_packet_t *packet;
-        while ((packet = csp_read(conn, 50)) != NULL)
+
+        while ((packet = csp_read(connection, 50)) != NULL)
         {
-            if (csp_conn_dport(conn) == THERMALS_CMD_PORT &&
-                packet->length == sizeof(thermal_command_t))
+            if (csp_conn_dport(connection) == THERMALS_CMD_PORT &&
+                packet->length >= sizeof(command_envelope_t))
             {
+                command_envelope_t envelope;
+                command_ack_t acknowledgement;
 
-            thermal_command_t payload;
-            memcpy(&payload, packet->data, sizeof(payload));
-
-            thermals_command_t message = {0};
-
-            message.sequence = payload.envelope.seq;
-
-            switch (payload.envelope.command_id)
-            {
-                case THERMALS_WIRE_COMMAND_SET_TARGET_TEMP:
-                    message.type = THERMALS_COMMAND_SET_TARGET_TEMP;
-                    message.parameter.target_temp = payload.target_temp;
-                    break;
-
-                case THERMALS_WIRE_COMMAND_REQUEST_TELEMETRY:
-                    message.type = THERMALS_COMMAND_REQUEST_TELEMETRY;
-                    break;
-
-                default:
-                    printf(
-                        "[THERMALS COMMAND HANDLER] Unknown wire command: %u\n",
-                        (unsigned int)payload.envelope.command_id
-                    );
-                    fflush(stdout);
-                    break;
-            }
-
-            if (message.type != THERMALS_COMMAND_NONE)
-            {
-                printf(
-                    "[THERMALS COMMAND HANDLER] Decoded command=%u sequence=%lu\n",
-                    (unsigned int)message.type,
-                    (unsigned long)message.sequence
+                memcpy(
+                    &envelope,
+                    packet->data,
+                    sizeof(envelope)
                 );
-                fflush(stdout);
 
-                if (!command_task_send(&message))
-                {
-                    printf(
-                        "[THERMALS COMMAND HANDLER] Failed to queue command %u\n",
-                        (unsigned int)message.type
-                    );
-                    fflush(stdout);
-                }
+                acknowledgement.ack_command_id =
+                    envelope.command_id;
+
+                acknowledgement.ack_seq =
+                    envelope.seq;
+
+                acknowledgement.status =
+                    decode_command(packet, &envelope);
+
+                send_ack(connection, &acknowledgement);
+
+                printf(
+                    "[THERMALS COMMAND HANDLER] Command=%u sequence=%lu status=%s\n",
+                    (unsigned int)envelope.command_id,
+                    (unsigned long)envelope.seq,
+                    acknowledgement.status == ACK ? "ACK" : "NACK"
+                );
+
+                fflush(stdout);
             }
-        }
-            else if (csp_conn_dport(conn) == THERMALS_CMD_PORT)
-                {
-                    printf(
-                        "[THERMALS COMMAND HANDLER] Invalid packet size: received=%u expected=%lu\n",
-                        (unsigned int)packet->length,
-                        (unsigned long)sizeof(thermal_command_t)
-                    );
-                    fflush(stdout);
-                }
+            else
+            {
+                printf("[THERMALS COMMAND HANDLER] Invalid command packet.\n");
+                fflush(stdout);
+            }
+
             csp_buffer_free(packet);
         }
 
-        csp_close(conn);
+        csp_close(connection);
     }
 
     return NULL;
@@ -115,4 +170,5 @@ void command_handler_init(void)
         printf("[THERMALS COMMAND HANDLER] rx thread create failed: %d\n", ret);
         fflush(stdout);
     }
+    else { pthread_detach(rx_thread); }
 }
