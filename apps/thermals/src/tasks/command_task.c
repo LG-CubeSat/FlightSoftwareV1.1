@@ -95,7 +95,7 @@ void command_task(void *pvParameters)
             {
                 if (!thermals_set_target(message.parameter.target_temp))
                 {
-                    printf("[THERMALS COMMAND] Invalid target temperature received\n");
+                    printf("[THERMALS COMMAND] Rejected target temperature: %.2f\n",message.parameter.target_temp);
                     fflush(stdout);
                     continue;
                 }

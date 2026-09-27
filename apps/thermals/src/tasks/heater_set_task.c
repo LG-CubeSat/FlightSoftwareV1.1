@@ -55,8 +55,21 @@ void heater_set_task(void *pvParameters) {
 
         thermal_data = get_thermal_data();
 
+        if (thermal_data.valid_sensor_mask != 0u && thermal_data.target_temp_valid != 0u) {
+
         average_temp = thermal_data.average_temp;
         target_temp = thermal_data.target_temp;
+
+        } else {
+
+            printf("[THERMALS] thermal data rejected, heater will not adjust.");
+            /*
+            * TODO(SIM): command the simulated heater interface to 0.0 power.
+            * TODO(HW): force the physical heater output OFF.
+            */
+
+        }
+
 
         if (fabs(target_temp - average_temp) > ERROR_TOLERANCE)
         {
