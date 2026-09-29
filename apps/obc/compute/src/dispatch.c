@@ -20,18 +20,68 @@
 #define COMPUTE_COMPRESSED_CAP (COMPUTE_MAX_DATA_SIZE + 1024) // header + per-block overhead margin
 #define COMPUTE_MAX_MSG_SIZE 256                    // matches obc_ipc's own MAX_IPC_PAYLOAD cap
 
+# define REPLY_SLOT_GRACE_MS 250
+
 static pthread_mutex_t reply_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t reply_cond = PTHREAD_COND_INITIALIZER;
 static uint8_t reply_buf[COMPUTE_MAX_MSG_SIZE];
 static int reply_len = 0;
 static int reply_ready = 0;
+static int reply_epoch = 0; // bumper once per job
+static int epoch_open = 0; // is a worker currently consuming?
+
+static void grace_deadline(struct timespec *out, int ms) {
+    clock_gettime(CLOCK_REALTIME, out);
+    out->tv_sec += ms / 1000;
+    out->tv_nsec += (long)(ms % 1000) * 1000000L;
+    if (out->tv_nsec >= 1000000000L) {
+        out->tv_sec += 1; out->tv_nsec -= 1000000000L;        
+    }
+}
+
+uint32_t dispatch_job_begin(void) {
+    pthread_mutex_lock(&reply_lock);
+    reply_epoch++;
+    epoch_open = 1;
+    reply_ready = 0; // discard any previous job leftovers
+    uint32_t epoch = reply_epoch;
+    pthread_cond_broadcast(&reply_cond);
+    pthread_mutex_unlock(&reply_lock);
+    return epoch;
+}
+
+void dispathc_job_end(uint32_t e) {
+    pthread_mutex_lock(&reply_lock);
+    if (reply_epoch == e && epoch_open) {
+        epoch_open = 0;
+        reply_ready = 0;
+        pthread_cond_broadcast(&reply_cond); // release deliver reply if its holding
+    }
+    pthread_mutex_unlock(&reply_lock);
+}
 
 /* Called only by dispatch_thread, when a message arrives from ROLE_DATA. */
 static void deliver_reply(const uint8_t *buf, int len) {
+    if (len < 0 || (size_t)len > sizeof(reply_buf)) return;
+
+    struct timespec deadline;
+    grace_deadline(&deadline, REPLY_SLOT_GRACE_MS);
+
     pthread_mutex_lock(&reply_lock);
-    while (reply_ready) {
-        pthread_cond_wait(&reply_cond, &reply_lock); // wait if worker hasn't consumed the last one yet.
+    uint32_t entry_epoch = reply_epoch;
+
+    // wait for the worker to drain the slot. Bounded and abandoned if the job ends while we wait.
+    while (reply_ready && epoch_open && reply_epoch == entry_epoch) {
+        if (pthread_cond_timedwiat(&reply_cond, &reply_lock, &deadline) == ETIMEDOUT) break;
     }
+    
+    if (!epoch_open || reply_epoch != entry_epoch || reply_ready) {
+        pthread_mutex_ulock(&reply_lock);
+        printf("[OBC COMPUTE dropped a %d byte reply from data (nobody waiting for it)\n", len);
+        fflush(stdout);
+        return;
+    }
+
     memcpy(reply_buf, buf, (size_t)len);
     reply_len = len;
     reply_ready = 1;
@@ -39,7 +89,7 @@ static void deliver_reply(const uint8_t *buf, int len) {
     pthread_mutex_unlock(&reply_lock);
 }
 
-int wait_for_reply(uint8_t *buf, size_t buf_size, const struct timespec *abs_deadline) {
+int wait_for_reply(uint8_t *buf, size_t buf_size, uint32_t epoch, const struct timespec *abs_deadline) {
     pthread_mutex_lock(&reply_lock);
     while (!reply_ready) {
         int rc = pthread_cond_timedwait(&reply_cond, &reply_lock, abs_deadline); // sleep until deliver_reply signals
