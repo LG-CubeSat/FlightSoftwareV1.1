@@ -27,6 +27,9 @@ static int image_id_counter = 0;
 static uint8_t input_buf[COMPUTE_MAX_DATA_SIZE];
 static uint8_t compressed_buf[COMPUTE_COMPRESSED_CAP];
 
+#define COMPUTE_REPLY_TIMEOUT_MS "COMPUTE_REPLY_TIMEOUT_MS"
+#define COMPUTE_JOB_TIMEOUT_MS "COMPUTE_JOB_TIMEOUT_MS"
+
 /* 
 Recommend searching up 'Chunk Delay'. It makes the compression determinisitc and controlled
 This is done by a delay
@@ -36,6 +39,21 @@ static int chunk_delay_ms(void) {
     if (env == NULL) return 0;
     int val = atoi(env); // atoi turns string -> int
     return (val > 0) ? val : 0;
+}
+
+static int env_ms(const char *name, int fallback) {
+    const char *env = getenv(name);
+    if (env == NULL) return fallback;
+
+    int val = atoi(env); // atoi turns string -> int
+    return (val > 0) ? val : fallback;
+}
+
+static const struct timespec *earlier(const struct timespec *a, const struct timespec *b) {
+    if (a->tv_sec != b->tv_sec) {
+        return (a->tv_sec < b->tv_sec) ? a : b;
+    }
+    return (a->tv_nsec < b->tv_nsec) ? a : b;
 }
 
 static int check_cancelled(uint32_t job_id) {
@@ -65,7 +83,24 @@ static void deadline_in_ms(struct timespec *out, int ms) {
     }
 }
 
+/* Sends the job's one and only result and releases job_busy. output_size is
+   meaningful only for COMPUTE_STATUS_OK; every other status passes 0.
+
+   NOTE: this cannot return on the worker's behalf -- each call site still needs
+   its own `return NULL;` right after. */
+static void send_result(uint32_t job_id, OBC_Roles_t requester,
+                        compute_status_t status, uint32_t output_size) {
+    compute_result_t result = { .job_id = job_id, .status = status, .output_size = output_size };
+    IPC_send(requester, (const uint8_t *)&result, sizeof(result));
+
+    pthread_mutex_lock(&job_lock); job_busy = 0;
+    pthread_mutex_unlock(&job_lock);
+}
+
 void *worker_thread(void *arg) {
+    const int reply_timeout_ms = env_ms(COMPUTE_REPLY_TIMEOUT_MS, 5000); // 5 seconds of silence is termination
+    const int job_timeout_ms = env_ms(COMPUTE_JOB_TIMEOUT_MS, 60000); // 60 seconds on this and its terminated
+
     worker_job_t *job = (worker_job_t *)arg;
     uint32_t job_id = job->req.job_id;
     OBC_Roles_t requester = job->requester;
@@ -77,23 +112,31 @@ void *worker_thread(void *arg) {
     /* --- phase 1: read in_path from data, in chunks --- */
     data_read_request_t read_req = {0};
     snprintf(read_req.path, sizeof(read_req.path), "%s", in_path);
+
+    struct timespec job_deadline;
+    deadline_in_ms(&job_deadline, job_timeout_ms);
+        
     IPC_send(ROLE_DATA, (const uint8_t *)&read_req, sizeof(read_req));
 
     size_t input_len = 0;
     for (;;) {
-        uint8_t buf[sizeof(data_read_reply_t)];
-        int len = wait_for_reply(buf, sizeof(buf), );
-        if (len != sizeof(data_read_reply_t)) continue;
+        struct timespec reply_deadline;
+        deadline_in_ms(&reply_deadline, reply_timeout_ms);
 
+        uint8_t buf[sizeof(data_read_reply_t)];
+        int len = wait_for_reply(buf, sizeof(buf), earlier(&reply_deadline, &job_deadline));
+        if (len < 0) {
+            fprintf(stderr, "[OBC COMPUTE] job %u gave up waiting on data while reading %s\n", job_id, in_path);
+            send_result(job_id, requester, COMPUTE_STATUS_TIMEOUT, 0);
+            return NULL;
+        }
+        if (len != (int)sizeof(data_read_reply_t)) continue;
+        
         data_read_reply_t reply;
         memcpy(&reply, buf, sizeof(reply));
-
+        
         if (reply.status != 0) {
-            compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_FAILED };
-            IPC_send(requester, (const uint8_t *)&result, sizeof(result));
-
-            pthread_mutex_lock(&job_lock); job_busy = 0;
-            pthread_mutex_unlock(&job_lock);
+            send_result(job_id, requester, COMPUTE_STATUS_FAILED, 0);
             return NULL;
         }
 
@@ -103,10 +146,7 @@ void *worker_thread(void *arg) {
 
         /* Cancellation Block */
         if (check_cancelled(job_id)) {
-            compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_CANCELLED };
-            IPC_send(requester, (const uint8_t *)&result, sizeof(result));
-            pthread_mutex_lock(&job_lock); job_busy = 0;
-            pthread_mutex_unlock(&job_lock);
+            send_result(job_id, requester, COMPUTE_STATUS_CANCELLED, 0);
             return NULL;
         }
         if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
@@ -115,21 +155,15 @@ void *worker_thread(void *arg) {
     size_t compressed_len = 0;
     int image_id = image_id_counter++;
     if (ssdv_encode_image(input_buf, input_len, CALL_SIGN, (uint8_t)image_id, compressed_buf, sizeof(compressed_buf), &compressed_len) != 0) {
-        compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_FAILED };
-        IPC_send(requester, (const uint8_t *)&result, sizeof(result));
-        pthread_mutex_lock(&job_lock); job_busy = 0;
-        pthread_mutex_unlock(&job_lock);
+        send_result(job_id, requester, COMPUTE_STATUS_FAILED, 0);
         return NULL;
     }
 
     /* Cancellation Block */
     if (check_cancelled(job_id)) {
-            compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_CANCELLED };
-            IPC_send(requester, (const uint8_t *)&result, sizeof(result));
-            pthread_mutex_lock(&job_lock); job_busy = 0;
-            pthread_mutex_unlock(&job_lock);
-            return NULL;
-        }
+        send_result(job_id, requester, COMPUTE_STATUS_CANCELLED, 0);
+        return NULL;
+    }
     if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
 
     size_t written = 0;
@@ -146,32 +180,31 @@ void *worker_thread(void *arg) {
         IPC_send(ROLE_DATA, (const uint8_t *)&chunk, sizeof(chunk));
 
         uint8_t ack_buf[sizeof(data_write_ack_t)];
-        int len = wait_for_reply(ack_buf, sizeof(ack_buf));
+
+        struct timespec reply_deadline;
+        deadline_in_ms(&reply_deadline, reply_timeout_ms);
+
+        int len = wait_for_reply(ack_buf, sizeof(ack_buf), earlier(&reply_deadline, &job_deadline));
+        if (len < 0) {
+            fprintf(stderr, "[OBC COMPUTE] job %u gave up waiting on a write ack for %s\n", job_id, out_path);
+            send_result(job_id, requester, COMPUTE_STATUS_TIMEOUT, 0);
+            return NULL;
+        }
         data_write_ack_t ack;
-        if (len != sizeof(ack) || (memcpy(&ack, ack_buf, sizeof(ack)), ack.status != 0)) {
-            compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_FAILED };
-            IPC_send(requester, (const uint8_t *)&result, sizeof(result));
-            pthread_mutex_lock(&job_lock); job_busy=0;
-            pthread_mutex_unlock(&job_lock);
+        if (len != (int)sizeof(ack) || (memcpy(&ack, ack_buf, sizeof(ack)), ack.status != 0)) {
+            send_result(job_id, requester, COMPUTE_STATUS_FAILED, 0);
             return NULL;
         }
         written += chunk_len;
 
         /* Cancellation Block */
         if (check_cancelled(job_id)) {
-            compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_CANCELLED };
-            IPC_send(requester, (const uint8_t *)&result, sizeof(result));
-            pthread_mutex_lock(&job_lock); job_busy = 0;
-            pthread_mutex_unlock(&job_lock);
+            send_result(job_id, requester, COMPUTE_STATUS_CANCELLED, 0);
             return NULL;
         }
         if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
     }
-    compute_result_t result = { .job_id = job_id, .status = COMPUTE_STATUS_OK, .output_size = (uint32_t)compressed_len };
-    IPC_send(requester, (const uint8_t *)&result, sizeof(result));
-    pthread_mutex_lock(&job_lock);
-    job_busy = 0;
-    pthread_mutex_unlock(&job_lock);
+    send_result(job_id, requester, COMPUTE_STATUS_OK, (uint32_t)compressed_len);
     return NULL;
 }
 
@@ -214,11 +247,7 @@ void handle_compress_request(const uint8_t *buf, OBC_Roles_t src) {
 
     if (ret != 0) {
         printf("[OBC COMPUTE] Failed to start worker thread for job %u\n", req.job_id);
-        pthread_mutex_lock(&job_lock);
-        job_busy = 0;
-        pthread_mutex_unlock(&job_lock);
-        compute_result_t result = { .job_id = req.job_id, .status = COMPUTE_STATUS_FAILED };
-        IPC_send(src, (const uint8_t *)&result, sizeof(result));
+        send_result(req.job_id, src, COMPUTE_STATUS_FAILED, 0);
     }
 }
 

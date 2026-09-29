@@ -7,6 +7,9 @@
 #include "obc_ipc.h"
 #include "obc_compute_protocol.h"
 
+#define WAIT_REPLY_TOO_BIG (-1)
+#define WAIT_REPLY_TIMEOUT (-2)
+
 int dispatch_thread_init(void);
 void *dispatch_thread(void *arg);
 

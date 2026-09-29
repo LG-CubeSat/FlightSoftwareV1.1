@@ -26,9 +26,6 @@ static uint8_t reply_buf[COMPUTE_MAX_MSG_SIZE];
 static int reply_len = 0;
 static int reply_ready = 0;
 
-#define WAIT_REPLY_TOO_BIG (-1)
-#define WAIT_REPLY_TIMEOUT (-2)
-
 /* Called only by dispatch_thread, when a message arrives from ROLE_DATA. */
 static void deliver_reply(const uint8_t *buf, int len) {
     pthread_mutex_lock(&reply_lock);
