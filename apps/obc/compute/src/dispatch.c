@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <errno.h>
+#include <time.h>
 
 #include "worker.h"
 #include "obc_ipc.h"
@@ -25,6 +26,9 @@ static uint8_t reply_buf[COMPUTE_MAX_MSG_SIZE];
 static int reply_len = 0;
 static int reply_ready = 0;
 
+#define WAIT_REPLY_TOO_BIG (-1)
+#define WAIT_REPLY_TIMEOUT (-2)
+
 /* Called only by dispatch_thread, when a message arrives from ROLE_DATA. */
 static void deliver_reply(const uint8_t *buf, int len) {
     pthread_mutex_lock(&reply_lock);
@@ -41,14 +45,23 @@ static void deliver_reply(const uint8_t *buf, int len) {
 int wait_for_reply(uint8_t *buf, size_t buf_size, const struct timespec *abs_deadline) {
     pthread_mutex_lock(&reply_lock);
     while (!reply_ready) {
-        int rc = pthread_cond_timedwait(&reply_cond, &reply_lock, &abs_deadline); // sleep until deliver_reply signals
+        int rc = pthread_cond_timedwait(&reply_cond, &reply_lock, abs_deadline); // sleep until deliver_reply signals
+        
+        if (rc == ETIMEDOUT) {
+            // the otherside isn't there. They didn't reply by abs_deadline
+            // so we have to break to avoid infinite loop
+            pthread_mutex_unlock(&reply_lock);
+            return WAIT_REPLY_TIMEOUT; // specific failure mode for timeout
+        }
+        
     }
     int len = reply_len;
     if ((size_t)len <= buf_size) {
         memcpy(buf, reply_buf, (size_t)len);
     } else {
-        len = -1;
+        len = WAIT_REPLY_TOO_BIG; // failure mode for reply being too long for buffer
     }
+
     reply_ready = 0;
     pthread_cond_signal(&reply_cond); // wake deliver_reply if it's waiting for the slot to free up
     pthread_mutex_unlock(&reply_lock);

@@ -46,6 +46,25 @@ static int check_cancelled(uint32_t job_id) {
     return cancelled;
 }
 
+static void deadline_in_ms(struct timespec *out, int ms) {
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    
+    // break millseconds into whole seconds and nanoseconds.
+    long sec_to_add = ms / 1000;
+    long nsec_to_add = (ms % 1000) * 1000000L; // 1 ms = 1,000,000 ns
+
+    // add directly to the time
+    out->tv_sec = now.tv_sec + sec_to_add;
+    out->tv_nsec = now.tv_nsec + nsec_to_add;
+
+    // handle any overflow
+    if (out->tv_nsec >= 1000000000L) {
+        out->tv_sec += 1;
+        out->tv_nsec -= 1000000000L;
+    }
+}
+
 void *worker_thread(void *arg) {
     worker_job_t *job = (worker_job_t *)arg;
     uint32_t job_id = job->req.job_id;
@@ -63,7 +82,7 @@ void *worker_thread(void *arg) {
     size_t input_len = 0;
     for (;;) {
         uint8_t buf[sizeof(data_read_reply_t)];
-        int len = wait_for_reply(buf, sizeof(buf));
+        int len = wait_for_reply(buf, sizeof(buf), );
         if (len != sizeof(data_read_reply_t)) continue;
 
         data_read_reply_t reply;

@@ -1,9 +1,11 @@
 #ifndef OBC_COMPUTE_H
 #define OBC_COMPUTE_H
 
+#include <stddef.h>
+#include <time.h>
+
 #include "obc_ipc.h"
 #include "obc_compute_protocol.h"
-#include <stddef.h>
 
 int dispatch_thread_init(void);
 void *dispatch_thread(void *arg);
