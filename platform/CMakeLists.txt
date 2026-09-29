@@ -4,8 +4,12 @@ if (HW_MODE)
         real/drivers/board_reset.c
         real/drivers/board_shutdown.c
         real/drivers/camera.c
+        real/drivers/radio.c
         )
     target_compile_definitions(platform PRIVATE HW_MODE)
+    # real/drivers/radio.c drives the E22's M0/M1/AUX pins via libgpiod --
+    # requires libgpiod-dev installed on the target (Raspberry Pi OS: apt install libgpiod-dev).
+    target_link_libraries(platform PUBLIC gpiod)
 else()
     add_library(platform STATIC
         sim/drivers/comms_i2c.c
