@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "worker.h"
 #include "obc_ipc.h"
@@ -37,10 +38,10 @@ static void deliver_reply(const uint8_t *buf, int len) {
     pthread_mutex_unlock(&reply_lock);
 }
 
-int wait_for_reply(uint8_t *buf, size_t buf_size) {
+int wait_for_reply(uint8_t *buf, size_t buf_size, const struct timespec *abs_deadline) {
     pthread_mutex_lock(&reply_lock);
     while (!reply_ready) {
-        pthread_cond_wait(&reply_cond, &reply_lock); // sleep until deliver_reply signals
+        int rc = pthread_cond_timedwait(&reply_cond, &reply_lock, &abs_deadline); // sleep until deliver_reply signals
     }
     int len = reply_len;
     if ((size_t)len <= buf_size) {

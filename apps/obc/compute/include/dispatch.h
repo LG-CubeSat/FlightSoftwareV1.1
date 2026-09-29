@@ -8,6 +8,6 @@
 int dispatch_thread_init(void);
 void *dispatch_thread(void *arg);
 
-int wait_for_reply(uint8_t *buf, size_t buf_size);
+int wait_for_reply(uint8_t *buf, size_t buf_size, const struct timespec *abs_deadline);
 
 #endif // OBC_COMPUTE_H
