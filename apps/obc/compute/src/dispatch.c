@@ -27,7 +27,7 @@ static pthread_cond_t reply_cond = PTHREAD_COND_INITIALIZER;
 static uint8_t reply_buf[COMPUTE_MAX_MSG_SIZE];
 static int reply_len = 0;
 static int reply_ready = 0;
-static int reply_epoch = 0; // bumper once per job
+static uint32_t reply_epoch = 0; // bumper once per job
 static int epoch_open = 0; // is a worker currently consuming?
 
 static void grace_deadline(struct timespec *out, int ms) {
@@ -50,7 +50,7 @@ uint32_t dispatch_job_begin(void) {
     return epoch;
 }
 
-void dispathc_job_end(uint32_t e) {
+void dispatch_job_end(uint32_t e) {
     pthread_mutex_lock(&reply_lock);
     if (reply_epoch == e && epoch_open) {
         epoch_open = 0;
@@ -72,11 +72,11 @@ static void deliver_reply(const uint8_t *buf, int len) {
 
     // wait for the worker to drain the slot. Bounded and abandoned if the job ends while we wait.
     while (reply_ready && epoch_open && reply_epoch == entry_epoch) {
-        if (pthread_cond_timedwiat(&reply_cond, &reply_lock, &deadline) == ETIMEDOUT) break;
+        if (pthread_cond_timedwait(&reply_cond, &reply_lock, &deadline) == ETIMEDOUT) break;
     }
     
     if (!epoch_open || reply_epoch != entry_epoch || reply_ready) {
-        pthread_mutex_ulock(&reply_lock);
+        pthread_mutex_unlock(&reply_lock);
         printf("[OBC COMPUTE dropped a %d byte reply from data (nobody waiting for it)\n", len);
         fflush(stdout);
         return;
@@ -92,9 +92,14 @@ static void deliver_reply(const uint8_t *buf, int len) {
 int wait_for_reply(uint8_t *buf, size_t buf_size, uint32_t epoch, const struct timespec *abs_deadline) {
     pthread_mutex_lock(&reply_lock);
     while (!reply_ready) {
+        if (!epoch_open || reply_epoch != epoch) {
+            pthread_mutex_unlock(&reply_lock);
+            return WAIT_REPLY_ABORTED;
+        }
+
         int rc = pthread_cond_timedwait(&reply_cond, &reply_lock, abs_deadline); // sleep until deliver_reply signals
         
-        if (rc == ETIMEDOUT) {
+        if (rc == ETIMEDOUT && !reply_ready) {
             // the otherside isn't there. They didn't reply by abs_deadline
             // so we have to break to avoid infinite loop
             pthread_mutex_unlock(&reply_lock);
@@ -102,6 +107,7 @@ int wait_for_reply(uint8_t *buf, size_t buf_size, uint32_t epoch, const struct t
         }
         
     }
+
     int len = reply_len;
     if ((size_t)len <= buf_size) {
         memcpy(buf, reply_buf, (size_t)len);

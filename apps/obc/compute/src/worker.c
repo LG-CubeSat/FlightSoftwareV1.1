@@ -88,10 +88,13 @@ static void deadline_in_ms(struct timespec *out, int ms) {
 
    NOTE: this cannot return on the worker's behalf -- each call site still needs
    its own `return NULL;` right after. */
-static void send_result(uint32_t job_id, OBC_Roles_t requester,
+static void send_result(uint32_t job_id, OBC_Roles_t requester, uint32_t epoch,
                         compute_status_t status, uint32_t output_size) {
     compute_result_t result = { .job_id = job_id, .status = status, .output_size = output_size };
     IPC_send(requester, (const uint8_t *)&result, sizeof(result));
+
+    /* Close the epoch before releasing job busy or else a new job can start while this job's replies are still deliverable. */
+    dispatch_job_end(epoch);
 
     pthread_mutex_lock(&job_lock); job_busy = 0;
     pthread_mutex_unlock(&job_lock);
@@ -104,6 +107,7 @@ void *worker_thread(void *arg) {
     worker_job_t *job = (worker_job_t *)arg;
     uint32_t job_id = job->req.job_id;
     OBC_Roles_t requester = job->requester;
+    uint32_t epoch = job->epoch;
     char in_path[COMPUTE_MAX_PATH];
     char out_path[COMPUTE_MAX_PATH];
     memcpy(&in_path, job->req.in_path, sizeof(in_path));
@@ -124,10 +128,10 @@ void *worker_thread(void *arg) {
         deadline_in_ms(&reply_deadline, reply_timeout_ms);
 
         uint8_t buf[sizeof(data_read_reply_t)];
-        int len = wait_for_reply(buf, sizeof(buf), earlier(&reply_deadline, &job_deadline));
+        int len = wait_for_reply(buf, sizeof(buf), epoch, earlier(&reply_deadline, &job_deadline));
         if (len < 0) {
             fprintf(stderr, "[OBC COMPUTE] job %u gave up waiting on data while reading %s\n", job_id, in_path);
-            send_result(job_id, requester, COMPUTE_STATUS_TIMEOUT, 0);
+            send_result(job_id, requester, epoch, COMPUTE_STATUS_TIMEOUT, 0);
             return NULL;
         }
         if (len != (int)sizeof(data_read_reply_t)) continue;
@@ -136,7 +140,7 @@ void *worker_thread(void *arg) {
         memcpy(&reply, buf, sizeof(reply));
         
         if (reply.status != 0) {
-            send_result(job_id, requester, COMPUTE_STATUS_FAILED, 0);
+            send_result(job_id, requester, epoch, COMPUTE_STATUS_FAILED, 0);
             return NULL;
         }
 
@@ -146,7 +150,7 @@ void *worker_thread(void *arg) {
 
         /* Cancellation Block */
         if (check_cancelled(job_id)) {
-            send_result(job_id, requester, COMPUTE_STATUS_CANCELLED, 0);
+            send_result(job_id, requester, epoch, COMPUTE_STATUS_CANCELLED, 0);
             return NULL;
         }
         if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
@@ -155,13 +159,13 @@ void *worker_thread(void *arg) {
     size_t compressed_len = 0;
     int image_id = image_id_counter++;
     if (ssdv_encode_image(input_buf, input_len, CALL_SIGN, (uint8_t)image_id, compressed_buf, sizeof(compressed_buf), &compressed_len) != 0) {
-        send_result(job_id, requester, COMPUTE_STATUS_FAILED, 0);
+        send_result(job_id, requester, epoch, COMPUTE_STATUS_FAILED, 0);
         return NULL;
     }
 
     /* Cancellation Block */
     if (check_cancelled(job_id)) {
-        send_result(job_id, requester, COMPUTE_STATUS_CANCELLED, 0);
+        send_result(job_id, requester, epoch, COMPUTE_STATUS_CANCELLED, 0);
         return NULL;
     }
     if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
@@ -184,27 +188,27 @@ void *worker_thread(void *arg) {
         struct timespec reply_deadline;
         deadline_in_ms(&reply_deadline, reply_timeout_ms);
 
-        int len = wait_for_reply(ack_buf, sizeof(ack_buf), earlier(&reply_deadline, &job_deadline));
+        int len = wait_for_reply(ack_buf, sizeof(ack_buf), epoch, earlier(&reply_deadline, &job_deadline));
         if (len < 0) {
             fprintf(stderr, "[OBC COMPUTE] job %u gave up waiting on a write ack for %s\n", job_id, out_path);
-            send_result(job_id, requester, COMPUTE_STATUS_TIMEOUT, 0);
+            send_result(job_id, requester, epoch, COMPUTE_STATUS_TIMEOUT, 0);
             return NULL;
         }
         data_write_ack_t ack;
         if (len != (int)sizeof(ack) || (memcpy(&ack, ack_buf, sizeof(ack)), ack.status != 0)) {
-            send_result(job_id, requester, COMPUTE_STATUS_FAILED, 0);
+            send_result(job_id, requester, epoch, COMPUTE_STATUS_FAILED, 0);
             return NULL;
         }
         written += chunk_len;
 
         /* Cancellation Block */
         if (check_cancelled(job_id)) {
-            send_result(job_id, requester, COMPUTE_STATUS_CANCELLED, 0);
+            send_result(job_id, requester, epoch, COMPUTE_STATUS_CANCELLED, 0);
             return NULL;
         }
         if (chunk_delay_ms() > 0) usleep((useconds_t)chunk_delay_ms() * 1000);
     }
-    send_result(job_id, requester, COMPUTE_STATUS_OK, (uint32_t)compressed_len);
+    send_result(job_id, requester, epoch, COMPUTE_STATUS_OK, (uint32_t)compressed_len);
     return NULL;
 }
 
@@ -232,6 +236,7 @@ void handle_compress_request(const uint8_t *buf, OBC_Roles_t src) {
 
     current_job.req = req;
     current_job.requester = src;
+    current_job.epoch = dispatch_job_begin();
     pthread_t worker;
 
     /*
@@ -247,7 +252,7 @@ void handle_compress_request(const uint8_t *buf, OBC_Roles_t src) {
 
     if (ret != 0) {
         printf("[OBC COMPUTE] Failed to start worker thread for job %u\n", req.job_id);
-        send_result(req.job_id, src, COMPUTE_STATUS_FAILED, 0);
+        send_result(req.job_id, src, current_job.epoch, COMPUTE_STATUS_FAILED, 0);
     }
 }
 
