@@ -12,16 +12,14 @@ not a real cross-compiled link. Verify 0.1/0.3 with an actual HW_MODE build once
 
 ## Tier 0 — HW_MODE doesn't build or run
 
-- [X] **0.1 — Add a real (or honest-stub) HW radio.** `radio_send` is only defined in
-      `platform/sim/drivers/radio.c`, which the `HW_MODE` branch of `platform/CMakeLists.txt`
-      excludes. `obc_mission`'s `payload_commander.c:109` calls it unconditionally, so
-      `-DHW_MODE=ON` cannot link today. Create `platform/real/drivers/radio.c` (a stub
-      returning -1 is fine if the real UART driver isn't ready) and add it to the HW branch's
-      source list.
-- [X] **0.2 — Give `radio.h` a receive path.** There is no `radio_receive` anywhere in the repo
-      — zero ground uplink exists. Decide explicitly whether this flight is downlink-only or
-      needs uplink, and if it needs uplink, add `radio_receive` + a listener thread in
-      `commands`.
+- [X] **0.1 — Add an honest-stub HW radio abstraction.**
+      `platform/real/drivers/radio.c` implements the shared send/receive interface as explicit
+      failure stubs and is part of the HW `platform` target, so mission links without pretending
+      real radio traffic works. The E22 implementation is deliberately deferred to the teammate
+      working on radio.
+- [X] **0.2 — Give `radio.h` a receive path.** The shared API and HW stub now have
+      `radio_receive`. The ground-uplink listener and real E22 behavior remain deferred with the
+      rest of the radio work; current OBC testing is downlink-path only.
 - [X] **0.3 — Stop building ADCS/EPS in the Pi (HW_MODE) build.** Root `CMakeLists.txt` adds
       `apps/adcs` and `apps/eps` unconditionally. Under `HW_MODE=ON` on a Pi these would link
       the Linux-only real I2C driver and the POSIX FreeRTOS port — nonsense for an STM32, and it
@@ -34,10 +32,10 @@ not a real cross-compiled link. Verify 0.1/0.3 with an actual HW_MODE build once
       `libcamera`/`rpicam-apps`, not V4L2 UVC. Implementation: shell out to `rpicam-jpeg` via
       `posix_spawn` (writes real JPEG directly, no separate encode step needed for SSDV). *(In
       progress.)*
-- [X] **0.5 — No HW_MODE test coverage.** Root `CMakeLists.txt` gates `BUILD_TESTS` with
-      `AND NOT HW_MODE`, and the test suite depends on `adcs_sim`. Split out the
-      hardware-independent tests (frame codec, IPC, SSDV round-trip) so they build and run under
-      `HW_MODE=ON` on the Pi too.
+- [X] **0.5 — Add HW_MODE-safe automated coverage.** `frame_codec_test`, `obc_ipc_test`,
+      `ssdv_roundtrip_test`, and `compute_async_test` build and run with `HW_MODE=ON` without
+      touching the camera, radio, or I2C device. SIM-only constellation/bus tests remain gated
+      behind `if (NOT HW_MODE)`. See `docs/testing.md` for the test and CMake walkthrough.
 
 ## Tier 1 — bugs that break indefinite operation
 
@@ -142,7 +140,7 @@ not a real cross-compiled link. Verify 0.1/0.3 with an actual HW_MODE build once
 
 ## Doc correction needed
 
-`docs/satellite_architecture.md:145` says "`-DHW_MODE=ON` doesn't even compile today" and
-blames stale I2C driver signatures — that's now out of date, `comms_i2c.c` was rewritten and is
-syntactically correct. The real remaining HW_MODE build blocker is the missing radio driver
-(0.1), not I2C. Worth fixing so the next person doesn't chase the wrong lead.
+`docs/satellite_architecture.md`'s bring-up snapshot is older than the current implementation:
+the I2C signatures were repaired, the camera backend was implemented, the honest radio stub is
+now linked, and portable HW_MODE tests exist. The complete hardware build still needs to be
+verified on the Raspberry Pi because non-Linux hosts do not provide `<linux/i2c-dev.h>`.

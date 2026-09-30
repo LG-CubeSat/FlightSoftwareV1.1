@@ -4,6 +4,7 @@ if (HW_MODE)
         real/drivers/board_reset.c
         real/drivers/board_shutdown.c
         real/drivers/camera.c
+        real/drivers/radio.c
         )
     target_compile_definitions(platform PRIVATE HW_MODE)
 else()

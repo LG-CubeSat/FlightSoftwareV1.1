@@ -1,5 +1,173 @@
 # Flight Software V1 — Testing
 
+## Writing a new test
+
+This project does not require a separate C testing framework. A test is a normal C executable:
+it returns `0` when every check passes and a nonzero value when any check fails. CMake builds the
+executable, and CTest runs it and interprets that exit status.
+
+The portable tests are useful in both build modes:
+
+| Test | What it exercises | SIM | HW_MODE |
+|---|---|---:|---:|
+| `frame_codec_test` | I2C-independent wire serialization and malformed-frame rejection | yes | yes |
+| `obc_ipc_test` | Unix-socket payloads, source roles, and bounded receive timeout | yes | yes |
+| `ssdv_roundtrip_test` | Production JPEG-to-SSDV wrapper plus SSDV decode | yes | yes |
+| `compute_async_test` | Data/compute process IPC, busy response, and cancellation | yes | yes |
+
+The remaining tests use the simulated communications bus or launch `adcs_sim`, so they stay
+inside `if (NOT HW_MODE)` in `tests/CMakeLists.txt`.
+
+### 1. Write the C test
+
+Create `tests/test_<feature>.c`. Include the public header for the behavior being tested and
+call the production API exactly as another component would. Do not include a production `.c`
+file directly.
+
+A small test can use this pattern:
+
+```c
+#include <stdio.h>
+#include "frame.h"
+
+int main(void)
+{
+    Frame frame = { .dest_addr = 2, .src_addr = 1, .length = 0 };
+    uint8_t wire[4 + MAX_FRAME_PAYLOAD];
+
+    if (frame_serialize(&frame, wire, sizeof(wire)) != 4) {
+        fprintf(stderr, "frame_test: FAIL\n");
+        return 1;
+    }
+
+    printf("frame_test: PASS\n");
+    return 0;
+}
+```
+
+Good tests normally cover three things:
+
+1. The ordinary success path.
+2. A boundary or malformed input that the API promises to reject.
+3. The externally visible result, rather than a private implementation detail.
+
+Always bound a blocking test. Use the API's timeout, a child-process `alarm()`, and/or CTest's
+`TIMEOUT` property so one regression cannot hang the entire suite.
+
+### 2. Make production code linkable
+
+CMake links targets, not arbitrary functions. If the code already belongs to a library such as
+`frame_codec` or `obc_ipc`, the test can link that library directly. If useful code exists only
+inside an application executable, extract it into a small library first.
+
+For example, the SSDV wrapper used to be compiled directly into `obc_compute`. It is now a
+reusable target in `apps/obc/compute/CMakeLists.txt`:
+
+```cmake
+add_library(obc_ssdv_codec STATIC
+    src/ssdv_codec.c
+)
+
+target_include_directories(obc_ssdv_codec PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(obc_ssdv_codec PUBLIC ssdv)
+```
+
+`PUBLIC` matters here: consumers need both the wrapper's headers and its `ssdv` dependency.
+Use `PRIVATE` when only the target itself needs an include path or linked library.
+
+### 3. Register the test in CMake
+
+Add three commands to `tests/CMakeLists.txt`:
+
+```cmake
+add_executable(frame_codec_test test_frame_codec.c)
+target_link_libraries(frame_codec_test PRIVATE frame_codec)
+add_test(NAME frame_codec_test COMMAND frame_codec_test)
+set_tests_properties(frame_codec_test PROPERTIES TIMEOUT 5)
+```
+
+Each line has one job:
+
+- `add_executable` compiles the test source into a runnable program.
+- `target_link_libraries` supplies the production implementation and propagates its public
+  include directories. This is why the test can write `#include "frame.h"` without a relative
+  path.
+- `add_test` registers the executable with CTest. Merely building an executable does not make
+  CTest discover it.
+- `set_tests_properties(... TIMEOUT 5)` tells CTest to kill it after five seconds.
+
+Keep a portable test outside `if (NOT HW_MODE)`. Put it inside that condition only when it
+requires a SIM driver or a SIM application. A future hardware-only test can use
+`if (HW_MODE)`, but a physical-device test should normally be labeled separately so an ordinary
+Pi build does not try to operate hardware unexpectedly.
+
+### 4. Protect shared test resources
+
+CTest can run tests concurrently with `ctest -j`. Tests using the same fixed socket path must
+declare a resource lock:
+
+```cmake
+set_tests_properties(obc_ipc_test PROPERTIES
+    TIMEOUT 5
+    RESOURCE_LOCK obc_ipc_sockets
+)
+```
+
+Every test with the same lock name runs serially relative to the others holding that lock, while
+unrelated tests remain parallel. The suite uses `obc_ipc_sockets` for OBC Unix sockets and
+`comms_bus_socket` for `/tmp/comms_i2c.sock`. A test that needs both can specify a semicolon list:
+
+```cmake
+RESOURCE_LOCK "comms_bus_socket;obc_ipc_sockets"
+```
+
+This is not production locking; it only prevents test processes from stealing each other's
+fixed endpoints.
+
+### 5. Configure, build, and run
+
+For the complete simulation suite:
+
+```bash
+cmake -S . -B build-sim -DHW_MODE=OFF -DBUILD_TESTS=ON
+cmake --build build-sim
+ctest --test-dir build-sim --output-on-failure -j4
+```
+
+For the portable HW_MODE tests on the Raspberry Pi:
+
+```bash
+cmake -S . -B build-hw -DHW_MODE=ON -DBUILD_TESTS=ON
+cmake --build build-hw
+ctest --test-dir build-hw --output-on-failure -j4
+```
+
+On a non-Linux development machine, the complete HW build cannot compile the real Linux I2C
+driver. You can still prove that the portable targets are genuinely available in HW_MODE:
+
+```bash
+cmake -S . -B build-hw -DHW_MODE=ON -DBUILD_TESTS=ON
+cmake --build build-hw --target \
+  frame_codec_test obc_ipc_test ssdv_roundtrip_test compute_async_test
+ctest --test-dir build-hw --output-on-failure -j4
+```
+
+To iterate on one test, build its target and use CTest's regular-expression filter:
+
+```bash
+cmake --build build-sim --target frame_codec_test
+ctest --test-dir build-sim -R '^frame_codec_test$' --output-on-failure
+```
+
+When adding a new test, run it once by itself and then run the whole suite with `-j4`. The
+parallel run catches undeclared shared resources and process-cleanup mistakes that a single-test
+run cannot reveal.
+
+---
+
 ## comms_bus_test — OBC ↔ ADCS Communication Sanity Check
 
 ### What it is
