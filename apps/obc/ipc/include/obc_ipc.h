@@ -18,7 +18,7 @@ typedef enum {
     ROLE_MISSION = 5,
     ROLE_SUPERVISOR = 6,
     ROLE_TIME = 7,
-    
+    ROLE_CAM = 8, // sorta not really a role
 } OBC_Roles_t;
 
 // init

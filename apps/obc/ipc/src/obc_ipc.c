@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <arpa/inet.h>
 
 #define IPC_BACKLOG 5
 #define MAX_IPC_PAYLOAD 256

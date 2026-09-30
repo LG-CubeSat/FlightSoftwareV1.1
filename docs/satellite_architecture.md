@@ -29,7 +29,7 @@ Three things are wired directly to the Pi as local peripherals — **not** as CS
 | Peripheral | Interface | Role |
 |---|---|---|
 | E22 LoRa module | UART | Ground radio link (uplink/downlink) |
-| Arducam camera module | USB-C | Payload photo capture |
+| Arducam OV5647 camera module | CSI ribbon | Payload photo capture |
 | (I2C bus to ADCS + Thermals) | I2C | See §2 below |
 
 ### Power — 4S2P 21700 pack + buck converter (no MCU)
@@ -53,12 +53,16 @@ over the shared **I2C** bus as a CSP node.
 Same shape as ADCS: a separate **STM32 + RTOS** board on the same I2C bus, its own CSP node.
 Software for this board doesn't exist yet (see Open Items / follow-up work).
 
-### Camera — Arducam over USB-C (not a separate board)
+### Camera — Arducam OV5647 over the CSI ribbon cable (not a separate board)
 
-The camera is an **Arducam module**, connected to the Pi directly over **USB-C**. It is not a
-separate PCB, not a CSP node, and doesn't sit on the I2C bus — it's a USB peripheral of the OBC,
-matching the existing `shared/interfaces/camera.h` contract (today mock-only in
-`platform/sim/drivers/camera.c`; a real backend needs a USB/V4L2-based driver, not yet written).
+The camera is an **Arducam OV5647 5MP module** (the standard Raspberry Pi Camera Module form
+factor), connected to the Pi directly over the **24-pin CSI ribbon cable** — not USB-C as
+earlier assumed. It is not a separate PCB, not a CSP node, and doesn't sit on the I2C bus. On
+modern Raspberry Pi OS (Bullseye/Bookworm) this sensor is driven through the **`libcamera`**
+stack rather than a generic UVC/V4L2 device node, matching the existing
+`shared/interfaces/camera.h` contract (today mock-only in `platform/sim/drivers/camera.c`; the
+real backend shells out to the `rpicam-apps` CLI tools, e.g. `rpicam-jpeg`, rather than talking
+to `/dev/videoN` directly).
 
 ### Comms — E22 LoRa module over UART (not a separate board)
 
@@ -82,7 +86,7 @@ the specific E22 variant uses — transparent mode or its command-mode framing, 
                     └───────────────────┬───────────────────────┘
                                         │ 5V
                                         ▼
-   ┌────────────────┐     UART     ┌─────────────────────────┐     USB-C     ┌───────────────┐
+   ┌────────────────┐     UART     ┌─────────────────────────┐   CSI ribbon  ┌───────────────┐
    │  E22 LoRa       │◄───────────►│   OBC -- Raspberry Pi     │◄─────────────►│  Arducam       │
    │  (ground link)  │              │   Zero 2 W (custom PCB)  │                │  (payload cam) │
    └────────────────┘              └────────────┬─────────────┘                └───────────────┘
@@ -208,11 +212,11 @@ boards (ADCS, Thermals) — each needing different real backends and different t
    - Implement the actual E22 send/receive protocol (transparent vs. configuration mode,
      channel/address setup) — blocked on confirming the exact module variant (Open Items).
 6. **Real camera driver (`platform/real/drivers/camera.c` is currently a bare `TODO` stub).**
-   - Confirm whether the Arducam enumerates as a standard UVC device (→ straightforward V4L2
-     `/dev/videoN` capture) or needs Arducam's own vendor SDK (more work) — blocked on
-     confirming the exact model (Open Items).
-   - SSDV needs valid JPEG input — if the camera doesn't produce JPEG natively (e.g. MJPEG over
-     UVC), a JPEG-encode step (e.g. `libjpeg`) has to happen before handing frames to `compute`.
+   Confirmed model: **Arducam OV5647**, CSI ribbon cable, not USB — driven through Raspberry Pi
+   OS's `libcamera` stack, not a generic V4L2 UVC device. The real backend shells out to the
+   `rpicam-apps` CLI (`rpicam-jpeg`) via `posix_spawn`, the same process-launch mechanism
+   `apps/obc/supervisor` already uses — `rpicam-jpeg` writes a real JPEG file directly, so no
+   separate JPEG-encode step (e.g. `libjpeg`) is needed before handing frames to `compute`.
 
 ### D. MCU-side bring-up (ADCS + Thermals boards)
 
