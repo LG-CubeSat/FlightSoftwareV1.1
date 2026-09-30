@@ -34,6 +34,8 @@ target_include_directories(ssdv PUBLIC libs/ssdv)
 
 add_subdirectory(shared)
 add_subdirectory(sys)
+add_subdirectory(apps/adcs)
+add_subdirectory(apps/thermals)
 
 # ADCS/EPS target an STM32 running FreeRTOS. On HW_MODE=ON they'd currently
 # link the Linux-only real I2C driver and the POSIX FreeRTOS port -- neither

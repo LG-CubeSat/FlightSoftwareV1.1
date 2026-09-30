@@ -1,0 +1,9 @@
+../Core/Src/lcd1602.c:6:13:lcd_pulse_enable	1
+../Core/Src/lcd1602.c:15:13:lcd_write_nibble	1
+../Core/Src/lcd1602.c:44:13:lcd_send_byte	1
+../Core/Src/lcd1602.c:54:13:lcd_send_command	1
+../Core/Src/lcd1602.c:59:13:lcd_write_character	1
+../Core/Src/lcd1602.c:64:6:lcd_init	1
+../Core/Src/lcd1602.c:89:6:lcd_clear	1
+../Core/Src/lcd1602.c:95:6:lcd_set_cursor	2
+../Core/Src/lcd1602.c:111:6:lcd_print	2
