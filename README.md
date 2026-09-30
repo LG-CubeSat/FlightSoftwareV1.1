@@ -15,7 +15,7 @@ this file is the practical "clone it, build it, run it" reference for the softwa
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. **OBC's real backend now exists** (`platform/real/drivers/comms_i2c.c` — Linux `i2c-dev`/`ioctl`, round-robin polls known boards since real I2C can't do broadcast-and-listen like the SIM transport does), verified to compile against real Linux/i2c-dev headers, but only exercised via Docker so far — no physical bus yet. MCU-side (ADCS/Thermals real I2C slave) is still a stub, and the OBC/MCU split into separate real backends hasn't happened yet (see Known gaps). |
 | Thermals | CSP/FreeRTOS simulation scaffold builds successfully. Command handling, sensor collection, and on-demand telemetry are present; hardware drivers, closed-loop heater control, FDIR, and hardware testing remain. |
 | EPS | Not a CSP board at all — real hardware is a passive buck converter with no MCU. Address reserved in code in case future battery-monitoring hardware needs it. See `docs/satellite_architecture.md`. |
-| Camera / Comms (radio) | Not CSP boards — both are OBC-local peripherals (Arducam over USB-C, E22 LoRa module over UART). Their *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; real backends aren't written yet. |
+| Camera / Comms (radio) | Not CSP boards — both are OBC-local peripherals (Arducam OV5647 over CSI ribbon, E22 LoRa module over UART). Their *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; real backends aren't written yet. |
 
 ## Architecture at a glance
 

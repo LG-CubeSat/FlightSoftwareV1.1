@@ -16,3 +16,4 @@ build-hw/
 .vscode/c_cpp_properties.json
 .vscode/c_cpp_properties.json
 *.json
+build_hw/
