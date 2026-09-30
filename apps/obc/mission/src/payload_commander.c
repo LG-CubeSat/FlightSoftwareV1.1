@@ -68,11 +68,19 @@ int payload_commander_compress_photo(const char *in_path, const char *out_path)
 
     IPC_send(ROLE_COMPUTE, (const uint8_t *)&req, sizeof(req));
 
+    struct timespec deadline;
+    deadline_in_ms(&deadline, COMPRESS_TOTAL_TIMEOUT_MS);
+
     for (;;) {
         OBC_Roles_t src;
         uint8_t buf[sizeof(compute_result_t)];
-        int len = IPC_receive(&src, buf, sizeof(buf));
-        if (len != sizeof(compute_result_t)) continue;
+        int len = IPC_receive_timeout(&src, buf, sizeof(buf), remaining_ms(&deadline));
+        
+        if (len == IPC_TIMEOUT) {
+            fprintf(stderr, "[PAYLOAD COMMANDER] no result for compute for %s in %d ms\n", in_path, COMPRESS_TOTAL_TIMEOUT_MS);
+            return -1;
+        }
+        if (len != (int)sizeof(compute_result_t)) continue;
 
         compute_result_t result;
         memcpy(&result, buf, sizeof(result));
@@ -99,11 +107,25 @@ int payload_commander_downlink_photo(const char *photo_path)
     IPC_send(ROLE_DATA, (const uint8_t *)&req, sizeof(req));
 
     size_t total = 0;
+    
+    struct timespec total_deadline, chunk_deadline;
+    deadline_in_ms(&total_deadline, DOWNLINK_TOTAL_TIMEOUT_MS);
 
     for (;;) {
+        deadline_in_ms(&chunk_deadline, DOWNLINK_CHUNK_TIMEOUT_MS);
+
+        int wait = remaining_ms(&chunk_deadline);
+        int total_left = remaining_ms(&total_deadline);
+        if (total_left < wait) wait = total_left;
+
         OBC_Roles_t src;
         uint8_t buf[sizeof(data_read_reply_t)];
-        int len = IPC_receive(&src, buf, sizeof(buf));
+        int len = IPC_receive_timeout(&src, buf, sizeof(buf), wait);
+
+        if (len == IPC_TIMEOUT) {
+            fprintf(stderr, "[PAYLOAD COMMANDER] data went quit while reading%s\n", photo_path);
+            return -1;
+        }
         if (len != sizeof(data_read_reply_t)) continue;
 
         data_read_reply_t reply;

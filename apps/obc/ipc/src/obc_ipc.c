@@ -146,7 +146,7 @@ int IPC_receive(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_length)
     return IPC_receive_timeout(src_role, buffer, max_length, -1);
 }
 
-int IPC_receive(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_length, int timeout_ms)
+int IPC_receive_timeout(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_length, int timeout_ms)
 {
     if (bus_fd < 0) return -1;
 
