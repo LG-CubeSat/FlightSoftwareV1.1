@@ -94,3 +94,8 @@ set_tests_properties(compute_async_test PROPERTIES
     TIMEOUT 30
     RESOURCE_LOCK obc_ipc_sockets
 )
+
+add_executable(obc_progress_test test_obc_progress.c)
+target_link_libraries(obc_progress_test PRIVATE obc_progress)
+add_test(NAME obc_progress_test COMMAND obc_progress_test)
+set_tests_properties(obc_progress_test PROPERTIES TIMEOUT 5)

@@ -25,6 +25,11 @@ returns 0 on success or a pthread error code on failure.
 int obc_progress_init(obc_progress_t *watch, uint64_t timeout_ms);
 
 /*
+Marks an operation active and starts its progress deadline.
+*/
+void obc_progress_begin(obc_progress_t *watch);
+
+/*
 Records that the active operation passed a meaningful checkpoint.
 */
 void obc_progress_touch(obc_progress_t *watch);

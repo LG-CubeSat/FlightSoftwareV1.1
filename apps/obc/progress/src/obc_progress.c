@@ -7,7 +7,7 @@ static void monotonic_now(struct timespec *out)
     clock_gettime(CLOCK_MONOTONIC, out);
 }
 
-static uint64_t elpased_ms(const struct timespec *start, const struct timespec *end)
+static uint64_t elapsed_ms(const struct timespec *start, const struct timespec *end)
 {
     int64_t seconds = (int64_t)end->tv_sec - (int64_t)start->tv_sec;
     int64_t nanoseconds = (int64_t)end->tv_nsec - (int64_t)start->tv_nsec;
@@ -88,7 +88,7 @@ int obc_progress_is_healthy(obc_progress_t *watch)
     active = watch->active;
     last_progress = watch->last_progress;
     timeout_ms = watch->timeout_ms;
-    pthread_muitex_unlock(&watch->lock);
+    pthread_mutex_unlock(&watch->lock);
 
     if (!active) {
         return 1;
