@@ -6,7 +6,7 @@
 #include "simulation/thermal_model.h"
 #include "thermal_sensor.h"
 
-#define TEST_TARGET_TEMPERATURE_C  (50.0f)
+#define TEST_TARGET_TEMPERATURE_C  (40.0f)
 #define TEST_TIME_STEP_SECONDS     (0.1f)
 #define TEST_SIMULATION_STEPS      (10000)
 
@@ -88,7 +88,7 @@ int main(void)
         if ((step % 100) == 0)
         {
             printf(
-                "time=%6.1f  temp=%6.2f C  target=%6.2f C  power=%5.1f%%\n",
+                "time=%6.1f s  temp=%6.2f C  target=%6.2f C  power=%5.1f%%\n",
                 step * TEST_TIME_STEP_SECONDS,
                 average_temp,
                 TEST_TARGET_TEMPERATURE_C,
