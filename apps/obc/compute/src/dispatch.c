@@ -14,6 +14,7 @@
 #include "obc_compute_protocol.h"
 #include "obc_data_protocol.h"
 #include "ssdv_codec.h"
+#include "compute_health.h"
 
 #define CALL_SIGN "COM" // TODO: make this fetched from mission process...
 #define COMPUTE_MAX_DATA_SIZE (64 * 1024)          // matches payload_commander's MAX_PHOTO_SIZE ceiling
@@ -21,6 +22,8 @@
 #define COMPUTE_MAX_MSG_SIZE 256                    // matches obc_ipc's own MAX_IPC_PAYLOAD cap
 
 # define REPLY_SLOT_GRACE_MS 250
+
+#define DISPATCH_POLL_TIMEOUT_MS 1000
 
 static pthread_mutex_t reply_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t reply_cond = PTHREAD_COND_INITIALIZER;
@@ -139,8 +142,20 @@ void *dispatch_thread(void *arg) {
 
     for (;;) {
         OBC_Roles_t src;
-        int len = IPC_receive(&src, buf, sizeof(buf));
+        int len = IPC_receive_timeout(&src, buf, sizeof(buf), DISPATCH_POLL_TIMEOUT_MS);
 
+        /*
+        An ordinary timoeut proves the dispatch thread wokeup and completed aonther polling interval
+        */
+        if (len == IPC_TIMEOUT) {
+            compute_health_dispatch_progress();
+            continue;
+        }
+        
+        /* 
+        don't count receive errors as progress. if error continue
+        indefinitely, the dispatch watch will eventually become stale.
+        */
         if (len < 0) continue;
 
         printf("[OBC COMPUTE] got %d bytes from role %d\n", len, src);
@@ -152,5 +167,11 @@ void *dispatch_thread(void *arg) {
         } else if (len == sizeof(compute_cancel_request_t)) {
             handle_cancel_request(buf);
         }
+
+        /* 
+        record progress after processing. not immediately after receiving.
+        if a handler wedges, this line is never reached.
+        */
+        compute_health_dispatch_progress();
     }
 }
