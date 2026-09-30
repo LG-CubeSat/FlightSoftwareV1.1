@@ -32,6 +32,9 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define LCD_EDITOR_ROWS     2U
+#define LCD_EDITOR_COLUMNS  16U
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,9 +48,16 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 
 static uint8_t received_character;
-static uint8_t lcd_row = 0;
-static uint8_t lcd_column = 0;
-static char lcd_character_text[2] = {'\0', '\0'};
+static uint8_t lcd_row;
+static uint8_t lcd_column;
+static uint8_t editor_active;
+static uint8_t escape_state;
+
+static char lcd_buffer[LCD_EDITOR_ROWS][LCD_EDITOR_COLUMNS + 1U] =
+{
+  "                ",
+  "                "
+};
 
 /* USER CODE END PV */
 
@@ -61,6 +71,194 @@ static void MX_USART2_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+static void editor_clear_buffer(void)
+{
+  uint8_t row;
+  uint8_t column;
+
+  for (row = 0U; row < LCD_EDITOR_ROWS; row++)
+  {
+    for (column = 0U; column < LCD_EDITOR_COLUMNS; column++)
+    {
+      lcd_buffer[row][column] = ' ';
+    }
+
+    lcd_buffer[row][LCD_EDITOR_COLUMNS] = '\0';
+  }
+}
+
+static void editor_redraw(void)
+{
+  uint8_t row;
+
+  for (row = 0U; row < LCD_EDITOR_ROWS; row++)
+  {
+    lcd_set_cursor(row, 0U);
+    lcd_print(lcd_buffer[row]);
+  }
+
+  lcd_set_cursor(lcd_row, lcd_column);
+}
+
+static void editor_begin(void)
+{
+  if (editor_active == 0U)
+  {
+    editor_clear_buffer();
+    lcd_clear();
+
+    lcd_row = 0U;
+    lcd_column = 0U;
+    editor_active = 1U;
+
+    editor_redraw();
+  }
+}
+
+static void editor_clear(void)
+{
+  editor_clear_buffer();
+  lcd_clear();
+
+  lcd_row = 0U;
+  lcd_column = 0U;
+  editor_active = 1U;
+
+  editor_redraw();
+}
+
+static void editor_write_character(char character)
+{
+  editor_begin();
+
+  lcd_buffer[lcd_row][lcd_column] = character;
+
+  if (lcd_column < (LCD_EDITOR_COLUMNS - 1U))
+  {
+    lcd_column++;
+  }
+  else
+  {
+    lcd_column = 0U;
+    lcd_row = (lcd_row == 0U) ? 1U : 0U;
+  }
+
+  editor_redraw();
+}
+
+static void editor_backspace(void)
+{
+  if (editor_active == 0U)
+  {
+    return;
+  }
+
+  if (lcd_column > 0U)
+  {
+    lcd_column--;
+  }
+  else
+  {
+    lcd_row = (lcd_row == 0U) ? 1U : 0U;
+    lcd_column = LCD_EDITOR_COLUMNS - 1U;
+  }
+
+  lcd_buffer[lcd_row][lcd_column] = ' ';
+  editor_redraw();
+}
+
+static void editor_new_line(void)
+{
+  editor_begin();
+
+  lcd_row = (lcd_row == 0U) ? 1U : 0U;
+  lcd_column = 0U;
+
+  editor_redraw();
+}
+
+static void editor_handle_arrow(uint8_t arrow)
+{
+  if (editor_active == 0U)
+  {
+    return;
+  }
+
+  if ((arrow == 'A') && (lcd_row > 0U))
+  {
+    lcd_row--;
+  }
+  else if ((arrow == 'B') && (lcd_row < (LCD_EDITOR_ROWS - 1U)))
+  {
+    lcd_row++;
+  }
+  else if ((arrow == 'C') && (lcd_column < (LCD_EDITOR_COLUMNS - 1U)))
+  {
+    lcd_column++;
+  }
+  else if ((arrow == 'D') && (lcd_column > 0U))
+  {
+    lcd_column--;
+  }
+
+  editor_redraw();
+}
+
+static void editor_process_byte(uint8_t byte)
+{
+  if (escape_state == 1U)
+  {
+    if ((byte == '[') || (byte == 'O'))
+    {
+      escape_state = 2U;
+    }
+    else
+    {
+      escape_state = 0U;
+    }
+
+    return;
+  }
+
+  if (escape_state == 2U)
+  {
+    if ((byte == 'A') || (byte == 'B') ||
+        (byte == 'C') || (byte == 'D'))
+    {
+      editor_handle_arrow(byte);
+    }
+    else if (byte == 'Z')
+    {
+      /* Shift-Tab sends ESC [ Z. */
+      editor_clear();
+    }
+
+    escape_state = 0U;
+    return;
+  }
+
+  if (byte == 27U)
+  {
+    escape_state = 1U;
+  }
+  else if (byte == '\r')
+  {
+    editor_new_line();
+  }
+  else if (byte == '\n')
+  {
+    /* Ignore the second byte of a CR/LF line ending. */
+  }
+  else if ((byte == '\b') || (byte == 127U))
+  {
+    editor_backspace();
+  }
+  else if ((byte >= 32U) && (byte <= 126U))
+  {
+    editor_write_character((char)byte);
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -102,8 +300,10 @@ int main(void)
   lcd_set_cursor(0, 0);
   lcd_print("Type over USB:");
 
-  lcd_row = 1;
-  lcd_column = 0;
+  lcd_row = 1U;
+  lcd_column = 0U;
+  editor_active = 0U;
+  escape_state = 0U;
   lcd_set_cursor(lcd_row, lcd_column);
   /* USER CODE END 2 */
 
@@ -115,57 +315,10 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  if (HAL_UART_Receive(
-	          &huart2,
-	          &received_character,
-	          1,
-	          10) == HAL_OK)
-	  {
-	      if (received_character == '\r')
-	      {
-	          lcd_clear();
-	          lcd_row = 0;
-	          lcd_column = 0;
-	          lcd_set_cursor(lcd_row, lcd_column);
-	      }
-	      else if (received_character == '\n')
-	      {
-	          /* Ignore the line-feed character. */
-	      }
-	      else if ((received_character == '\b') ||
-	               (received_character == 127U))
-	      {
-	          if (lcd_column > 0U)
-	          {
-	              lcd_column--;
-
-	              lcd_set_cursor(lcd_row, lcd_column);
-	              lcd_print(" ");
-	              lcd_set_cursor(lcd_row, lcd_column);
-	          }
-	      }
-	      else if ((received_character >= 32U) &&
-	               (received_character <= 126U))
-	      {
-	          lcd_character_text[0] = (char)received_character;
-	          lcd_print(lcd_character_text);
-
-	          lcd_column++;
-
-	          if (lcd_column >= 16U)
-	          {
-	              lcd_column = 0;
-	              lcd_row++;
-
-	              if (lcd_row >= 2U)
-	              {
-	                  lcd_row = 0;
-	              }
-
-	              lcd_set_cursor(lcd_row, lcd_column);
-	          }
-	      }
-	  }
+    if (HAL_UART_Receive(&huart2, &received_character, 1U, 10U) == HAL_OK)
+    {
+      editor_process_byte(received_character);
+    }
 
   }
   /* USER CODE END 3 */
