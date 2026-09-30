@@ -11,10 +11,35 @@
 #include "obc_relay_protocol.h"
 #include "obc_data_protocol.h"
 #include "obc_compute_protocol.h"
+#include "time.h"
 
 #define MAX_PHOTO_SIZE (64 * 1024) // 64kb, tune to real photo size
 
+/* 
+Compute's own job deadline is 60s (COMPUTE_JOB_TIMEOUT_MS), 
+so give it headroom before we conclude the whole process is gone.
+*/
+#define COMPRESS_TOTAL_TIMEOUT_MS 90000
+#define DOWNLINK_CHUNK_TIMEOUT_MS 10000
+#define DOWNLINK_TOTAL_TIMEOUT_MS 120000
+
 static uint8_t photo_buf[MAX_PHOTO_SIZE];
+
+static void deadline_in_ms(struct timespec *out, int ms)
+{
+    clock_gettime(CLOCK_MONOTONIC, out);
+    out->tv_sec += ms / 1000;
+    out->tv_nsec += (long)(ms % 1000) * 1000000L;
+    if (out->tv_nsec >= 1000000000L) { out->tv_sec += 1; out->tv_nsec -= 1000000000L; }
+}
+
+static int remaining_ms(const struct timespec *deadline)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    long ms = (long)(deadline->tv_sec - now.tv_sec) * 1000 + (deadline->tv_nsec - now.tv_nsec) / 1000000L;
+    return (ms > 0) ? (int)ms: 0;
+}
 
 int payload_commander_take_photo(const char *out_path)
 {
