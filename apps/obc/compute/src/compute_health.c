@@ -59,7 +59,7 @@ void compute_health_worker_begin(void)
 }
 
 void compute_health_worker_progress(void) {
-    obc_progress_toch(&worker_watch);
+    obc_progress_touch(&worker_watch);
 }
 
 void compute_health_worker_end(void)

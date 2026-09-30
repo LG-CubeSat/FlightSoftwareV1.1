@@ -19,6 +19,6 @@ void compute_health_worker_end(void);
 /*
 Compute is healthy only if both its dispatch and worker watches are healthy
 */
-int compute_healthy(void);
+int compute_health_is_healthy(void);
 
 #endif

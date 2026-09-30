@@ -57,7 +57,7 @@ not a real cross-compiled link. Verify 0.1/0.3 with an actual HW_MODE build once
       resets the ascent timer to zero and replays the whole timeline from scratch. Persist
       mission phase to disk and reload on start. Also note `CLOCK_MONOTONIC` itself resets at
       Pi reboot.
-- [ ] **1.4 — `IPC_receive` has no timeout, and this wedges `compute` permanently.** If `data`
+- [X] **1.4 — `IPC_receive` has no timeout, and this wedges `compute` permanently.** If `data`
       dies mid-stream, the worker thread blocks forever in `wait_for_reply` with `job_busy = 1`
       held — every subsequent compress request gets `COMPUTE_STATUS_BUSY` for the rest of the
       flight. Add a receive timeout and a job deadline that releases `job_busy`.
