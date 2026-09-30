@@ -17,3 +17,8 @@ build-hw/
 .vscode/c_cpp_properties.json
 *.json
 build_hw/
+
+# STM32CubeIDE local workspace and generated build outputs
+**/.metadata/
+**/Debug/
+**/Release/
