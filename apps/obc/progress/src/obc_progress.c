@@ -81,7 +81,7 @@ int obc_progress_is_healthy(obc_progress_t *watch)
     monotonic_now(&now);
 
     /*
-    copy the statw while holding the lock, then perform the calculation
+    copy the state while holding the lock, then perform the calculation
     after releasing it. this keeps the critical section short.
     */
     pthread_mutex_lock(&watch->lock);

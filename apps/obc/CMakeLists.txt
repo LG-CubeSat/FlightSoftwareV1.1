@@ -1,4 +1,6 @@
 add_subdirectory(ipc)
+add_subdirectory(progress)
+
 add_subdirectory(supervisor)
 add_subdirectory(commands)
 add_subdirectory(compute)
