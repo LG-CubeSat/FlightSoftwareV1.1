@@ -80,7 +80,7 @@ void lcd_init(void)
     lcd_write_nibble(0x02);
 
     lcd_send_command(0x28);
-    lcd_send_command(0x0E);
+    lcd_send_command(0x0C);
     lcd_send_command(0x06);
 
     lcd_clear();
