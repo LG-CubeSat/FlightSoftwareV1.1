@@ -44,11 +44,14 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
-static uint8_t received_character;
-static uint8_t lcd_row = 0;
-static uint8_t lcd_column = 0;
-static char lcd_character_text[2] = {'\0', '\0'};
 
+static uint8_t received_character;
+static uint8_t lcd_row = 0U;
+static uint8_t lcd_column = 0U;
+static uint8_t typing_started = 0U;
+static uint8_t escape_state = 0U;
+
+static char lcd_character_text[2] = {'\0', '\0'};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -121,23 +124,99 @@ int main(void)
 	          1,
 	          10) == HAL_OK)
 	  {
-	      if (received_character == '\r')
+	      if (escape_state == 1U)
 	      {
-	          lcd_clear();
-	          lcd_row = 0;
-	          lcd_column = 0;
+	          if (received_character == '[')
+	          {
+	              escape_state = 2U;
+	          }
+	          else
+	          {
+	              escape_state = 0U;
+	          }
+	      }
+	      else if (escape_state == 2U)
+	      {
+	          if (received_character == 'Z')
+	          {
+	              /* Shift-Tab clears the complete display. */
+	              lcd_clear();
+
+	              lcd_row = 0U;
+	              lcd_column = 0U;
+	              typing_started = 1U;
+	          }
+	          else if (typing_started != 0U)
+	          {
+	              if ((received_character == 'A') && (lcd_row > 0U))
+	              {
+	                  /* Up arrow */
+	                  lcd_row--;
+	              }
+	              else if ((received_character == 'B') && (lcd_row < 1U))
+	              {
+	                  /* Down arrow */
+	                  lcd_row++;
+	              }
+	              else if ((received_character == 'C') && (lcd_column < 15U))
+	              {
+	                  /* Right arrow */
+	                  lcd_column++;
+	              }
+	              else if ((received_character == 'D') && (lcd_column > 0U))
+	              {
+	                  /* Left arrow */
+	                  lcd_column--;
+	              }
+	          }
+
+	          escape_state = 0U;
+	          lcd_set_cursor(lcd_row, lcd_column);
+	      }
+	      else if (received_character == 27U)
+	      {
+	          /* 27 is the ESC byte that begins an arrow-key sequence. */
+	          escape_state = 1U;
+	      }
+	      else if (received_character == '\r')
+	      {
+	          if (typing_started == 0U)
+	          {
+	              lcd_clear();
+	              typing_started = 1U;
+	          }
+
+	          lcd_column = 0U;
+
+	          if (lcd_row == 0U)
+	          {
+	              lcd_row = 1U;
+	          }
+	          else
+	          {
+	              lcd_row = 0U;
+	          }
+
 	          lcd_set_cursor(lcd_row, lcd_column);
 	      }
 	      else if (received_character == '\n')
 	      {
-	          /* Ignore the line-feed character. */
+	          /* Ignore line feed. */
 	      }
 	      else if ((received_character == '\b') ||
 	               (received_character == 127U))
 	      {
-	          if (lcd_column > 0U)
+	          if (typing_started != 0U)
 	          {
-	              lcd_column--;
+	              if (lcd_column > 0U)
+	              {
+	                  lcd_column--;
+	              }
+	              else if (lcd_row > 0U)
+	              {
+	                  lcd_row--;
+	                  lcd_column = 15U;
+	              }
 
 	              lcd_set_cursor(lcd_row, lcd_column);
 	              lcd_print(" ");
@@ -147,6 +226,18 @@ int main(void)
 	      else if ((received_character >= 32U) &&
 	               (received_character <= 126U))
 	      {
+	          if (typing_started == 0U)
+	          {
+	              /* Remove the starting message before the first character. */
+	              lcd_clear();
+
+	              lcd_row = 0U;
+	              lcd_column = 0U;
+	              typing_started = 1U;
+
+	              lcd_set_cursor(lcd_row, lcd_column);
+	          }
+
 	          lcd_character_text[0] = (char)received_character;
 	          lcd_print(lcd_character_text);
 
@@ -154,21 +245,23 @@ int main(void)
 
 	          if (lcd_column >= 16U)
 	          {
-	              lcd_column = 0;
-	              lcd_row++;
+	              lcd_column = 0U;
 
-	              if (lcd_row >= 2U)
+	              if (lcd_row == 0U)
 	              {
-	                  lcd_row = 0;
+	                  lcd_row = 1U;
+	              }
+	              else
+	              {
+	                  lcd_row = 0U;
 	              }
 
 	              lcd_set_cursor(lcd_row, lcd_column);
 	          }
 	      }
 	  }
-
-  }
   /* USER CODE END 3 */
+  }
 }
 
 /**
