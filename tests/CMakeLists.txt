@@ -111,7 +111,56 @@ set_tests_properties(compute_progress_test PROPERTIES
     RESOURCE_LOCK obc_ipc_sockets
 )
 
+add_executable(data_progress_test test_data_progress.c)
+target_link_libraries(data_progress_test PRIVATE obc_ipc)
+target_include_directories(data_progress_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/apps/obc/include
+)
+add_dependencies(data_progress_test obc_data)
+
+add_test(
+    NAME data_progress_test
+    COMMAND data_progress_test "$<TARGET_FILE:obc_data>"
+)
+set_tests_properties(data_progress_test PROPERTIES
+    TIMEOUT 20
+    RESOURCE_LOCK obc_ipc_sockets
+)
+
+add_executable(mission_progress_test test_mission_progress.c)
+target_link_libraries(mission_progress_test PRIVATE obc_ipc)
+target_include_directories(mission_progress_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/apps/obc/include
+)
+add_dependencies(mission_progress_test obc_mission)
+
+add_test(
+    NAME mission_progress_test
+    COMMAND mission_progress_test "$<TARGET_FILE:obc_mission>"
+)
+set_tests_properties(mission_progress_test PROPERTIES
+    TIMEOUT 20
+    RESOURCE_LOCK obc_ipc_sockets
+)
+
 add_executable(obc_progress_test test_obc_progress.c)
 target_link_libraries(obc_progress_test PRIVATE obc_progress)
 add_test(NAME obc_progress_test COMMAND obc_progress_test)
 set_tests_properties(obc_progress_test PROPERTIES TIMEOUT 5)
+
+add_executable(obc_role_health_test
+    test_obc_role_health.c
+    ${CMAKE_SOURCE_DIR}/apps/obc/data/src/data_health.c
+    ${CMAKE_SOURCE_DIR}/apps/obc/commands/src/commands_health.c
+    ${CMAKE_SOURCE_DIR}/apps/obc/mission/src/mission_health.c
+    ${CMAKE_SOURCE_DIR}/apps/obc/time/src/time_health.c
+)
+target_include_directories(obc_role_health_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/apps/obc/data/include
+    ${CMAKE_SOURCE_DIR}/apps/obc/commands/include
+    ${CMAKE_SOURCE_DIR}/apps/obc/mission/include
+    ${CMAKE_SOURCE_DIR}/apps/obc/time/include
+)
+target_link_libraries(obc_role_health_test PRIVATE obc_progress)
+add_test(NAME obc_role_health_test COMMAND obc_role_health_test)
+set_tests_properties(obc_role_health_test PROPERTIES TIMEOUT 5)
