@@ -10,6 +10,7 @@
 #include "obc_sleep_until.h"
 #include "payload_commander.h"
 #include "pthread.h"
+#include "mission_health.h"
 
 #define ASCENT_WAIT_SEC 5400 // ~90 min: typical HAB ascent to burst altitude at ~5 m/s; tune once real ascent rate/fill is known
 #define PHOTO_PATH "/tmp/photos" // placeholder
@@ -156,6 +157,7 @@ void *scheduler_thread(void *arg) {
     int ascent_wait_sec = get_ascent_wait_sec();
 
     mission_state_load(); // restores phase + mission_start_unix
+    mission_health_scheduler_progress();
 
     for (;;) {
         struct timespec now;
@@ -170,30 +172,42 @@ void *scheduler_thread(void *arg) {
                     set_state(MISSION_TAKING_PHOTO);
                 }
                 break;
-            case MISSION_TAKING_PHOTO:
-                if (payload_commander_take_photo(PHOTO_PATH) == 0) {
+            case MISSION_TAKING_PHOTO: {
+                mission_health_payload_begin();
+                int result = payload_commander_take_photo(PHOTO_PATH);
+                mission_health_payload_end();
+                if (result == 0) {
                     set_state(MISSION_COMPRESSING);
                 } else if (++retry_count >= STEP_RETRY_LIMIT) {
                     fprintf(stderr, "[SCHEDULER] Photo capture failed %d times, abandoning this cycle\n", retry_count);
                     enter_cooldown();
                 }
                 break;
-            case MISSION_COMPRESSING:
-                if (payload_commander_compress_photo(PHOTO_PATH, COMPRESSED_PHOTO_PATH) == 0) {
+            }
+            case MISSION_COMPRESSING: {
+                mission_health_payload_begin();
+                int result = payload_commander_compress_photo(PHOTO_PATH, COMPRESSED_PHOTO_PATH);
+                mission_health_payload_end();
+                if (result == 0) {
                     set_state(MISSION_DOWNLINKING);
                 } else if (++retry_count >= STEP_RETRY_LIMIT) {
                     fprintf(stderr, "[SCHEDULER] Photo compression failed %d times, abandoning this cycle\n", retry_count);
                     enter_cooldown();
                 }
                 break;
-            case MISSION_DOWNLINKING:
-                if (payload_commander_downlink_photo(COMPRESSED_PHOTO_PATH) == 0) {
+            }
+            case MISSION_DOWNLINKING: {
+                mission_health_payload_begin();
+                int result = payload_commander_downlink_photo(COMPRESSED_PHOTO_PATH);
+                mission_health_payload_end();
+                if (result == 0) {
                     enter_cooldown(); // success also goes to cooldown. Next cycle starts after the pause
                 } else if (++retry_count >= STEP_RETRY_LIMIT) {
                     fprintf(stderr, "[SCHEDULER] Downlink failed %d times, abandoning this cycle\n", retry_count);
                     enter_cooldown();
                 }
                 break;
+            }
             case MISSION_COOLDOWN: { // braces keep cooldown_elapsed's scope local to this case
                 double cooldown_elapsed = (now.tv_sec - cooldown_start.tv_sec) + (now.tv_nsec - cooldown_start.tv_nsec) / 1e9;
                 if (cooldown_elapsed >= COOLDOWN_SEC) {
@@ -204,6 +218,9 @@ void *scheduler_thread(void *arg) {
                 break;
             }
         }
+
+        /* Reaching here proves the complete state handler returned. */
+        mission_health_scheduler_progress();
 
         next.tv_sec += 1;
         obc_sleep_until(&next);

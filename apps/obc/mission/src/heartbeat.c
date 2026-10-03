@@ -5,6 +5,7 @@
 #include "pthread.h"
 #include "obc_ipc.h"
 #include "obc_sleep_until.h"
+#include "mission_health.h"
 
 /* Proves this process is alive to supervisor's frozen-check -- without
    this, supervisor has no way to tell "still running" from "hung", and
@@ -33,10 +34,27 @@ void *heartbeat_thread(void *arg)
     (void)arg;
 
     struct timespec next;
+    int previously_healthy = 1;
     clock_gettime(CLOCK_MONOTONIC, &next);
 
     for (;;) {
-        IPC_send(ROLE_SUPERVISOR, NULL, 0); // zero payload ping
+        int healthy = mission_health_is_healthy();
+
+        if (healthy) {
+            IPC_send(ROLE_SUPERVISOR, NULL, 0);
+
+            if (!previously_healthy) {
+                printf("[OBC MISSION HEALTH] Progress recovered. heartbeats resumed.\n");
+                fflush(stdout);
+            }
+        } else if (previously_healthy) {
+            fprintf(
+                stderr,
+                "[OBC MISSION HEALTH] Progress stalled. withholding heartbeat.\n"
+            );
+        }
+
+        previously_healthy = healthy;
 
         next.tv_sec += HEARTBEAT_PERIOD_SEC;
         obc_sleep_until(&next);

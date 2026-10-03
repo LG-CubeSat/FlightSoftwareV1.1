@@ -12,6 +12,7 @@
 #include "obc_data_protocol.h"
 #include "obc_compute_protocol.h"
 #include "time.h"
+#include "mission_health.h"
 
 #define MAX_PHOTO_SIZE (64 * 1024) // 64kb, tune to real photo size
 
@@ -49,6 +50,7 @@ int payload_commander_take_photo(const char *out_path)
        fprintf(stderr, "[PAYLOAD COMMANDER] photo capture failed\n");
         return -1;
     }
+    mission_health_payload_progress();
     return 0;
 }
 
@@ -85,6 +87,8 @@ int payload_commander_compress_photo(const char *in_path, const char *out_path)
         compute_result_t result;
         memcpy(&result, buf, sizeof(result));
         if (result.job_id != job_id) continue; // stale reply from an earlier job, not ours
+
+        mission_health_payload_progress();
 
         if (result.status != COMPUTE_STATUS_OK) {
             fprintf(stderr, "[PAYLOAD COMMANDER] compression of %s failed (status=%d)\n", in_path, result.status);
@@ -143,6 +147,7 @@ int payload_commander_downlink_photo(const char *photo_path)
 
         memcpy(photo_buf + total, reply.payload, reply.length);
         total += reply.length;
+        mission_health_payload_progress();
 
         if (reply.is_last) break;
     }
@@ -157,6 +162,8 @@ int payload_commander_downlink_photo(const char *photo_path)
         fprintf(stderr, "[PAYLOAD COMMANDER] downlink failed.\n");
         return -1;
     }
+
+    mission_health_payload_progress();
 
     return 0;
 }

@@ -6,6 +6,7 @@
 
 #include "payload_commander.h"
 #include "obc_sleep_until.h"
+#include "mission_health.h"
 
 typedef struct {
     const char *name;
@@ -62,6 +63,8 @@ void *autonomy_thread(void *arg)
                 }
             }
         }
+
+        mission_health_autonomy_progress();
 
         next.tv_sec += 1;
         obc_sleep_until(&next);

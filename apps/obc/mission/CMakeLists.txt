@@ -4,6 +4,7 @@ add_executable(obc_mission
     src/autonomy.c
     src/payload_commander.c
     src/heartbeat.c
+    src/mission_health.c
 )
 
 target_include_directories(obc_mission PRIVATE
@@ -11,4 +12,4 @@ target_include_directories(obc_mission PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
-target_link_libraries(obc_mission PRIVATE obc_ipc pthread platform csp_interface)
+target_link_libraries(obc_mission PRIVATE obc_ipc pthread platform csp_interface obc_progress)
