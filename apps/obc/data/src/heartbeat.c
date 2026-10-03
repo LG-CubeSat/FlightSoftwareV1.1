@@ -41,6 +41,7 @@ void *heartbeat_thread(void *arg)
         int healthy = data_health_is_healthy();
 
         if (healthy) {
+            IPC_send(ROLE_FDIR, NULL, 0);
             IPC_send(ROLE_SUPERVISOR, NULL, 0);
 
             if (!previously_healthy) {
