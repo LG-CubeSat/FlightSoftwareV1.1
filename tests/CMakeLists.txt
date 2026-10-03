@@ -95,6 +95,22 @@ set_tests_properties(compute_async_test PROPERTIES
     RESOURCE_LOCK obc_ipc_sockets
 )
 
+add_executable(compute_progress_test test_compute_progress.c)
+target_link_libraries(compute_progress_test PRIVATE obc_ipc)
+target_include_directories(compute_progress_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/apps/obc/include
+)
+add_dependencies(compute_progress_test obc_compute)
+
+add_test(
+    NAME compute_progress_test
+    COMMAND compute_progress_test "$<TARGET_FILE:obc_compute>"
+)
+set_tests_properties(compute_progress_test PROPERTIES
+    TIMEOUT 20
+    RESOURCE_LOCK obc_ipc_sockets
+)
+
 add_executable(obc_progress_test test_obc_progress.c)
 target_link_libraries(obc_progress_test PRIVATE obc_progress)
 add_test(NAME obc_progress_test COMMAND obc_progress_test)
