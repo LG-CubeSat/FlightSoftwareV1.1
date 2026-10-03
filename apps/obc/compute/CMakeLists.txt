@@ -21,4 +21,14 @@ target_include_directories(obc_compute PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
+# Supervisor luanches these executables at runtime. Cmake cannot infer dependencies made through posix spawn. So must be declared beforehand.
+add_dependencies(obc_supervisor
+    obc_fdir
+    obc_commands
+    obc_compute
+    obc_data
+    obc_mission
+    obc_time
+)
+
 target_link_libraries(obc_compute PRIVATE obc_ipc pthread obc_ssdv_codec obc_progress)
