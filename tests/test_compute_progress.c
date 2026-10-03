@@ -41,7 +41,7 @@ static int64_t monotonic_ms(void)
 {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
-    
+
     return (int64_t)now.tv_sec * 1000 +
         now.tv_nsec / 1000000;
 }
@@ -109,14 +109,14 @@ static void run_fake_data(int event_fd)
     }
 
     /*
-    Deliberate sabatage: remain alive but never send the next chunk.
+    Deliberate sabotage: remain alive but never send the next chunk.
     */
     for (;;) {
         sleep(1);
     }
 }
 
-static pid_t spawn_compute(void)
+static pid_t spawn_compute(const char *compute_path)
 {
     int log_fd = open(
         COMPUTE_LOG,
@@ -145,16 +145,14 @@ static pid_t spawn_compute(void)
         These variables affect only this child and the compute process
         that replaces it through execl().
         */
-       setenv("COMPUTE_WORKER_STALL_TIMEOUT_MS", "1500", 1);
-       setenv("COMPUTE_REPLY_TIMEOUT_MS", "10000", 1);
+        setenv("COMPUTE_WORKER_STALL_TIMEOUT_MS", WORKER_STALL_TIMEOUT, 1);
+        setenv("COMPUTE_REPLY_TIMEOUT_MS", REPLY_TIMEOUT, 1);
 
-       execl(COMPUTE_PATH, COMPUTE_PATH, (char *)NULL);
+        execl(compute_path, compute_path, (char *)NULL);
 
-       /*
-       Reached only if execl fails
-       */
-      perror("execl obc_compute");
-      _exit(127);
+        /* Reached only if execl fails. */
+        perror("execl obc_compute");
+        _exit(127);
     }
     close(log_fd);
     return pid;
@@ -261,9 +259,24 @@ static void cleanup_socket_paths(void)
     unlink("/tmp/obc_ipc_mission.sock");
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     alarm(TEST_TIMEOUT_SEC);
+
+    if (argc != 2) {
+        fprintf(
+            stderr,
+            "usage: %s /path/to/obc_compute\n",
+            argv[0]
+        );
+        return 2;
+    }
+
+    const char *compute_path = argv[1];
+    if (access(compute_path, X_OK) != 0) {
+        perror("compute executable is not accessible");
+        return 2;
+    }
 
     cleanup_socket_paths();
     unlink(COMPUTE_LOG);
@@ -309,7 +322,7 @@ int main(void)
         return 1;
     }
 
-    pid_t compute_pid = spawn_compute();
+    pid_t compute_pid = spawn_compute(compute_path);
     if (compute_pid < 0) {
         stop_process(data_pid);
         close(data_events[0]);

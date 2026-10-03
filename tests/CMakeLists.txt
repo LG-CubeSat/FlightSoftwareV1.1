@@ -100,12 +100,12 @@ target_link_libraries(compute_progress_test PRIVATE obc_ipc)
 target_include_directories(compute_progress_test PRIVATE
     ${CMAKE_SOURCE_DIR}/apps/obc/include
 )
-target_compile_definitions(compute_progress_test PRIVATE
-    COMPUTE_PATH="$<TARGET_FILE:obc_compute>"
-)
 add_dependencies(compute_progress_test obc_compute)
 
-add_test(NAME compute_progress_test COMMAND compute_progress_test)
+add_test(
+    NAME compute_progress_test
+    COMMAND compute_progress_test "$<TARGET_FILE:obc_compute>"
+)
 set_tests_properties(compute_progress_test PROPERTIES
     TIMEOUT 20
     RESOURCE_LOCK obc_ipc_sockets
