@@ -149,6 +149,13 @@ void *worker_thread(void *arg) {
         }
 
         memcpy(input_buf + input_len, reply.payload, reply.length);
+
+        if (reply.length > sizeof(reply.payload) || input_len + reply.length >= sizeof(input_buf)) {
+            fprintf(stderr, "[OBC COMPUTE] job %u: %s exceeds %d byte cap (have %zu, + %u more)\n", job_id, in_path, COMPUTE_MAX_DATA_SIZE, input_len, reply.len);
+            send_result(job_id, requester, epoch, COMPUTE_STATUS_FAILED, 0);
+            return NULL; // fail if overflow
+        }
+
         input_len += reply.length;
 
         compute_health_worker_progress();

@@ -39,6 +39,10 @@ typedef struct {
     uint8_t payload[MAX_IPC_PAYLOAD];
 } IPCFrame;
 
+static inline int role_is_valid(unsigned v) {
+    return v>=ROLE_COMMANDS && v < ROLE_COUNT;
+}
+
 /* Wire format: [dest:1][src:1][length:2 network order][payload: length]*/
 static int ipc_frame_serialize(const IPCFrame *f, uint8_t *out, size_t out_size)
 {
@@ -183,6 +187,12 @@ int IPC_receive_timeout(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_len
 
     // setsockopt alters the socket so readfull has timelimit
     if (read_full(conn, buffer, payload_len) < 0) { close(conn); return IPC_ERROR; }
+
+    if (!role_is_valid(header[1])) {
+        fprintf(stderr, "[IPC] dropping frame with invalid src role %u\n", header[1]);
+        close(conn);
+        return IPC_ERROR;
+    }
 
     if (src_role != NULL) {
         *src_role = (OBC_Roles_t)header[1];

@@ -23,7 +23,7 @@
 #define SHUTDOWN_GRACE_SEC 3
 #define MAX_CRASH_RESTARTS 5
 
-static struct timespec last_heartbeat[ROLE_TIME + 1]; // indexed by OBC_Roles_t
+static struct timespec last_heartbeat[ROLE_COUNT]; // indexed by OBC_Roles_t
 static pthread_mutex_t hb_lock = PTHREAD_MUTEX_INITIALIZER; // guards the heartbeat timestamp updates
 static pthread_mutex_t proc_lock = PTHREAD_MUTEX_INITIALIZER; // guards .pid across processes[]
 static volatile sig_atomic_t shutting_down = 0; // set by supervisor_shutdown_all
@@ -276,6 +276,10 @@ obc_process_t *supervisor_find_process(OBC_Roles_t role)
 
 void supervisor_mark_alive(OBC_Roles_t role)
 {
+    if (!role_is_valid((unsigned)role)) {
+        fprintf(stderr, "[SUPERVISOR] ignoring heartbeat for invalid role %d\n", role);
+        return;
+    }
     pthread_mutex_lock(&hb_lock);
     clock_gettime(CLOCK_MONOTONIC, &last_heartbeat[role]); // writes the monotonic to the last_heartbeat
     pthread_mutex_unlock(&hb_lock);
