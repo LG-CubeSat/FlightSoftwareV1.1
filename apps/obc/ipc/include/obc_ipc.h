@@ -19,6 +19,7 @@ typedef enum {
     ROLE_SUPERVISOR = 6,
     ROLE_TIME = 7,
     ROLE_CAM = 8, // sorta not really a role
+    ROLE_COUNT // not a role: array sizing bound, keep last
 } OBC_Roles_t;
 
 // init
