@@ -1,6 +1,8 @@
 #include "compute_health.h"
 
 #include "obc_progress.h"
+#include <errno.h>
+#include <stdlib.h>
 
 /*
 Dispatch will eventually wake once per second, so three seconds gives
@@ -14,12 +16,42 @@ Give it additonal headroom before declaring it stuck.
 TODO: This should be tuned eventually
 */
 #define WORKER_STALL_TIMEOUT_MS 10000
+#define WORKER_STALL_TIMEOUT_ENV "COMPUTE_WORKER_STALL_TIMEOUT_MS"
 
 static obc_progress_t dispatch_watch;
 static obc_progress_t worker_watch;
 
+static uint64_t timeout_from_env(
+    const char *name,
+    uint64_t fallback
+) {
+    const char *text = getenv(name);
+
+    if (text == NULL || text[0] == '\0') {
+        return fallback;
+    }
+
+    errno = 0;
+    char *end = NULL;
+
+    unsigned long long parsed = strtoull(text, &end, 10); // strtoull = str to unsigned long long
+
+    if (errno != 0 ||
+        end == text ||
+        *end != '\0' ||
+        parsed == 0) {
+        return fallback;
+    }
+    return (uint64_t)parsed;
+}
+
 int compute_health_init(void)
 {
+    uint64_t worker_timeout_ms = timeout_from_env(
+        WORKER_STALL_TIMEOUT_ENV,
+        WORKER_STALL_TIMEOUT_MS
+    );
+
     int ret = obc_progress_init(
         &dispatch_watch,
         DISPATCH_STALL_TIMEOUT_MS
@@ -31,7 +63,7 @@ int compute_health_init(void)
 
     ret = obc_progress_init(
         &worker_watch,
-        WORKER_STALL_TIMEOUT_MS
+        worker_timeout_ms
     );
 
     if (ret != 0) {
