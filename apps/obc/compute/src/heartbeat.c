@@ -41,6 +41,7 @@ void *heartbeat_thread(void *arg)
         int healthy = compute_health_is_healthy();
 
         if (healthy) {
+            IPC_send(ROLE_FDIR, NULL, 0);
             IPC_send(ROLE_SUPERVISOR, NULL, 0);
 
             if (!previously_healthy) {
@@ -59,7 +60,7 @@ void *heartbeat_thread(void *arg)
         }
 
         previously_healthy = healthy;
-        
+
         next.tv_sec += HEARTBEAT_PERIOD_SEC;
         obc_sleep_until(&next);
     }
