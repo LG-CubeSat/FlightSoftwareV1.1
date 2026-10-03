@@ -10,6 +10,7 @@
 #include "ssdv_codec.h"
 #include "dispatch.h"
 #include "time.h"
+#include "compute_health.h"
 
 #define CALL_SIGN "COM" // TODO: make this fetched from mission process...
 #define COMPUTE_MAX_DATA_SIZE (64 * 1024)          // matches payload_commander's MAX_PHOTO_SIZE ceiling
@@ -96,7 +97,10 @@ static void send_result(uint32_t job_id, OBC_Roles_t requester, uint32_t epoch,
     /* Close the epoch before releasing job busy or else a new job can start while this job's replies are still deliverable. */
     dispatch_job_end(epoch);
 
-    pthread_mutex_lock(&job_lock); job_busy = 0;
+    compute_health_worker_end();
+
+    pthread_mutex_lock(&job_lock); 
+    job_busy = 0;
     pthread_mutex_unlock(&job_lock);
 }
 
@@ -146,6 +150,9 @@ void *worker_thread(void *arg) {
 
         memcpy(input_buf + input_len, reply.payload, reply.length);
         input_len += reply.length;
+
+        compute_health_worker_progress();
+
         if (reply.is_last) break;
 
         /* Cancellation Block */
@@ -162,6 +169,8 @@ void *worker_thread(void *arg) {
         send_result(job_id, requester, epoch, COMPUTE_STATUS_FAILED, 0);
         return NULL;
     }
+
+    compute_health_worker_progress();
 
     /* Cancellation Block */
     if (check_cancelled(job_id)) {
@@ -200,6 +209,7 @@ void *worker_thread(void *arg) {
             return NULL;
         }
         written += chunk_len;
+        compute_health_worker_progress();
 
         /* Cancellation Block */
         if (check_cancelled(job_id)) {
@@ -237,6 +247,9 @@ void handle_compress_request(const uint8_t *buf, OBC_Roles_t src) {
     current_job.req = req;
     current_job.requester = src;
     current_job.epoch = dispatch_job_begin();
+
+    compute_health_worker_begin();
+
     pthread_t worker;
 
     /*
