@@ -4,6 +4,7 @@
 #include "obc_ipc.h"
 #include "time_sync.h"
 #include "heartbeat.h"
+#include "time_health.h"
 
 int main(void) {
     printf("[OBC TIME] Initializing.\n");
@@ -14,9 +15,21 @@ int main(void) {
         return 1;
     }
 
-    time_sync_broadcast_thread_init();
-    time_sync_request_thread_init();
-    heartbeat_thread_init();
+    if (time_health_init() != 0) {
+        fprintf(stderr, "[OBC TIME] Failed to initialize health tracking.\n");
+        return 1;
+    }
+
+    if (time_sync_broadcast_thread_init() != 0 ||
+        time_sync_request_thread_init() != 0) {
+        fprintf(stderr, "[OBC TIME] Failed to start a worker thread.\n");
+        return 1;
+    }
+
+    if (heartbeat_thread_init() != 0) {
+        fprintf(stderr, "[OBC TIME] Failed to start heartbeat thread.\n");
+        return 1;
+    }
 
     for (;;) sleep(1);
     return 0;
