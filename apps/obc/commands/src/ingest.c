@@ -5,6 +5,9 @@
 #include "pthread.h"
 #include <string.h>
 #include "csp_commands.h"
+#include "commands_health.h"
+
+#define INGEST_POLL_TIMEOUT_MS 1000
 
 typedef struct {
     uint8_t port;
@@ -52,8 +55,11 @@ void *ingest_thread(void *arg)
     csp_listen(&sock, 5);
 
     for (;;) {
-        csp_conn_t *conn = csp_accept(&sock, 10000);
-        if (conn == NULL) continue;
+        csp_conn_t *conn = csp_accept(&sock, INGEST_POLL_TIMEOUT_MS);
+        if (conn == NULL) {
+            commands_health_ingest_progress();
+            continue;
+        }
 
         uint8_t dport = csp_conn_dport(conn);
         const ingest_route_t *route = find_route(dport);
@@ -70,8 +76,10 @@ void *ingest_thread(void *arg)
                 fprintf(stderr, "[INGEST] no route for port %d, dropping\n", dport);
             }
             csp_buffer_free(packet);
+            commands_health_ingest_progress();
         }
         csp_close(conn);
+        commands_health_ingest_progress();
     }
 
     return NULL;
