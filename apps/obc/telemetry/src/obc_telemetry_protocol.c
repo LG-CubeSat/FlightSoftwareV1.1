@@ -52,6 +52,18 @@ obc_telemetry_status_t obc_telemetry_encode(
     size_t *encoded_size
 )
 {
+    // check null pointers
+    if (
+        record == NULL ||
+        output == NULL ||
+        encoded_size == NULL
+    ) {
+        return OBC_TELEMETRY_INVALID_ARGUMENT;
+    }
+
+    // failed encodings should never let the caller believe bytes were encoded if it messes up.
+    *encoded_size = 0;
+
     if (record->payload_length > OBC_TELEMETRY_MAX_PAYLOAD) {
         return OBC_TELEMETRY_INVALID_ARGUMENT;
     }
@@ -62,10 +74,38 @@ obc_telemetry_status_t obc_telemetry_encode(
         return OBC_TELEMETRY_BUFFER_TOO_SMALL;
     }
 
+    // header
     memcpy(
         &output[MAGIC_OFFSET],
         telemetry_magic,
         sizeof(telemetry_magic)
+    );
+
+    output[VERSION_OFFSET] = OBC_TELEMETRY_FORMAT_VERSION;
+    output[SOURCE_NODE_OFFSET] = record->source_node;
+    output[SOURCE_PORT_OFFSET] = record->source_port;
+    output[RESERVED_OFFSET] = 0;
+
+    /*
+    Multi-byte integers must use the defined big endian wire order
+    */
+    put_u64_be(
+        &output[TIMESTAMP_OFFSET],
+        record->received_unix_us
+    );
+    
+    put_u16_be(
+        &output[LENGTH_OFFSET],
+        record->payload_length
+    );
+
+    /*
+    Preserve the original board telemetry bytes exactly.
+    */
+    memcpy(
+        &output[OBC_TELEMETRY_HEADER_SIZE],
+        record->payload,
+        record->payload_length
     );
 
     *encoded_size = required_size;
