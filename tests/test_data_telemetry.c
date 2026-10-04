@@ -114,21 +114,27 @@ static int wait_for_file_size(size_t expected)
 static int encode_test_record(
     uint64_t timestamp,
     uint8_t payload_value,
+    uint16_t payload_length,
     uint8_t *encoded,
     size_t *encoded_size
 )
 {
+    if (payload_length > OBC_TELEMETRY_MAX_PAYLOAD) {
+        return OBC_TELEMETRY_INVALID_ARGUMENT;
+    }
+
     obc_telemetry_record_t record = {
         .source_node = 2,
         .source_port = 20,
         .received_unix_us = timestamp,
-        .payload_length = 3,
-        .payload = {
-            payload_value,
-            payload_value,
-            payload_value
-        }
+        .payload_length = payload_length
     };
+
+    memset(
+        record.payload,
+        payload_value,
+        payload_length
+    );
 
     return obc_telemetry_encode(
         &record,
@@ -138,8 +144,117 @@ static int encode_test_record(
     );
 }
 
+typedef struct {
+    obc_telemetry_read_status_t status;
+    uint8_t encoded[OBC_IPC_MAX_PAYLOAD];
+    size_t encoded_size;
+    uint64_t next_offset;
+    int end_of_log;
+    int chunk_count;
+} telemetry_read_result_t;
+
+static int request_telemetry_record(
+    uint64_t requested_offset,
+    telemetry_read_result_t *result
+)
+{
+    if (result == NULL) {
+        return -1;
+    }
+
+    memset(result, 0, sizeof(*result));
+    result->status = OBC_TELEMETRY_READ_IO_ERROR;
+
+    obc_telemetry_read_request_t request = {
+        .magic = OBC_TELEMETRY_READ_REQUEST_MAGIC,
+        .offset = requested_offset
+    };
+
+    if (
+        send_with_retry(
+            (const uint8_t *)&request,
+            sizeof(request)
+        ) != 0
+    ) {
+        return -1;
+    }
+
+    /*
+     * A 256-byte record requires at most two 216-byte chunks. Allow four
+     * iterations so malformed behavior fails cleanly instead of looping.
+     */
+    for (int reply_number = 0; reply_number < 4; reply_number++) {
+        OBC_Roles_t source;
+        obc_telemetry_read_reply_t reply;
+
+        int length = IPC_receive_timeout(
+            &source,
+            (uint8_t *)&reply,
+            sizeof(reply),
+            1000
+        );
+
+        if (
+            length != (int)sizeof(reply) ||
+            source != ROLE_DATA ||
+            reply.magic != OBC_TELEMETRY_READ_REPLY_MAGIC
+        ) {
+            return -1;
+        }
+
+        result->status =
+            (obc_telemetry_read_status_t)reply.status;
+
+        if (result->status != OBC_TELEMETRY_READ_OK) {
+            if (
+                !reply.is_last_chunk ||
+                reply.chunk_length != 0
+            ) {
+                return -1;
+            }
+
+            result->next_offset = reply.next_offset;
+            result->end_of_log = reply.end_of_log;
+            return 0;
+        }
+
+        if (
+            reply.record_offset != requested_offset ||
+            reply.record_length > sizeof(result->encoded) ||
+            reply.chunk_length > sizeof(reply.payload) ||
+            reply.chunk_offset != result->encoded_size ||
+            (size_t)reply.chunk_offset + reply.chunk_length >
+                reply.record_length
+        ) {
+            return -1;
+        }
+
+        memcpy(
+            result->encoded + reply.chunk_offset,
+            reply.payload,
+            reply.chunk_length
+        );
+
+        result->encoded_size += reply.chunk_length;
+        result->chunk_count++;
+
+        if (reply.is_last_chunk) {
+            if (result->encoded_size != reply.record_length) {
+                return -1;
+            }
+
+            result->next_offset = reply.next_offset;
+            result->end_of_log = reply.end_of_log;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
 int main(int argc, char **argv)
 {
+    unlink("/tmp/obc_ipc_mission.sock");
     if (argc != 2) {
         fprintf(
             stderr,
@@ -187,6 +302,7 @@ int main(int argc, char **argv)
         encode_test_record(
             1000,
             0x11,
+            3,
             first,
             &first_size
         ) == OBC_TELEMETRY_OK
@@ -197,6 +313,7 @@ int main(int argc, char **argv)
         encode_test_record(
             2000,
             0x22,
+            3,
             second,
             &second_size
         ) == OBC_TELEMETRY_OK
@@ -207,6 +324,7 @@ int main(int argc, char **argv)
         encode_test_record(
             3000,
             0x33,
+            OBC_TELEMETRY_MAX_PAYLOAD,
             third,
             &third_size
         ) == OBC_TELEMETRY_OK
@@ -275,6 +393,78 @@ int main(int argc, char **argv)
     check_true(
         "restarted Data appends instead of truncating",
         wait_for_file_size(final_size)
+    );
+
+    /* Record insertion is complete. Rebind the test as Mission so Data
+       authorizes retrieval and has a Mission socket for its replies. */
+    check_true(
+        "test switches to Mission IPC",
+        IPC_initialize(ROLE_MISSION) == IPC_OK
+    );
+
+    telemetry_read_result_t first_read;
+    telemetry_read_result_t second_read;
+    telemetry_read_result_t third_read;
+    telemetry_read_result_t end_read;
+
+    check_true(
+        "first record can be requested",
+        request_telemetry_record(0, &first_read) == 0
+    );
+    check_true(
+        "first record matches stored bytes",
+        first_read.status == OBC_TELEMETRY_READ_OK &&
+        first_read.encoded_size == first_size &&
+        memcmp(first_read.encoded, first, first_size) == 0
+    );
+    check_true(
+        "first cursor points to second record",
+        first_read.next_offset == first_size &&
+        !first_read.end_of_log
+    );
+
+    check_true(
+        "second record can be requested",
+        request_telemetry_record(first_read.next_offset, &second_read) == 0
+    );
+    check_true(
+        "second record matches stored bytes",
+        second_read.status == OBC_TELEMETRY_READ_OK &&
+        second_read.encoded_size == second_size &&
+        memcmp(second_read.encoded, second, second_size) == 0
+    );
+    check_true(
+        "second cursor points to third record",
+        second_read.next_offset == first_size + second_size &&
+        !second_read.end_of_log
+    );
+
+    check_true(
+        "third record can be requested",
+        request_telemetry_record(second_read.next_offset, &third_read) == 0
+    );
+    check_true(
+        "maximum record is reconstructed exactly",
+        third_read.status == OBC_TELEMETRY_READ_OK &&
+        third_read.encoded_size == third_size &&
+        memcmp(third_read.encoded, third, third_size) == 0
+    );
+    check_true(
+        "maximum record required two IPC chunks",
+        third_read.chunk_count == 2
+    );
+    check_true(
+        "third record reaches the current end of log",
+        third_read.end_of_log &&
+        third_read.next_offset == final_size
+    );
+
+    check_true(
+        "request beyond final record receives END",
+        request_telemetry_record(third_read.next_offset, &end_read) == 0 &&
+        end_read.status == OBC_TELEMETRY_READ_END &&
+        end_read.end_of_log &&
+        end_read.encoded_size == 0
     );
 
     stop_data(second_data);
