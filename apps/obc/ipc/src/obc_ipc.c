@@ -11,7 +11,6 @@
 #include <poll.h>
 
 #define IPC_BACKLOG 5
-#define MAX_IPC_PAYLOAD 256
 #define IPC_FRAME_READ_TIMEOUT_MS 1000
 
 static OBC_Roles_t my_role; // role/job.
@@ -36,7 +35,7 @@ typedef struct {
     uint8_t dest;
     uint8_t src;
     uint16_t length;
-    uint8_t payload[MAX_IPC_PAYLOAD];
+    uint8_t payload[OBC_IPC_MAX_PAYLOAD];
 } IPCFrame;
 
 /* Wire format: [dest:1][src:1][length:2 network order][payload: length]*/
@@ -101,7 +100,7 @@ IPC_Status_t IPC_initialize(OBC_Roles_t role)
 
 int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length)
 {
-    if (length > MAX_IPC_PAYLOAD) return -1;
+    if (length > OBC_IPC_MAX_PAYLOAD) return -1;
 
     const char *path = path_for_role(role_dest);
     if (path==NULL) return -1;
@@ -122,7 +121,7 @@ int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length)
     IPCFrame frame = { .dest = (uint8_t)role_dest, .src = (uint8_t)my_role, .length = length };
     memcpy(frame.payload, data, length);
 
-    uint8_t wire[4 + MAX_IPC_PAYLOAD];
+    uint8_t wire[4 + OBC_IPC_MAX_PAYLOAD];
     int wire_len = ipc_frame_serialize(&frame, wire, sizeof(wire));
 
     size_t sent = 0;

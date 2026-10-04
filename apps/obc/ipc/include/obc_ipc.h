@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define OBC_IPC_MAX_PAYLOAD 256U
+
 typedef enum {
     IPC_OK = 0,
     IPC_ERROR = -1,
