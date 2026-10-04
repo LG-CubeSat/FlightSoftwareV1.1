@@ -61,27 +61,27 @@ not a real cross-compiled link. Verify 0.1/0.3 with an actual HW_MODE build once
       dies mid-stream, the worker thread blocks forever in `wait_for_reply` with `job_busy = 1`
       held — every subsequent compress request gets `COMPUTE_STATUS_BUSY` for the rest of the
       flight. Add a receive timeout and a job deadline that releases `job_busy`.
-- [ ] **1.5 — Heartbeat proves liveness, not progress.** Each process's `heartbeat_thread`
+- [X] **1.5 — Heartbeat proves liveness, not progress.** Each process's `heartbeat_thread`
       pings supervisor on a fixed 1s timer independent of whether its actual worker threads are
       making progress. A `compute` wedged per 1.4 keeps heartbeating happily forever. Make the
       heartbeat reflect real work (e.g. worker threads bump a counter; heartbeat only pings if
       the counter moved).
-- [ ] **1.6 — Buffer overflow in compute's worker.** `worker.c:81`:
+- [X] **1.6 — Buffer overflow in compute's worker.** `worker.c:81`:
       `memcpy(input_buf + input_len, reply.payload, reply.length)` has no bound check against
       `COMPUTE_MAX_DATA_SIZE` (64KB). `payload_commander.c:92` checks this on the sending side,
       the worker doesn't on the receiving side. A real Arducam JPEG over 64KB triggers this on
       the very first photo. Add the bound check; consider raising or streaming past the cap.
-- [ ] **1.7 — Out-of-bounds write in supervisor.** `supervisor.c:121` calls
+- [X] **1.7 — Out-of-bounds write in supervisor.** `supervisor.c:121` calls
       `supervisor_mark_alive(src)` where `src` comes straight off the wire
       (`obc_ipc.c` reads it unchecked from the header byte), indexing
       `last_heartbeat[ROLE_TIME + 1]` — an 8-element array. Any `src > 7` from a malformed or
       malicious message corrupts adjacent memory. Range-check `src` before indexing.
-- [ ] **1.8 — FDIR is mostly inert.** `fallback_handle_fault` is dead code — nothing calls it.
+- [X] **1.8 — FDIR is mostly inert.** `fallback_handle_fault` is dead code — nothing calls it.
       `watchdog.c` is just a heartbeat ticker, not a real watchdog. The only live FDIR path is
       `health_monitor` reacting to board reset notices. Either wire FDIR into real OBC-role
       fault detection, or accept that supervisor's heartbeat/restart loop is the entire
       recovery story (and make sure 1.1/1.5 are solid if so).
-- [ ] **1.9 — ADCS telemetry is received and discarded.** `ingest.c` routes `ADCS_TELEM_PORT`
+- [X] **1.9 — ADCS telemetry is received and discarded.** `ingest.c` routes `ADCS_TELEM_PORT`
       to `ROLE_MISSION`, but nothing in `mission` ever reads/stores/limit-checks it — the
       transient `IPC_receive` loops inside `payload_commander` just skip wrong-sized messages.
       No telemetry is stored or downlinked anywhere. Biggest remaining *feature* gap: for a
