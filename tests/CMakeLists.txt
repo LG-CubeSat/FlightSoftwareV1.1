@@ -192,3 +192,30 @@ add_test(
 )
 
 set_tests_properties(obc_telemetry_test PROPERTIES TIMEOUT 5)
+
+
+add_executable(data_telemetry_test
+    test_data_telemetry.c
+)
+
+target_link_libraries(
+    data_telemetry_test
+    PRIVATE
+        obc_ipc
+        obc_telemetry
+)
+
+add_dependencies(
+    data_telemetry_test
+    obc_data
+)
+
+add_test(
+    NAME data_telemetry_test
+    COMMAND data_telemetry_test "$<TARGET_FILE:obc_data>"
+)
+
+set_tests_properties(data_telemetry_test PROPERTIES
+    TIMEOUT 20
+    RESOURCE_LOCK obc_ipc_sockets
+)
