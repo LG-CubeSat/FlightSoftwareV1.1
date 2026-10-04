@@ -176,3 +176,19 @@ target_include_directories(obc_role_health_test PRIVATE
 target_link_libraries(obc_role_health_test PRIVATE obc_progress)
 add_test(NAME obc_role_health_test COMMAND obc_role_health_test)
 set_tests_properties(obc_role_health_test PROPERTIES TIMEOUT 5)
+
+add_executable(obc_telemetry_test
+    test_obc_telemetry.c
+)
+
+target_link_libraries(obc_telemetry_test
+    PRIVATE
+        obc_telemetry
+)
+
+add_test(
+    NAME obc_telemetry_test
+    COMMAND obc_telemetry_test
+)
+
+set_tests_properties(obc_telemetry_test PROPERTIES TIMEOUT 5)
