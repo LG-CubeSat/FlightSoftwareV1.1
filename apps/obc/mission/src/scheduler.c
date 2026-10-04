@@ -19,6 +19,8 @@
 #define DEFAULT_STATE_PATH "/var/lib/obc/mission_state"
 #define STEP_RETRY_LIMIT 3 // attempts per step before giving up on the cycle
 #define COOLDOWN_SEC 600 // 10 min between cycles, need to tune
+#define TELEMETRY_BATCH_LIMIT 8U
+#define TELEMETRY_DOWNLINK_INTERVAL_SEC 30
 
 typedef enum {
     MISSION_WAITING_FOR_ASCENT,
@@ -37,7 +39,7 @@ static time_t mission_start_unix = 0;
 static int retry_count = 0; // reused across the steps for whichever one is active
 static struct timespec cooldown_start; // set when we enter MISSION_COOLDOWN
 /*
-Byte offset of the first telem record that has no yet been successfully downlinked.
+Byte offset of the first telemetry record that has not yet been successfully downlinked.
 */
 static uint64_t telemetry_cursor = 0;
 
@@ -51,6 +53,18 @@ static int get_ascent_wait_sec(void)
 
     int val = atoi(env);
     return (val > 0) ? val : ASCENT_WAIT_SEC;
+}
+
+static int get_telemetry_downlink_interval_sec(void)
+{
+    const char *env = getenv("MISSION_TELEMETRY_DOWNLINK_INTERVAL_SEC");
+
+    if (env == NULL) {
+        return TELEMETRY_DOWNLINK_INTERVAL_SEC;
+    }
+
+    int value = atoi(env);
+    return value > 0 ? value : TELEMETRY_DOWNLINK_INTERVAL_SEC;
 }
 
 static const char *get_state_path(void)
@@ -158,6 +172,50 @@ int init_scheduler_thread(void) {
     return ret;
 }
 
+static void run_telemetry_downlink_batch(void)
+{
+    uint64_t cursor_before_batch = telemetry_cursor;
+    size_t records_sent = 0;
+    int end_of_log = 0;
+
+    mission_health_payload_begin();
+
+    int result = payload_commander_downlink_telemetry_batch(
+        &telemetry_cursor,
+        TELEMETRY_BATCH_LIMIT,
+        &records_sent,
+        &end_of_log
+    );
+
+    mission_health_payload_end();
+
+    /*
+    Save any successful transmitted prefix even if a later record
+    in this batch failed
+    */
+    if (telemetry_cursor != cursor_before_batch) {
+        mission_state_save();
+    }
+
+    if (result != 0) {
+        fprintf(
+            stderr,
+            "[SCHEDULER] telemetry batch failed after %zu records; cursor=%" PRIu64 "\n",
+            records_sent,
+            telemetry_cursor
+        );
+        return;
+    }
+
+    if (records_sent > 0) {
+        printf(
+            "[SCHEDULER] downlinked %zu telemetry records; cursor=%" PRIu64 ", end_of_log=%d\n",
+            records_sent, telemetry_cursor, end_of_log
+        );
+        fflush(stdout);
+    }
+}
+
 void *scheduler_thread(void *arg) {
     (void)arg;
     struct timespec next;
@@ -167,6 +225,11 @@ void *scheduler_thread(void *arg) {
 
     mission_state_load(); // restores phase + mission_start_unix + telem cursor
     mission_health_scheduler_progress();
+
+    int telemetry_downlink_interval_sec =
+        get_telemetry_downlink_interval_sec();
+    
+    struct timespec last_telemetry_attempt = {0};
 
     for (;;) {
         struct timespec now;
@@ -226,6 +289,26 @@ void *scheduler_thread(void *arg) {
                 }
                 break;
             }
+        }
+
+        struct timespec telemetry_now;
+        clock_gettime(CLOCK_MONOTONIC, &telemetry_now);
+
+        double since_telemetry_attempt = (telemetry_now.tv_sec - last_telemetry_attempt.tv_sec) +
+            (telemetry_now.tv_nsec - last_telemetry_attempt.tv_nsec) / 1e9;
+
+        if (
+            since_telemetry_attempt >= telemetry_downlink_interval_sec
+        ) {
+            run_telemetry_downlink_batch();
+
+            /*
+            Re-read the clock after the operation. A failed Data request may have consumed its complete timeout.
+            */
+            clock_gettime(
+                CLOCK_MONOTONIC,
+                &last_telemetry_attempt
+            );
         }
 
         /* Reaching here proves the complete state handler returned. */
