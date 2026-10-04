@@ -29,12 +29,12 @@ static uint16_t get_u16_be(const uint8_t *input)
 static void put_u64_be(uint8_t *output, uint64_t value)
 {
     for (size_t i=0; i < sizeof(value); i++) {
-        unsigned shift = (unsigned)(56 - (i * 8U));
+        unsigned shift = (unsigned)(56U - (i * 8U));
         output[i] = (uint8_t)(value >> shift);
     }
 }
 
-// puts into reverse: least sif byte
+// puts into reverse: least sig byte
 static uint64_t get_u64_be(const uint8_t *input)
 {
     uint64_t value = 0;

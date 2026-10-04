@@ -40,7 +40,7 @@ The encode decode functions define the actual portable wire format.
 typedef struct {
     uint8_t source_node;
     uint8_t source_port;
-    uint64_t received_unix_us;
+    uint64_t received_unix_us; // unix is since 1970 midnight UTC. us is for microseconds.
     uint16_t payload_length;
     uint8_t payload[OBC_TELEMETRY_MAX_PAYLOAD];
 } obc_telemetry_record_t;
