@@ -27,8 +27,8 @@ typedef struct {
 } ingest_route_t;
 
 static const ingest_route_t routes[] = {
-    { ADCS_TELEM_PORT, ROLE_MISSION, INGEST_FORWARD_TELEMETRY, "adcs telemetry" },
-    { EPS_TELEM_PORT, ROLE_MISSION, INGEST_FORWARD_TELEMETRY, "eps telemetry" },
+    { ADCS_TELEM_PORT, ROLE_DATA, INGEST_FORWARD_TELEMETRY, "adcs telemetry" },
+    { EPS_TELEM_PORT, ROLE_DATA, INGEST_FORWARD_TELEMETRY, "eps telemetry" },
     { ADCS_STATUS_PORT, ROLE_FDIR, INGEST_FORWARD_RAW, "adcs reset notice" },
     { TIME_SYNC_REQUEST_PORT, ROLE_TIME, INGEST_FORWARD_RAW, "time sync request" }
     // new board comes online -> add one line here, nothing else changes
