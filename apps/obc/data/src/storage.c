@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <string.h>
 
+#include "telemetry_store.h"
 #include "obc_ipc.h"
 #include "obc_data_protocol.h"
 #include "filesystem.h"
@@ -30,8 +31,7 @@ void *storage_thread(void *arg)
     (void)arg;
 
     /* sized to the larger of the two request types this thread handles */
-    uint8_t buf[sizeof(data_write_chunk_t) > sizeof(data_read_request_t)
-                ? sizeof(data_write_chunk_t) : sizeof(data_read_request_t)];
+    uint8_t buf[OBC_IPC_MAX_PAYLOAD];
 
     for (;;) {
         OBC_Roles_t src;
@@ -50,7 +50,14 @@ void *storage_thread(void *arg)
             continue;
         }
 
-        if (len == sizeof(data_read_request_t)) {
+        if (src == ROLE_COMMANDS) {
+            if (telemetry_store_append(buf, (size_t)len) != 0) {
+                fprintf(
+                    stderr,
+                    "[STORAGE] failed to persist telemetry record\n"
+                );
+            }
+        } else if (len == sizeof(data_read_request_t)) {
             data_read_request_t req;
             memcpy(&req, buf, sizeof(req));
             req.path[sizeof(req.path) - 1] = '\0';  // don't trust the sender to have NUL terminated it.
