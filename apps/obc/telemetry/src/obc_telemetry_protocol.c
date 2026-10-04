@@ -34,6 +34,7 @@ static void put_u64_be(uint8_t *output, uint64_t value)
     }
 }
 
+// puts into reverse: least sif byte
 static uint64_t get_u64_be(const uint8_t *input)
 {
     uint64_t value = 0;
