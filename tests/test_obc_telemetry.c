@@ -247,13 +247,81 @@ static void test_output_buffer_limit(void)
     );
 }
 
+static void test_maximum_payload(void)
+{
+    obc_telemetry_record_t original = {
+        .source_node = 2,
+        .source_port = 20,
+        .received_unix_us = UINT64_C(1791072000123456),
+        .payload_length = OBC_TELEMETRY_MAX_PAYLOAD
+    };
+
+    /*
+     * Give every payload byte a recognizable pattern.
+     * Casting to uint8_t deliberately wraps values above 255.
+     */
+    for (size_t i = 0; i < original.payload_length; i++) {
+        original.payload[i] = (uint8_t)i;
+    }
+
+    uint8_t encoded[OBC_IPC_MAX_PAYLOAD] = {0};
+    size_t encoded_size = 0;
+
+    obc_telemetry_status_t encode_status =
+        obc_telemetry_encode(
+            &original,
+            encoded,
+            sizeof(encoded),
+            &encoded_size
+        );
+
+    check_true(
+        "maximum payload encodes successfully",
+        encode_status == OBC_TELEMETRY_OK
+    );
+
+    check_true(
+        "maximum record exactly fills one IPC payload",
+        encoded_size == OBC_IPC_MAX_PAYLOAD
+    );
+
+    obc_telemetry_record_t decoded;
+
+    obc_telemetry_status_t decode_status =
+        obc_telemetry_decode(
+            encoded,
+            encoded_size,
+            &decoded
+        );
+
+    check_true(
+        "maximum record decodes successfully",
+        decode_status == OBC_TELEMETRY_OK
+    );
+
+    check_true(
+        "maximum payload length survives round trip",
+        decoded.payload_length == OBC_TELEMETRY_MAX_PAYLOAD
+    );
+
+    check_true(
+        "maximum payload bytes survive round trip",
+        memcmp(
+            decoded.payload,
+            original.payload,
+            OBC_TELEMETRY_MAX_PAYLOAD
+        ) == 0
+    );
+}
+
 int main(void)
 {
     test_exact_encoding();
     test_round_trip();
     test_invalid_records();
     test_output_buffer_limit();
-
+    test_maximum_payload();
+    
     if (failed_checks == 0) {
         printf(
             "obc_telemetry_test: PASS (%d/%d checks)\n",
