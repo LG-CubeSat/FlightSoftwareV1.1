@@ -4,7 +4,7 @@ add_library(obc_telemetry STATIC
 
 target_include_directories(obc_telemetry
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/../include
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(obc_telemetry
