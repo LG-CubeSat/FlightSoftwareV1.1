@@ -38,6 +38,9 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <stdint.h>
+#include "csp_commands.h"
+#include "obc_telemetry_protocol.h"
 
 #define ASCENT_OVERRIDE_SEC     "2"
 #define TIME_SYNC_OVERRIDE_SEC  "1"
@@ -46,6 +49,7 @@
 
 #define SUPERVISOR_LOG "/tmp/full_constellation_test_supervisor.log"
 #define ADCS_LOG       "/tmp/full_constellation_test_adcs.log"
+#define TELEMETRY_LOG "/tmp/full_constellation_telemetry.bin"
 
 static int total_checks = 0;
 static int failed_checks = 0;
@@ -103,6 +107,7 @@ static pid_t spawn_logged(const char * path, const char * log_path, int set_asce
         if (set_ascent_override) {
             setenv("MISSION_ASCENT_WAIT_SEC", ASCENT_OVERRIDE_SEC, 1);
             setenv("TIME_SYNC_INTERVAL_SEC", TIME_SYNC_OVERRIDE_SEC, 1);
+            setenv("OBC_TELEMETRY_LOG_PATH", TELEMETRY_LOG, 1);
         }
 
         execl(path, path, (char *)NULL);
@@ -114,7 +119,118 @@ static pid_t spawn_logged(const char * path, const char * log_path, int set_asce
     return pid;
 }
 
+static uint8_t *read_binary_file(
+    const char *path,
+    size_t *size_out
+)
+{
+    if (size_out == NULL) {
+        return NULL;
+    }
+
+    *size_out = 0;
+
+    FILE *file = fopen(path, "rb");
+    if (file == NULL) {
+        return NULL;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return NULL;
+    }
+
+    long size = ftell(file);
+    if (size < 0) {
+        fclose(file);
+        return NULL;
+    }
+
+    rewind(file);
+
+    uint8_t *contents = malloc((size_t)size);
+    if (contents == NULL && size != 0) {
+        fclose(file);
+        return NULL;
+    }
+
+    size_t bytes_read = fread(
+        contents,
+        1,
+        (size_t)size,
+        file
+    );
+
+    fclose(file);
+
+    if (bytes_read != (size_t)size) {
+        free(contents);
+        return NULL;
+    }
+
+    *size_out = bytes_read;
+    return contents;
+}
+
+static int count_valid_adcs_records(
+    const uint8_t *contents,
+    size_t contents_size
+)
+{
+    size_t offset = 0;
+    int adcs_records = 0;
+
+    while (offset < contents_size) {
+        size_t remaining = contents_size - offset;
+
+        if (remaining < OBC_TELEMETRY_HEADER_SIZE) {
+            return -1;
+        }
+
+        /*
+         * Payload length is stored big-endian at bytes 16 and 17.
+         */
+        uint16_t payload_length =
+            ((uint16_t)contents[offset + 16] << 8U) |
+            (uint16_t)contents[offset + 17];
+
+        size_t record_size =
+            OBC_TELEMETRY_HEADER_SIZE + payload_length;
+
+        if (record_size > remaining) {
+            return -1;
+        }
+
+        obc_telemetry_record_t record;
+
+        if (
+            obc_telemetry_decode(
+                contents + offset,
+                record_size,
+                &record
+            ) != OBC_TELEMETRY_OK
+        ) {
+            return -1;
+        }
+
+        if (
+            record.source_node == ADCS_ADDRESS &&
+            record.source_port == ADCS_TELEM_PORT &&
+            record.payload_length >= 4 &&
+            memcmp(record.payload, "ADCS", 4) == 0
+        ) {
+            adcs_records++;
+        }
+
+        offset += record_size;
+    }
+
+    return adcs_records;
+}
+
 int main(void) {
+    unlink(TELEMETRY_LOG);
+
     alarm(TEST_TIMEOUT_SEC);
 
     /* Same hardcoded sockets as production code -- don't run this test
@@ -146,6 +262,41 @@ int main(void) {
     kill(adcs_pid, SIGTERM);
     waitpid(sup_pid, NULL, 0);
     waitpid(adcs_pid, NULL, 0);
+
+    /* Read only after Data has exited, so every appended record has been
+       flushed and the integration capture window has completed. */
+    size_t telemetry_size = 0;
+    uint8_t *telemetry_contents =
+        read_binary_file(TELEMETRY_LOG, &telemetry_size);
+
+    int adcs_record_count = telemetry_contents == NULL
+        ? -1
+        : count_valid_adcs_records(
+            telemetry_contents,
+            telemetry_size
+        );
+
+    total_checks++;
+    if (telemetry_contents != NULL && telemetry_size > 0) {
+        printf("[CHECK] PASS: Data created a nonempty telemetry log\n");
+    } else {
+        printf("[CHECK] FAIL: Data did not create a nonempty telemetry log\n");
+        failed_checks++;
+    }
+
+    total_checks++;
+    if (adcs_record_count >= 3) {
+        printf(
+            "[CHECK] PASS: Data persisted %d valid ADCS telemetry records\n",
+            adcs_record_count
+        );
+    } else {
+        printf(
+            "[CHECK] FAIL: expected at least 3 valid ADCS telemetry records, found %d\n",
+            adcs_record_count
+        );
+        failed_checks++;
+    }
 
     char * sup_log = slurp_file(SUPERVISOR_LOG);
     char * adcs_log = slurp_file(ADCS_LOG);
@@ -192,7 +343,8 @@ int main(void) {
 
     free(sup_log);
     free(adcs_log);
-
+    free(telemetry_contents);
+    
     if (failed_checks == 0) {
         printf("full_constellation_test: PASS (%d/%d checks)\n", total_checks, total_checks);
         return 0;

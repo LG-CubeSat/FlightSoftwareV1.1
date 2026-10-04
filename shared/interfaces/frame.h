@@ -4,7 +4,9 @@
 #include <stdint.h>
 #include <stddef.h> // size_t
 
-#define MAX_FRAME_PAYLOAD 128
+/* libcsp packets contain up to 256 data bytes plus up to 8 bytes of packed
+ * header space. The comms-bus frame must carry that complete wire packet. */
+#define MAX_FRAME_PAYLOAD 264
 
 /* 
 this is the framing used for the I2C bus

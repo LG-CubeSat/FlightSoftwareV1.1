@@ -48,12 +48,20 @@ if (NOT HW_MODE)
         OBC_SUPERVISOR_PATH="$<TARGET_FILE:obc_supervisor>"
         ADCS_SIM_PATH="$<TARGET_FILE:adcs_sim>"
     )
+    target_include_directories(full_constellation_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/shared/csp
+    )
     add_dependencies(full_constellation_test obc_supervisor adcs_sim)
 
     add_test(NAME full_constellation_test COMMAND full_constellation_test)
     set_tests_properties(full_constellation_test PROPERTIES
         TIMEOUT 30
         RESOURCE_LOCK "comms_bus_socket;obc_ipc_sockets"
+    )
+    target_link_libraries(
+        full_constellation_test
+        PRIVATE
+            obc_telemetry
     )
 
     add_executable(fdir_recovery_test test_fdir_recovery.c)

@@ -50,6 +50,30 @@ int main(void)
     CHECK(frame_deserialize(truncated, sizeof(truncated), &decoded) == -1,
           "deserialize rejects a payload shorter than its declared length");
 
+    Frame maximum = {
+        .dest_addr = 0x01,
+        .src_addr = 0x02,
+        .length = MAX_FRAME_PAYLOAD,
+    };
+    for (size_t i = 0; i < MAX_FRAME_PAYLOAD; i++) {
+        maximum.payload[i] = (uint8_t)i;
+    }
+
+    uint8_t maximum_wire[4 + MAX_FRAME_PAYLOAD] = {0};
+    int maximum_wire_len = frame_serialize(
+        &maximum,
+        maximum_wire,
+        sizeof(maximum_wire)
+    );
+    CHECK(maximum_wire_len == (int)sizeof(maximum_wire),
+          "serialize accepts a maximum-size CSP transport frame");
+
+    Frame maximum_decoded = {0};
+    CHECK(frame_deserialize(maximum_wire, maximum_wire_len, &maximum_decoded) == maximum_wire_len &&
+          maximum_decoded.length == MAX_FRAME_PAYLOAD &&
+          memcmp(maximum_decoded.payload, maximum.payload, MAX_FRAME_PAYLOAD) == 0,
+          "maximum-size transport frame survives round trip");
+
     if (failures != 0) {
         fprintf(stderr, "frame_codec_test: FAIL (%d checks failed)\n", failures);
         return 1;
