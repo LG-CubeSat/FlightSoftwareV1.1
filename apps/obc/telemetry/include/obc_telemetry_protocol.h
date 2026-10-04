@@ -13,14 +13,13 @@
 
 /*
 So the codec is going to have these bytes
-Offset: 0, Size: 4, Meaning: Magic Bytes "OTLM"
-Offset: 4, Size: 1, Meaning: 
-Offset: 5, Size: 1, Meaning: 
-Offset: 6, Size: 1, Meaning: 
-Offset: 7, Size: 1, Meaning: 
-Offset: 8, Size: 8, Meaning: 
-Offset: 16, Size: 2, Meaning: 
-Offset: 18, Size: N, Meaning: 
+Offset: 0, Size: 4, Meaning: Magic Bytes "WESW"
+Offset: 4, Size: 1, Meaning: Version
+Offset: 5, Size: 1, Meaning: Source Node
+Offset: 6, Size: 1, Meaning: Port Node
+Offset: 7, Size: 1, Meaning: Reserved
+Offset: 8, Size: 8, Meaning: Timestamp
+Offset: 16, Size: 2, Meaning: Length
 */
 
 typedef enum {
