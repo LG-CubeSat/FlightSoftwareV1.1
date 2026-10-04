@@ -114,14 +114,25 @@ void *shutdown_thread(void *arg)
             continue; // receive error, keep listening
         }
 
+        // zero-payload message: a liveness ping, identity comes from `src` alone
         if (len == 0) {
-            // zero-payload message: a liveness ping, identity comes from `src` alone
             supervisor_mark_alive(src);
             continue;
         }
 
+        // unrecognized message shape, ignore
         if ((size_t)len != sizeof(supervisor_request_t)) {
-            continue; // unrecognized message shape, ignore
+            continue;
+        }
+
+        // if the command asks to shutdown a process, but doesn't have permission (non FDIR)
+        if (src != ROLE_FDIR) {
+            fprintf(
+                stderr,
+                "[SUPERVISOR SHUTDOWN] Ignoring control request from unauthroized role %d\n",
+                src
+            );
+            continue;
         }
 
         supervisor_request_t req;
