@@ -168,7 +168,7 @@ void supervisor_reap(obc_process_t *processes_to_reap, size_t n)
         /*
         We already hold this processe's lifecycle lock, so use the internal version. Calling the public wrapper would deadlock.
         */
-        supervisor_restart_process(proc);
+        supervisor_restart_process_locked(proc);
         pthread_mutex_unlock(&proc->lifecycle_lock);
     }
 }
