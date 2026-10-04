@@ -1,9 +1,19 @@
+add_library(obc_ssdv_codec STATIC
+    src/ssdv_codec.c
+)
+
+target_include_directories(obc_ssdv_codec PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+target_link_libraries(obc_ssdv_codec PUBLIC ssdv)
+
 add_executable(obc_compute
     src/main.c
-    src/ssdv_codec.c
     src/dispatch.c
     src/worker.c
     src/heartbeat.c
+    src/compute_health.c
 )
 
 target_include_directories(obc_compute PRIVATE
@@ -11,4 +21,14 @@ target_include_directories(obc_compute PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
-target_link_libraries(obc_compute PRIVATE obc_ipc pthread ssdv)
+# Supervisor luanches these executables at runtime. Cmake cannot infer dependencies made through posix spawn. So must be declared beforehand.
+add_dependencies(obc_supervisor
+    obc_fdir
+    obc_commands
+    obc_compute
+    obc_data
+    obc_mission
+    obc_time
+)
+
+target_link_libraries(obc_compute PRIVATE obc_ipc pthread obc_ssdv_codec obc_progress)

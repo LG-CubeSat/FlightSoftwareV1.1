@@ -3,6 +3,7 @@ add_executable(obc_commands
     src/ingest.c
     src/relay.c
     src/heartbeat.c
+    src/commands_health.c
 )
 
 target_include_directories(obc_commands PRIVATE
@@ -10,4 +11,12 @@ target_include_directories(obc_commands PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
-target_link_libraries(obc_commands PRIVATE obc_ipc csp_interface pthread)
+target_link_libraries(
+    obc_commands
+    PRIVATE 
+        obc_ipc 
+        csp_interface 
+        pthread 
+        obc_progress
+        obc_telemetry
+)

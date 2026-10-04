@@ -57,9 +57,7 @@ void *heartbeat_thread(void *arg)
     
     for(;;) {
 
-        supervisor_heartbeat();
-
-        // TODO: actually do something with the processes that fail heartbeat and frozen check
+        supervisor_heartbeat(); // within function the dead/hung processes are restarted
 
         next.tv_sec += PERIODIC_HEARTBEAT_SEC;
         obc_sleep_until(&next);
@@ -116,14 +114,25 @@ void *shutdown_thread(void *arg)
             continue; // receive error, keep listening
         }
 
+        // zero-payload message: a liveness ping, identity comes from `src` alone
         if (len == 0) {
-            // zero-payload message: a liveness ping, identity comes from `src` alone
             supervisor_mark_alive(src);
             continue;
         }
 
+        // unrecognized message shape, ignore
         if ((size_t)len != sizeof(supervisor_request_t)) {
-            continue; // unrecognized message shape, ignore
+            continue;
+        }
+
+        // if the command asks to shutdown a process, but doesn't have permission (non FDIR)
+        if (src != ROLE_FDIR) {
+            fprintf(
+                stderr,
+                "[SUPERVISOR SHUTDOWN] Ignoring control request from unauthroized role %d\n",
+                src
+            );
+            continue;
         }
 
         supervisor_request_t req;
@@ -140,11 +149,13 @@ void *shutdown_thread(void *arg)
         case SUPERVISOR_CMD_SHUTDOWN:
             printf("[SUPERVISOR SHUTDOWN] shutting down %s (requested by role %d)\n",
                    proc->name, src);
+            fflush(stdout);
             supervisor_shutdown_process(proc);
             break;
         case SUPERVISOR_CMD_RESTART:
             printf("[SUPERVISOR SHUTDOWN] restarting %s (requested by role %d)\n",
                    proc->name, src);
+            fflush(stdout);
             supervisor_restart_process(proc);
             break;
         default:

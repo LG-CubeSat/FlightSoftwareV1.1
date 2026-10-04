@@ -322,7 +322,6 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 
 int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length)
 {
-    (void)max_length; // frame.payload is already bounded to MAX_FRAME_PAYLOAD by frame_deserialize
     int found = 0;
     Frame frame;
 
@@ -367,6 +366,13 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
     }
 
     if (!found) {
+        return -1;
+    }
+
+    if (frame.length > max_length) {
+        fprintf(stderr,
+                "[COMMS BUS] received payload of %u bytes exceeds caller buffer of %u bytes\n",
+                frame.length, max_length);
         return -1;
     }
 

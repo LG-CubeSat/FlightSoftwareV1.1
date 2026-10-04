@@ -8,9 +8,10 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <poll.h>
 
 #define IPC_BACKLOG 5
-#define MAX_IPC_PAYLOAD 256
+#define IPC_FRAME_READ_TIMEOUT_MS 1000
 
 static OBC_Roles_t my_role; // role/job.
 static int bus_fd = -1; // this is the phone itself
@@ -34,7 +35,7 @@ typedef struct {
     uint8_t dest;
     uint8_t src;
     uint16_t length;
-    uint8_t payload[MAX_IPC_PAYLOAD];
+    uint8_t payload[OBC_IPC_MAX_PAYLOAD];
 } IPCFrame;
 
 /* Wire format: [dest:1][src:1][length:2 network order][payload: length]*/
@@ -99,7 +100,7 @@ IPC_Status_t IPC_initialize(OBC_Roles_t role)
 
 int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length)
 {
-    if (length > MAX_IPC_PAYLOAD) return -1;
+    if (length > OBC_IPC_MAX_PAYLOAD) return -1;
 
     const char *path = path_for_role(role_dest);
     if (path==NULL) return -1;
@@ -120,7 +121,7 @@ int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length)
     IPCFrame frame = { .dest = (uint8_t)role_dest, .src = (uint8_t)my_role, .length = length };
     memcpy(frame.payload, data, length);
 
-    uint8_t wire[4 + MAX_IPC_PAYLOAD];
+    uint8_t wire[4 + OBC_IPC_MAX_PAYLOAD];
     int wire_len = ipc_frame_serialize(&frame, wire, sizeof(wire));
 
     size_t sent = 0;
@@ -141,21 +142,52 @@ int IPC_send(OBC_Roles_t role_dest, const uint8_t *data, uint16_t length)
 
 int IPC_receive(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_length)
 {
+    return IPC_receive_timeout(src_role, buffer, max_length, -1);
+}
+
+int IPC_receive_timeout(OBC_Roles_t *src_role, uint8_t *buffer, uint16_t max_length, int timeout_ms)
+{
     if (bus_fd < 0) return -1;
 
-    int conn = accept(bus_fd, NULL, NULL); /* blocks */
-    if (conn < 0) return -1;
+    struct pollfd pfd = { .fd = bus_fd, .events = POLLIN };
+    for (;;) {
+        int ret = poll(&pfd, 1, timeout_ms);
+        if (ret < 0) {
+            if (errno == EINTR) continue; // TODO: should resume remaining time, rather than restart. Needs to use absolute deadline. Not relative.
+            return IPC_ERROR;
+        }
+        if (ret == 0) return IPC_TIMEOUT;
+        break;
+    }
+
+    int conn = accept(bus_fd, NULL, NULL); /* poll() said POLLIN so this won't block */
+    if (conn < 0) return IPC_ERROR;
+
+    /* Blocking point 2 and 3: a peer that connects and then goes silent mid-frame must not strand either*/
+    struct timeval rcv = { 
+        .tv_sec = IPC_FRAME_READ_TIMEOUT_MS / 1000,
+        .tv_usec = (IPC_FRAME_READ_TIMEOUT_MS % 1000) * 1000
+    }; // rcv stands for receive
+    // socket, level (SOL_SOCKET=general), option_name (SO_RCVTIMEO = receive time limit for trasnfer), value of rcv, len of option)
+    setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, &rcv, sizeof(rcv));
 
     uint8_t header[4];
-    if (read_full(conn, header, 4) < 0) { close(conn); return -1; }
+    if (read_full(conn, header, 4) < 0) { close(conn); return IPC_ERROR; }
 
     uint16_t net_len;
     memcpy(&net_len, &header[2], 2);
     uint16_t payload_len = ntohs(net_len);
 
-    if (payload_len > max_length) { close(conn); return -1; }
+    if (payload_len > max_length) { close(conn); return IPC_ERROR; }
 
-    if (read_full(conn, buffer, payload_len) < 0) { close(conn); return -1; }
+    // setsockopt alters the socket so readfull has timelimit
+    if (read_full(conn, buffer, payload_len) < 0) { close(conn); return IPC_ERROR; }
+
+    if (!role_is_valid(header[1])) {
+        fprintf(stderr, "[IPC] dropping frame with invalid src role %u\n", header[1]);
+        close(conn);
+        return IPC_ERROR;
+    }
 
     if (src_role != NULL) {
         *src_role = (OBC_Roles_t)header[1];

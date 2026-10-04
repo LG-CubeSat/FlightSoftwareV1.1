@@ -117,7 +117,6 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length) {
 
 int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length)
 {
-    (void)max_length; // frame.payload is already bounded. Needed for header signature
     if (bus_fd < 0) return -1;
 
     while(1) {
@@ -146,6 +145,13 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
 
             if (frame.length == 0) {
                 continue; // ACKed but nothing new. Basically has no data to send from this board.
+            }
+
+            if (frame.length > max_length) {
+                fprintf(stderr,
+                        "[COMMS BUS] receive: payload of %u bytes exceeds caller buffer of %u bytes\n",
+                        frame.length, max_length);
+                return -1;
             }
 
             next_slave_start = (i + 1) % NUM_KNOWN_SLAVES; // fainess for next call

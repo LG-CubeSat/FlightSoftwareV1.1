@@ -52,7 +52,7 @@ add_subdirectory(platform)
 
 option(BUILD_TESTS "Build simple sanity/integration tests" ON)
 
-if (BUILD_TESTS AND NOT HW_MODE)
+if (BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()

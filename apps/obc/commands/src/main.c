@@ -9,6 +9,7 @@
 #include "csp_commands.h"
 #include "obc_ipc.h"
 #include "obc_relay_protocol.h"
+#include "commands_health.h"
 
 int main(void) {
     printf("[OBC COMMAND P] Program started.\n");
@@ -17,11 +18,25 @@ int main(void) {
     init stuff here
     */
     csp_network_init(OBC_ADDRESS, 1); // is master
-    IPC_initialize(ROLE_COMMANDS);
+    if (IPC_initialize(ROLE_COMMANDS) != IPC_OK) {
+        fprintf(stderr, "[OBC COMMANDS] Failed to initialize IPC.\n");
+        return 1;
+    }
 
-    ingest_thread_init();
-    relay_thread_init();
-    heartbeat_thread_init();
+    if (commands_health_init() != 0) {
+        fprintf(stderr, "[OBC COMMANDS] Failed to initialize health tracking.\n");
+        return 1;
+    }
+
+    if (ingest_thread_init() != 0 || relay_thread_init() != 0) {
+        fprintf(stderr, "[OBC COMMANDS] Failed to start a worker thread.\n");
+        return 1;
+    }
+
+    if (heartbeat_thread_init() != 0) {
+        fprintf(stderr, "[OBC COMMANDS] Failed to start heartbeat thread.\n");
+        return 1;
+    }
 
     for (;;) { sleep(1); }
 
