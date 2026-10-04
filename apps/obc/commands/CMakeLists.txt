@@ -11,4 +11,12 @@ target_include_directories(obc_commands PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
-target_link_libraries(obc_commands PRIVATE obc_ipc csp_interface pthread obc_progress)
+target_link_libraries(
+    obc_commands
+    PRIVATE 
+        obc_ipc 
+        csp_interface 
+        pthread 
+        obc_progress
+        obc_telemetry
+)
