@@ -55,6 +55,18 @@ if (NOT HW_MODE)
         TIMEOUT 30
         RESOURCE_LOCK "comms_bus_socket;obc_ipc_sockets"
     )
+
+    add_executable(fdir_recovery_test test_fdir_recovery.c)
+    target_compile_definitions(fdir_recovery_test PRIVATE
+        OBC_SUPERVISOR_PATH="$<TARGET_FILE:obc_supervisor>"
+    )
+    add_dependencies(fdir_recovery_test obc_supervisor)
+
+    add_test(NAME fdir_recovery_test COMMAND fdir_recovery_test)
+    set_tests_properties(fdir_recovery_test PROPERTIES
+        TIMEOUT 35
+        RESOURCE_LOCK "comms_bus_socket;obc_ipc_sockets"
+    )
 endif()
 
 # These tests exercise code shared by SIM and the Raspberry Pi build. They
