@@ -39,10 +39,6 @@ typedef struct {
     uint8_t payload[MAX_IPC_PAYLOAD];
 } IPCFrame;
 
-static inline int role_is_valid(unsigned v) {
-    return v>=ROLE_COMMANDS && v < ROLE_COUNT;
-}
-
 /* Wire format: [dest:1][src:1][length:2 network order][payload: length]*/
 static int ipc_frame_serialize(const IPCFrame *f, uint8_t *out, size_t out_size)
 {

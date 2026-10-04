@@ -138,11 +138,13 @@ void *shutdown_thread(void *arg)
         case SUPERVISOR_CMD_SHUTDOWN:
             printf("[SUPERVISOR SHUTDOWN] shutting down %s (requested by role %d)\n",
                    proc->name, src);
+            fflush(stdout);
             supervisor_shutdown_process(proc);
             break;
         case SUPERVISOR_CMD_RESTART:
             printf("[SUPERVISOR SHUTDOWN] restarting %s (requested by role %d)\n",
                    proc->name, src);
+            fflush(stdout);
             supervisor_restart_process(proc);
             break;
         default:

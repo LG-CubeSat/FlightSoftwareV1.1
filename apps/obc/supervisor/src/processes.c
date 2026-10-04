@@ -32,12 +32,12 @@ static void supervisor_check_frozen(void);
 int supervisor_is_frozen(OBC_Roles_t role);
 
 static obc_process_t processes[] = {
-    { "fdir", "obc_fdir", {0}, -1, ROLE_FDIR },
-    { "commands", "obc_commands", {0}, -1, ROLE_COMMANDS },
-    { "compute", "obc_compute", {0}, -1, ROLE_COMPUTE },
-    { "data", "obc_data", {0}, -1, ROLE_DATA },
-    { "mission", "obc_mission", {0}, -1, ROLE_MISSION },
-    { "time", "obc_time", {0}, -1, ROLE_TIME },
+    { .name="fdir", .exe_name="obc_fdir", .resolved_path={0}, .pid=-1, .role=ROLE_FDIR, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
+    { .name="commands", .exe_name="obc_commands", .resolved_path={0}, .pid=-1, .role=ROLE_COMMANDS, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
+    { .name="compute", .exe_name="obc_compute", .resolved_path={0}, .pid=-1, .role=ROLE_COMPUTE, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER},
+    { .name="data", .exe_name="obc_data", .resolved_path={0}, .pid=-1, .role=ROLE_DATA, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
+    { .name="mission", .exe_name="obc_mission", .resolved_path={0}, .pid=-1, .role=ROLE_MISSION, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
+    { .name="time", .exe_name="obc_time", .resolved_path={0}, .pid=-1, .role=ROLE_TIME, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
 };
 
 /* Finds the directory this supervisor binary itself is running from,
@@ -81,6 +81,9 @@ int supervisor_resolve_paths(void)
     return 0;
 }
 
+static int supervisor_shutdown_process_locked(obc_process_t *proc);
+static int supervisor_restart_process_locked(obc_process_t *proc);
+
 /* Starts the processes of the OBC */
 int start_all_processes(void)
 {
@@ -106,39 +109,67 @@ void supervisor_reap(obc_process_t *processes_to_reap, size_t n)
 {
     // NOTE: supervisor reap checks if processes are alive or even running.
     for (size_t i = 0; i < n; i++) {
+        obc_process_t *proc = &processes_to_reap[i];
+
+        /*
+        No shutdown or restart operation may manipulate this process while the reaper is checking or reaping it.
+        */
+        pthread_mutex_lock(&proc->lifecycle_lock);
+
         pthread_mutex_lock(&proc_lock);
-        pid_t pid = processes_to_reap[i].pid;
+        pid_t pid = proc->pid;
         pthread_mutex_unlock(&proc_lock);
 
-        if (pid <= 0) continue;
+        if (pid <= 0) {
+            pthread_mutex_unlock(&proc->lifecycle_lock);
+            continue;
+        }
 
         int status;
         pid_t rc = waitpid(pid, &status, WNOHANG);
-        if (rc == 0) continue; // process is alive
-        if (rc < 0) { perror("waitpid"); continue; } // unusual (dead process are > 0)
+        if (rc == 0) { // process is alive
+            pthread_mutex_unlock(&proc->lifecycle_lock);
+            continue;
+        } 
+        if (rc < 0) { // unusual (dead process are > 0)
+            pthread_mutex_unlock(&proc->lifecycle_lock);
+            perror("waitpid"); 
+            continue; 
+        }
 
         // in the case those previous if pass the process is Dead.
 
         if (WIFEXITED(status)) {
-            fprintf(stderr, "[OBC SUPERVISOR] %s exited, code %d\n", processes_to_reap[i].name, WEXITSTATUS(status));
+            fprintf(stderr, "[OBC SUPERVISOR] %s exited, code %d\n", proc->name, WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
-            fprintf(stderr, "[OBC SUPERVISOR] %s killed by signal %d\n", processes_to_reap[i].name, WTERMSIG(status));
+            fprintf(stderr, "[OBC SUPERVISOR] %s killed by signal %d\n", proc->name, WTERMSIG(status));
         }
         
         pthread_mutex_lock(&proc_lock);
-        processes_to_reap[i].pid = -1; // dead. ready to restart with backoff
+        proc->pid = -1; // dead. ready to restart with backoff
         pthread_mutex_unlock(&proc_lock);
 
-        if (shutting_down) continue;
-        processes_to_reap[i].restart_count++;
-        // TODO: Will eventually want to reset restart count after prolonger healthy running.
-        if (processes_to_reap[i].restart_count > MAX_CRASH_RESTARTS) {
-            fprintf(stderr, "[OBC SUPERVISOR] %s crashed %d times, giving up\n", processes_to_reap[i].name, processes_to_reap[i].restart_count);
+        if (shutting_down) {
+            pthread_mutex_unlock(&proc->lifecycle_lock);
             continue;
         }
 
-        fprintf(stderr, "[OBC SUPERVISOR] Restarting %s after crash (attempt %d/%d)\n", processes_to_reap[i].name, processes_to_reap[i].restart_count, MAX_CRASH_RESTARTS);
-        supervisor_restart_process(&processes_to_reap[i]);
+        proc->restart_count++;
+
+        // TODO: Will eventually want to reset restart count after prolonger healthy running.
+        if (proc->restart_count > MAX_CRASH_RESTARTS) {
+            fprintf(stderr, "[OBC SUPERVISOR] %s crashed %d times, giving up\n", proc->name, proc->restart_count);
+            pthread_mutex_unlock(&proc->lifecycle_lock);
+            continue;
+        }
+
+        fprintf(stderr, "[OBC SUPERVISOR] Restarting %s after crash (attempt %d/%d)\n", proc->name, proc->restart_count, MAX_CRASH_RESTARTS);
+        
+        /*
+        We already hold this processe's lifecycle lock, so use the internal version. Calling the public wrapper would deadlock.
+        */
+        supervisor_restart_process(proc);
+        pthread_mutex_unlock(&proc->lifecycle_lock);
     }
 }
 
@@ -158,6 +189,14 @@ static void supervisor_check_frozen(void)
     }
 
     for (size_t i = 0; i < NUM_PROCESSES; i++) {
+        /*
+        FDIR Owns progress-timeout policy for the other roles.
+        Supervisor directly monitors only FDIR.
+        */
+        if (processes[i].role != ROLE_FDIR) {
+            continue;
+        }
+
         pthread_mutex_lock(&proc_lock);
         pid_t pid = processes[i].pid;
         pthread_mutex_unlock(&proc_lock);
@@ -183,7 +222,7 @@ void supervisor_shutdown_all(void)
 
 /* Sends SIGTERM and waits up to SHUTDOWN_GRACE_SEC for a clean exit,
    escalating to SIGKILL if the process ignores it. Blocks until gone. */
-int supervisor_shutdown_process(obc_process_t *proc)
+static int supervisor_shutdown_process_locked(obc_process_t *proc)
 {
     pthread_mutex_lock(&proc_lock);
     pid_t pid = proc->pid;
@@ -239,10 +278,24 @@ int supervisor_shutdown_process(obc_process_t *proc)
     return 0; // forceful shutdown
 }
 
-/* Shuts the process down if still running, then spawns a fresh copy. */
-int supervisor_restart_process(obc_process_t *proc)
+int supervisor_shutdown_process(obc_process_t *proc)
 {
-    if (supervisor_shutdown_process(proc) != 0) {
+    if (proc == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&proc->lifecycle_lock);
+
+    int result = supervisor_shutdown_process_locked(proc);
+
+    pthread_mutex_unlock(&proc->lifecycle_lock);
+    return result;
+}
+
+/* Shuts the process down if still running, then spawns a fresh copy. */
+static int supervisor_restart_process_locked(obc_process_t *proc)
+{
+    if (supervisor_shutdown_process_locked(proc) != 0) {
         return -1;
     }
 
@@ -262,6 +315,21 @@ int supervisor_restart_process(obc_process_t *proc)
 
     fprintf(stderr, "[OBC SUPERVISOR] Restarted %s (pid %d)\n", proc->name, pid);
     return 0;
+}
+
+int supervisor_restart_process(obc_process_t *proc)
+{
+    if (proc == NULL) {
+        return -1;
+    }
+
+    pthread_mutex_lock(&proc->lifecycle_lock);
+
+    int result = supervisor_restart_process_locked(proc);
+
+    pthread_mutex_unlock(&proc->lifecycle_lock);
+
+    return result;
 }
 
 obc_process_t *supervisor_find_process(OBC_Roles_t role)

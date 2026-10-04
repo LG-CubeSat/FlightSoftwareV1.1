@@ -23,14 +23,23 @@ int main(void) {
     printf("[OBC FDIR] Initializing.\n");
 
     /* Init here */
-    IPC_initialize(ROLE_FDIR);
-
-    if (watchdog_thread_init() != 0) {
-        printf("[OBC FDIR] Failed to launch the Watchdog thread.\n");
+    if (IPC_initialize(ROLE_FDIR) != IPC_OK) {
+        fprintf(stderr, "[OBC FDIR] Failed to initalize IPC.\n");
+        return -1;
     }
 
+    /*
+    Start the receiver first so heartbeats can be recorded before the watchdog begins eval on deadlines.
+    */
+
     if (health_monitor_thread_init() != 0) {
-        printf("[OBC FDIR] Failed to launch the Health Monitor thread.\n");
+        fprintf(stderr, "[OBC FDIR] Failed to launch the Health Monitor thread.\n");
+        return 1;
+    }
+
+    if (watchdog_thread_init() != 0) {
+        fprintf(stderr, "[OBC FDIR] Failed to launch the Watchdog thread.\n");
+        return 1;
     }
 
     for (;;) {
