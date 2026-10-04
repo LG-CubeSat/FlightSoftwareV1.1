@@ -1,7 +1,6 @@
 #ifndef OBC_MISSION_PAYLOAD_COMMANDER_H
 #define OBC_MISSION_PAYLOAD_COMMANDER_H
 
-#include <stdint.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -19,7 +18,7 @@ int payload_commander_downlink_telemetry_batch(
     uint64_t *cursor,
     size_t max_records,
     size_t *records_sent,
-    size_t *end_of_log
+    int *end_of_log
 );
 
 #endif // OBC_MISSION_PAYLOAD_COMMANDER_H

@@ -7,7 +7,8 @@
 #include "obc_telemetry_protocol.h"
 #include "payload_commander.h"
 
-#define MAX_REPLIES 4
+#define MAX_REPLIES 8
+#define MAX_RADIO_CALLS 8
 
 static int checks_failed;
 static int reply_count;
@@ -16,11 +17,15 @@ static obc_telemetry_read_reply_t replies[MAX_REPLIES];
 
 static int request_count;
 static obc_telemetry_read_request_t last_request;
+static obc_telemetry_read_request_t requests[MAX_REPLIES];
 
 static int radio_result;
+static int radio_fail_on_call;
 static int radio_calls;
 static uint8_t radio_bytes[OBC_IPC_MAX_PAYLOAD];
 static size_t radio_length;
+static uint8_t radio_history[MAX_RADIO_CALLS][OBC_IPC_MAX_PAYLOAD];
+static size_t radio_history_lengths[MAX_RADIO_CALLS];
 static int progress_calls;
 
 static void check_true(const char *name, int condition)
@@ -41,10 +46,14 @@ static void reset_fakes(void)
     memset(replies, 0, sizeof(replies));
     request_count = 0;
     memset(&last_request, 0, sizeof(last_request));
+    memset(requests, 0, sizeof(requests));
     radio_result = 0;
+    radio_fail_on_call = 0;
     radio_calls = 0;
     radio_length = 0;
     memset(radio_bytes, 0, sizeof(radio_bytes));
+    memset(radio_history, 0, sizeof(radio_history));
+    memset(radio_history_lengths, 0, sizeof(radio_history_lengths));
     progress_calls = 0;
 }
 
@@ -123,6 +132,9 @@ int IPC_send(OBC_Roles_t destination, const uint8_t *data, uint16_t length)
     }
 
     memcpy(&last_request, data, sizeof(last_request));
+    if (request_count < MAX_REPLIES) {
+        requests[request_count] = last_request;
+    }
     request_count++;
     return length;
 }
@@ -156,12 +168,19 @@ int radio_send(const uint8_t *data, size_t length)
     if (radio_result != 0) {
         return radio_result;
     }
+    if (radio_fail_on_call > 0 && radio_calls == radio_fail_on_call) {
+        return -1;
+    }
     if (data == NULL || length > sizeof(radio_bytes)) {
         return -1;
     }
 
     memcpy(radio_bytes, data, length);
     radio_length = length;
+    if (radio_calls <= MAX_RADIO_CALLS) {
+        memcpy(radio_history[radio_calls - 1], data, length);
+        radio_history_lengths[radio_calls - 1] = length;
+    }
     return 0;
 }
 
@@ -318,12 +337,178 @@ static void test_end_of_log_without_record(void)
     check_true("empty tail does not call radio", radio_calls == 0);
 }
 
+static void test_batch_reaches_end_of_log(void)
+{
+    reset_fakes();
+
+    uint8_t encoded[3][OBC_IPC_MAX_PAYLOAD];
+    size_t sizes[3];
+    uint64_t offsets[4] = {0};
+
+    for (size_t i = 0; i < 3; i++) {
+        sizes[i] = make_record((uint8_t)(0x40 + i), 3, encoded[i]);
+        offsets[i + 1] = offsets[i] + sizes[i];
+        queue_record_replies(
+            offsets[i],
+            offsets[i + 1],
+            i == 2,
+            encoded[i],
+            sizes[i]
+        );
+    }
+
+    uint64_t cursor = 0;
+    size_t records_sent = 99;
+    int end_of_log = 0;
+    int result = payload_commander_downlink_telemetry_batch(
+        &cursor,
+        5,
+        &records_sent,
+        &end_of_log
+    );
+
+    check_true("batch reaches end successfully", result == 0);
+    check_true(
+        "batch transmits every available record",
+        records_sent == 3 && radio_calls == 3
+    );
+    check_true(
+        "batch requests each cursor in sequence",
+        request_count == 3 &&
+        requests[0].offset == offsets[0] &&
+        requests[1].offset == offsets[1] &&
+        requests[2].offset == offsets[2]
+    );
+    check_true(
+        "batch preserves radio transmission order",
+        radio_history_lengths[0] == sizes[0] &&
+        radio_history_lengths[1] == sizes[1] &&
+        radio_history_lengths[2] == sizes[2] &&
+        memcmp(radio_history[0], encoded[0], sizes[0]) == 0 &&
+        memcmp(radio_history[1], encoded[1], sizes[1]) == 0 &&
+        memcmp(radio_history[2], encoded[2], sizes[2]) == 0
+    );
+    check_true(
+        "batch commits final cursor and end-of-log",
+        cursor == offsets[3] && end_of_log
+    );
+}
+
+static void test_batch_honors_record_limit(void)
+{
+    reset_fakes();
+
+    uint8_t encoded[3][OBC_IPC_MAX_PAYLOAD];
+    size_t sizes[3];
+    uint64_t offsets[4] = {0};
+
+    for (size_t i = 0; i < 3; i++) {
+        sizes[i] = make_record((uint8_t)(0x50 + i), 3, encoded[i]);
+        offsets[i + 1] = offsets[i] + sizes[i];
+        queue_record_replies(
+            offsets[i],
+            offsets[i + 1],
+            i == 2,
+            encoded[i],
+            sizes[i]
+        );
+    }
+
+    uint64_t cursor = 0;
+    size_t records_sent = 0;
+    int end_of_log = 1;
+    int result = payload_commander_downlink_telemetry_batch(
+        &cursor,
+        2,
+        &records_sent,
+        &end_of_log
+    );
+
+    check_true("limited batch succeeds", result == 0);
+    check_true(
+        "limited batch performs exactly two transmissions",
+        records_sent == 2 && radio_calls == 2 && request_count == 2
+    );
+    check_true(
+        "limited batch stops at the third record cursor",
+        cursor == offsets[2] && !end_of_log
+    );
+}
+
+static void test_batch_failure_keeps_failed_record_cursor(void)
+{
+    reset_fakes();
+
+    uint8_t encoded[3][OBC_IPC_MAX_PAYLOAD];
+    size_t sizes[3];
+    uint64_t offsets[4] = {0};
+
+    for (size_t i = 0; i < 3; i++) {
+        sizes[i] = make_record((uint8_t)(0x60 + i), 3, encoded[i]);
+        offsets[i + 1] = offsets[i] + sizes[i];
+        queue_record_replies(
+            offsets[i],
+            offsets[i + 1],
+            i == 2,
+            encoded[i],
+            sizes[i]
+        );
+    }
+    radio_fail_on_call = 3;
+
+    uint64_t cursor = 0;
+    size_t records_sent = 0;
+    int end_of_log = 0;
+    int result = payload_commander_downlink_telemetry_batch(
+        &cursor,
+        5,
+        &records_sent,
+        &end_of_log
+    );
+
+    check_true("mid-batch radio failure is reported", result == -1);
+    check_true(
+        "records before the failure remain committed",
+        records_sent == 2 && cursor == offsets[2]
+    );
+    check_true(
+        "failed record was attempted but not committed",
+        radio_calls == 3 && request_count == 3 && !end_of_log
+    );
+}
+
+static void test_batch_rejects_zero_limit(void)
+{
+    reset_fakes();
+
+    uint64_t cursor = 12;
+    size_t records_sent = 77;
+    int end_of_log = 5;
+    int result = payload_commander_downlink_telemetry_batch(
+        &cursor,
+        0,
+        &records_sent,
+        &end_of_log
+    );
+
+    check_true("zero-sized batch is rejected", result == -1);
+    check_true(
+        "rejected batch changes no caller state",
+        cursor == 12 && records_sent == 77 && end_of_log == 5
+    );
+    check_true("rejected batch sends no IPC or radio data", request_count == 0 && radio_calls == 0);
+}
+
 int main(void)
 {
     test_single_chunk_record();
     test_two_chunk_final_record();
     test_radio_failure_preserves_cursor();
     test_end_of_log_without_record();
+    test_batch_reaches_end_of_log();
+    test_batch_honors_record_limit();
+    test_batch_failure_keeps_failed_record_cursor();
+    test_batch_rejects_zero_limit();
 
     if (checks_failed == 0) {
         printf("mission_telemetry_test: PASS\n");
