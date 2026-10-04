@@ -227,3 +227,29 @@ set_tests_properties(data_telemetry_test PROPERTIES
     TIMEOUT 20
     RESOURCE_LOCK obc_ipc_sockets
 )
+
+add_executable(
+    mission_telemetry_test
+    test_mission_telemetry.c
+    ${CMAKE_SOURCE_DIR}/apps/obc/mission/src/payload_commander.c
+)
+
+target_include_directories(mission_telemetry_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/apps/obc/mission/include
+    ${CMAKE_SOURCE_DIR}/apps/obc/include
+    ${CMAKE_SOURCE_DIR}/shared/interfaces
+    ${CMAKE_SOURCE_DIR}/shared/csp
+)
+
+target_link_libraries(
+    mission_telemetry_test
+    PRIVATE
+        obc_telemetry
+)
+
+add_test(
+    NAME mission_telemetry_test
+    COMMAND mission_telemetry_test
+)
+
+set_tests_properties(mission_telemetry_test PROPERTIES TIMEOUT 5)

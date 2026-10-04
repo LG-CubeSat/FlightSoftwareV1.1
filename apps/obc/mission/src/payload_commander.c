@@ -13,7 +13,6 @@
 #include "obc_compute_protocol.h"
 #include "time.h"
 #include "mission_health.h"
-#include "telemetry_store.h"
 #include "obc_telemetry_protocol.h"
 
 #define MAX_PHOTO_SIZE (64 * 1024) // 64kb, tune to real photo size
@@ -196,7 +195,12 @@ int payload_commander_downlink_telemetry_record(
         .offset = offset
     };
 
-    if (IPC_send(ROLE_DATA, (const uint8_t *)&request, sizeof(request) < 0)) {
+    if (IPC_send(
+        ROLE_DATA, 
+        (const uint8_t *)&request, 
+        (uint16_t)sizeof(request)
+        ) < 0
+    ) {
         fprintf(stderr,
             "[PAYLOD COMMANDER] failed requesting telemetry at offset %llu\n",
             (unsigned long long)offset
@@ -257,8 +261,10 @@ int payload_commander_downlink_telemetry_record(
         if (reply.status == OBC_TELEMETRY_READ_END) {
             if (
                 !reply.is_last_chunk ||
+                !reply.end_of_log ||
                 reply.chunk_length != 0 ||
-                reply.record_offset != offset
+                reply.record_offset != offset ||
+                reply.next_offset != offset
             ) {
                 fprintf(stderr,
                     "[PAYLOAD COMMANDER] malformed telemetry END reply"
@@ -300,7 +306,6 @@ int payload_commander_downlink_telemetry_record(
         if (!received_first_chunk) {
             expected_record_length = reply.record_length;
             expected_next_offset = reply.next_offset;
-            expected_end_of_log = reply.end_of_log;
             received_first_chunk = 1;
         } else if (reply.record_length != expected_record_length || reply.next_offset != expected_next_offset) {
             fprintf(stderr,
@@ -317,9 +322,21 @@ int payload_commander_downlink_telemetry_record(
         encoded_size += reply.chunk_length;
 
         if (!reply.is_last_chunk) {
+            if (reply.end_of_log) {
+                fprintf(
+                    stderr,
+                    "[PAYLOAD COMMANDER] non-final chunk marked end-of-log\n"
+                );
+                return -1;
+            }
             continue;
         }
 
+        /*
+        Data attaches end_of_log to the final chunk because only that chunk completes the record
+        */
+        expected_end_of_log = reply.end_of_log;
+        
         if (encoded_size != expected_record_length) {
             fprintf(stderr,
                 "[PAYLOAD COMMANDER] incomplete telemetry record\n");
@@ -340,6 +357,13 @@ int payload_commander_downlink_telemetry_record(
             ) != OBC_TELEMETRY_OK
         ) {
             fprintf(stderr,
+                "[PAYLOAD COMMANDER] invalid telemetry record\n"
+            );
+            return -1;
+        }
+
+        if (radio_send(encoded, encoded_size) != 0) {
+            fprintf(stderr,
                 "[PAYLOAD COMMANDER] telemetry downlink failed\n"
             );
             return -1;
@@ -359,6 +383,77 @@ int payload_commander_downlink_telemetry_record(
 
         return 0;
     }
+}
 
+int payload_commander_downlink_telemetry_batch(
+    uint64_t *cursor,
+    size_t max_records,
+    size_t *records_sent,
+    int *end_of_log
+) {
+    if (
+        cursor == NULL ||
+        records_sent == NULL ||
+        end_of_log == NULL ||
+        max_records == 0
+    ) {
+        return -1;
+    }
 
+    *records_sent = 0;
+    *end_of_log = 0;
+
+    for (size_t i = 0; i < max_records; i++) {
+        /*
+        Work with a candidate cursor. 
+        The caller's cursor is only updated after one complete record reaches the radio.
+        */
+        uint64_t next_cursor = *cursor;
+        int record_reached_end = 0;
+
+        int result = payload_commander_downlink_telemetry_record(
+            *cursor,
+            &next_cursor,
+            &record_reached_end
+        );
+
+        if (result != 0) {
+            return -1;
+        }
+
+        /*
+        At the empty tail, Data returns READ_END and leaves the cursor unchanged.
+        No record was transmitted
+        */
+       if (next_cursor == *cursor) {
+            if (!record_reached_end) {
+                fprintf(
+                    stderr,
+                    "[PAYLOAD COMMANDER] telemetry read made no progress\n"
+                );
+                return -1;
+            }
+
+            *end_of_log = 1;
+            return 0;
+        }
+        
+        /*
+        The single record function successfully transmitted the record.
+        Use the returned cursor for next.
+        */
+        *cursor = next_cursor;
+        (*records_sent)++;
+
+        if (record_reached_end) {
+            *end_of_log = 1;
+            return 0;
+        }
+    }
+
+    /*
+    reaching here is success. stopped because record allow is complete.
+    nothing failed
+    */
+    return 0;
 }
