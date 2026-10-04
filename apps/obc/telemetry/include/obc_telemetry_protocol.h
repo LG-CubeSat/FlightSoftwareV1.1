@@ -15,10 +15,10 @@
 These messages are internal OBC IPC structures. Unlike encoded telemetry records
 these are never written to disk or transmitted to ground.
 */
-#define OBC_TELEMETRY_READ_REQUEST_MAGIC UINT32_C(0x76716783) /* TLMQ */
-#define OBC_TELEMETRY_READ_REPLY_MAGIC UINT32_C(0x554C4D41) /* TLMA */
+#define OBC_TELEMETRY_READ_REQUEST_MAGIC UINT32_C(0x544C4D51) /* "TLMQ" */
+#define OBC_TELEMETRY_READ_REPLY_MAGIC UINT32_C(0x544C4D41) /* "TLMA" */
 
-#define OBC_TELEMTRY_READ_CHUNK_SIZE 216U
+#define OBC_TELEMETRY_READ_CHUNK_SIZE 216U
 
 /*
 So the codec is going to have these bytes
@@ -41,9 +41,10 @@ typedef enum {
 
 typedef enum {
     OBC_TELEMETRY_READ_OK = 0,
-    OBC_TELEMTRY_READ_END = 1,
+    OBC_TELEMETRY_READ_END = 1,
     OBC_TELEMETRY_READ_IO_ERROR = -1,
-    OBC_TELEMETRY_READ_INVALID_RECROD = -2
+    OBC_TELEMETRY_READ_INVALID_RECORD = -2,
+    OBC_TELEMETRY_READ_INVALID_ARGUMENT = -3
 } obc_telemetry_read_status_t;
 
 /*
@@ -75,7 +76,7 @@ typedef struct {
     uint16_t chunk_offset;
     uint16_t chunk_length;
 
-    uint8_t payload[OBC_TELEMTRY_READ_CHUNK_SIZE];
+    uint8_t payload[OBC_TELEMETRY_READ_CHUNK_SIZE];
 } obc_telemetry_read_reply_t;
 
 _Static_assert(
