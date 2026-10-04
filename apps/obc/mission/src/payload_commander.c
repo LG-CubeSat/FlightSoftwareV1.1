@@ -13,6 +13,8 @@
 #include "obc_compute_protocol.h"
 #include "time.h"
 #include "mission_health.h"
+#include "telemetry_store.h"
+#include "obc_telemetry_protocol.h"
 
 #define MAX_PHOTO_SIZE (64 * 1024) // 64kb, tune to real photo size
 
@@ -23,6 +25,7 @@ so give it headroom before we conclude the whole process is gone.
 #define COMPRESS_TOTAL_TIMEOUT_MS 90000
 #define DOWNLINK_CHUNK_TIMEOUT_MS 10000
 #define DOWNLINK_TOTAL_TIMEOUT_MS 120000
+#define TELEMETRY_READ_TIMEOUT_MS 10000
 
 static uint8_t photo_buf[MAX_PHOTO_SIZE];
 
@@ -174,4 +177,188 @@ int payload_commander_point_to_sun(void)
     relay_request_t req = { .dest_addr = ADCS_ADDRESS, .dest_port = ADCS_CMD_PORT, .length = sizeof(cmd) };
     memcpy(req.payload, &cmd, sizeof(cmd));
     return IPC_send(ROLE_COMMANDS, (const uint8_t *)&req, sizeof(req)) < 0 ? -1 : 0;
+}
+
+int payload_commander_downlink_telemetry_record(
+    uint64_t offset,
+    uint64_t *next_offset,
+    int *end_of_log
+) {
+    if (
+        next_offset == NULL ||
+        end_of_log == NULL
+    ) {
+        return -1;
+    }
+    // do not modifty the caller's cursor until the entire record has been received and successfully passed to radio
+    obc_telemetry_read_request_t request = {
+        .magic=OBC_TELEMETRY_READ_REQUEST_MAGIC,
+        .offset = offset
+    };
+
+    if (IPC_send(ROLE_DATA, (const uint8_t *)&request, sizeof(request) < 0)) {
+        fprintf(stderr,
+            "[PAYLOD COMMANDER] failed requesting telemetry at offset %llu\n",
+            (unsigned long long)offset
+        );
+        return -1;
+    }
+
+    uint8_t encoded[OBC_IPC_MAX_PAYLOAD];
+    size_t encoded_size = 0;
+
+    uint16_t expected_record_length = 0;
+    uint64_t expected_next_offset = offset;
+    int expected_end_of_log = 0;
+    int received_first_chunk = 0;
+
+    struct timespec deadline;
+    deadline_in_ms(&deadline, TELEMETRY_READ_TIMEOUT_MS);
+
+    for (;;) {
+        int wait_ms = remaining_ms(&deadline);
+        if (wait_ms == 0) {
+            fprintf(stderr,
+                "[PAYLOAD COMMANDER] telemetry request timed out\n"
+            );
+            return -1;
+        }
+
+        OBC_Roles_t source;
+        obc_telemetry_read_reply_t reply;
+
+        int length = IPC_receive_timeout(
+            &source,
+            (uint8_t *)&reply,
+            sizeof(reply),
+            wait_ms
+        );
+
+        if (length == IPC_TIMEOUT) {
+            fprintf(stderr,
+                "[PAYLOAD COMMANDER] telemetry request timeout\n");
+            return -1;
+        }
+
+        /*
+        Mission may receive other IPC messages. They are not replies to this request, so ignore them.
+        */
+        if (
+            length != (int)sizeof(reply) ||
+            source != ROLE_DATA ||
+            reply.magic != OBC_TELEMETRY_READ_REPLY_MAGIC
+        ) {
+            continue;
+        }
+
+        /*
+        END is not an error. it means the cursor points to the current end of telem log
+        */
+        if (reply.status == OBC_TELEMETRY_READ_END) {
+            if (
+                !reply.is_last_chunk ||
+                reply.chunk_length != 0 ||
+                reply.record_offset != offset
+            ) {
+                fprintf(stderr,
+                    "[PAYLOAD COMMANDER] malformed telemetry END reply"
+                );
+                return -1;
+            }
+
+            *next_offset = reply.next_offset;
+            *end_of_log = 1;
+            return 0;
+        }
+
+        if (reply.status != OBC_TELEMETRY_READ_OK) {
+            fprintf(stderr,
+                "[PAYLOAD COMMANDER] Data returned telemetry status %d\n",
+                reply.status
+            );
+            return -1;
+        }
+
+        /*
+        These checks prevent malformed or inconsistent chunks from
+        overflowing the destination buffer
+        */
+        if (
+            reply.record_offset != offset ||
+            reply.record_length == 0 ||
+            reply.record_length > sizeof(encoded) ||
+            reply.chunk_length > sizeof(reply.payload) ||
+            reply.chunk_offset != encoded_size ||
+            (size_t)reply.chunk_offset + reply.chunk_length > reply.record_length
+        ) {
+            fprintf(stderr,
+                "[PAYLOAD COMMANDER] malformed telemetry chunk\n"
+            );
+            return -1;
+        }
+
+        if (!received_first_chunk) {
+            expected_record_length = reply.record_length;
+            expected_next_offset = reply.next_offset;
+            expected_end_of_log = reply.end_of_log;
+            received_first_chunk = 1;
+        } else if (reply.record_length != expected_record_length || reply.next_offset != expected_next_offset) {
+            fprintf(stderr,
+                "[PAYLOAD COMMANDER] inconsistent telemetry chunks\n"
+            );
+            return -1;
+        }
+
+        memcpy(
+            encoded + reply.chunk_offset,
+            reply.payload,
+            reply.chunk_length
+        );
+        encoded_size += reply.chunk_length;
+
+        if (!reply.is_last_chunk) {
+            continue;
+        }
+
+        if (encoded_size != expected_record_length) {
+            fprintf(stderr,
+                "[PAYLOAD COMMANDER] incomplete telemetry record\n");
+            return -1;
+        }
+        
+        /*
+        Decode once more before transmission. Data already validated the record. 
+        But this ensures Mission never downlinks malformed bytes
+        If the IPC reply is corruped
+        */
+        obc_telemetry_record_t decoded;
+        if (
+            obc_telemetry_decode(
+                encoded,
+                encoded_size,
+                &decoded
+            ) != OBC_TELEMETRY_OK
+        ) {
+            fprintf(stderr,
+                "[PAYLOAD COMMANDER] telemetry downlink failed\n"
+            );
+            return -1;
+        }
+
+        /*
+        Commit the new cursor only after radio_send succeeds. On failure the caller
+        can retry using its unchanged old cursor.
+        */
+        *next_offset = expected_next_offset;
+        *end_of_log = expected_end_of_log;
+
+        mission_health_payload_progress();
+
+        printf("[PAYLOAD COMMANDER] downlinked telemetry: %zu bytes, next offset %llu\n", encoded_size, (unsigned long long)*next_offset);
+        fflush(stdout);
+
+        return 0;
+    }
+
+
 }
