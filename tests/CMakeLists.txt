@@ -253,3 +253,16 @@ add_test(
 )
 
 set_tests_properties(mission_telemetry_test PROPERTIES TIMEOUT 5)
+
+add_executable(mission_state_test test_mission_state.c)
+add_dependencies(mission_state_test obc_mission)
+
+add_test(
+    NAME mission_state_test
+    COMMAND mission_state_test "$<TARGET_FILE:obc_mission>"
+)
+
+set_tests_properties(mission_state_test PROPERTIES
+    TIMEOUT 20
+    RESOURCE_LOCK obc_ipc_sockets
+)
