@@ -64,6 +64,6 @@ obc_telemetry_status_t obc_telemetry_decode(
     const uint8_t *encoded,
     size_t encoded_size,
     obc_telemetry_record_t *record
-)
+);
 
 #endif
