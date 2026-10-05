@@ -4,7 +4,7 @@
 #include "heater_interface.h"
 #include "prop_int_controller.h"
 #include "simulation/thermal_model.h"
-#include "thermal_sensor.h"
+#include "sensor_interface.h"
 
 #define TEST_TARGET_TEMPERATURE_C  (20.0f)
 #define TEST_TIME_STEP_SECONDS     (0.1f)

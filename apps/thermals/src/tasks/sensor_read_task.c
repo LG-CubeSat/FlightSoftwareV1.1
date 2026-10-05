@@ -2,7 +2,7 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
-#include "thermal_sensor.h"
+#include "sensor_interface.h"
 
 #include <stdint.h>
 #include <stdio.h>

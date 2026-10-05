@@ -5,7 +5,7 @@
  * in the hardware target.
  */
 
-#include "thermal_sensor.h"
+#include "sensor_interface.h"
 
 #include <stddef.h>
 #include <stdint.h>

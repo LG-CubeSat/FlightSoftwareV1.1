@@ -1,5 +1,5 @@
-#ifndef THERMAL_SENSOR_H
-#define THERMAL_SENSOR_H
+#ifndef SENSOR_INTERFACE_H
+#define SENSOR_INTERFACE_H
 
 #include <stdint.h>
 
@@ -24,4 +24,4 @@ Returns a positive value on success or a negative error code on failure.
 */
 int thermal_sensor_read(const thermal_sensor_t *sensor, float *temperature_out);
 
-#endif // THERMAL_SENSOR_H
+#endif // SENSOR_INTERFACE_H, THERMAL_SENSOR_H

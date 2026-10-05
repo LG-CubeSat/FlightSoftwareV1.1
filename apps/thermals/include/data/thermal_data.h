@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "thermal_sensor.h"
+#include "sensor_interface.h"
 
 #define THERMALS_MIN_TARGET_TEMP_C (-40.0f) //please don't confuse F with Farenheit
 #define THERMALS_MAX_TARGET_TEMP_C (125.0f)
