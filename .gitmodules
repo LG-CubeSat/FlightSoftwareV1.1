@@ -4,3 +4,6 @@
 [submodule "libs/ssdv"]
 	path = libs/ssdv
 	url = https://github.com/LG-CubeSat/SSDV
+[submodule "libs/libaec"]
+	path = libs/libaec
+	url = https://github.com/Deutsches-Klimarechenzentrum/libaec.git

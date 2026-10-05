@@ -53,3 +53,9 @@ add_dependencies(compute_async_test obc_data obc_compute)
 
 add_test(NAME compute_async_test COMMAND compute_async_test)
 set_tests_properties(compute_async_test PROPERTIES TIMEOUT 30)
+
+add_executable(ccsds_test test_ccsds.c)
+target_link_libraries(ccsds_test PRIVATE ccsds)
+
+add_test(NAME ccsds_test COMMAND ccsds_test)
+set_tests_properties(ccsds_test PROPERTIES TIMEOUT 10)

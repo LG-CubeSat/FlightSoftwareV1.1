@@ -38,7 +38,7 @@ sudo apt install -y cmake build-essential git i2c-tools
 ```
 
 Then clone this repo per `README.md`'s "Clone" section (it uses git submodules for libcsp,
-ssdv, and CCSDS_121.0 — `git clone --recurse-submodules ...`). Confirm the SIM build still
+ssdv, and libaec — `git clone --recurse-submodules ...`). Confirm the SIM build still
 works here first (`cmake -S . -B build -DHW_MODE=OFF && cmake --build build`) before touching
 I2C at all — that isolates "the Pi can build this project" from "the I2C bus works," so a
 problem later is easier to place.

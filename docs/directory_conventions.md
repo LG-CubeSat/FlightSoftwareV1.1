@@ -30,6 +30,7 @@ FlightSoftwareV1/
 │           └── thermals/
 ├── shared/                     # Code shared across OBC and MCU
 │   ├── CMakeLists.txt
+│   ├── ccsds/                  # CCSDS 121 + Space Packet/Profile v1 radio utilities
 │   ├── interfaces/             # Every abstract contract, bus + peripheral together
 │   │   └── comms_bus.h         # comms_bus API (shared by sim and real; medium-agnostic)
 │   └── csp/                    # CSP protocol layer
