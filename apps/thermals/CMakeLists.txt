@@ -3,10 +3,9 @@ add_executable(thermals_sim
     src/freertos_hooks.c
 
     src/data/thermal_data.c
-    src/data/thermal_sensor.c
-
     src/heater/prop_int_controller.c
 
+    src/simulation/thermal_sensor.c
     src/simulation/heater_sim.c
     src/simulation/thermal_model.c
 
@@ -28,6 +27,7 @@ target_include_directories(thermals_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/data
     ${CMAKE_CURRENT_SOURCE_DIR}/include/heater
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/interfaces
 )
 
 target_link_libraries(thermals_sim PRIVATE
@@ -40,7 +40,7 @@ target_link_libraries(thermals_sim PRIVATE
 add_executable(thermals_closed_loop_sim
     tests/closed_loop_sim.c
 
-    src/data/thermal_sensor.c
+    src/simulation/thermal_sensor.c
     src/heater/prop_int_controller.c
     src/simulation/heater_sim.c
     src/simulation/thermal_model.c
@@ -50,6 +50,7 @@ target_include_directories(thermals_closed_loop_sim PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/data
     ${CMAKE_CURRENT_SOURCE_DIR}/include/heater
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/interfaces
 )
 
 target_link_libraries(thermals_closed_loop_sim PRIVATE
