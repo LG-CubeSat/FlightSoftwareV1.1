@@ -22,3 +22,15 @@ target_link_libraries(csp_interface
         csp
         platform
 )
+
+add_library(obc_logging STATIC
+    logging/obc_log.c
+)
+
+target_include_directories(obc_logging PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/logging
+)
+
+target_link_libraries(obc_logging PUBLIC
+    pthread
+)
