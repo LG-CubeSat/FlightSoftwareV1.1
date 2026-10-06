@@ -7,8 +7,10 @@
 #include <unistd.h>
 #include <time.h>
 #include <pthread.h>
+#include <stdarg.h>
+#include <stdlib.h>
 
-static char *g_component;
+static char g_component[32] = "unknown";
 static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int obc_log_init(const char *component)
@@ -50,7 +52,23 @@ int obc_log_init(const char *component)
     return 0;
 }
 
-void obc_log_write(obc_log_level_t level, const char *format)
+static const char *level_name(obc_log_level_t level)
+{
+    switch (level) {
+        case OBC_LOG_DEBUG:
+            return "DEBUG";
+        case OBC_LOG_INFO:
+            return "INFO";
+        case OBC_LOG_WARN:
+            return "WARN";
+        case OBC_LOG_ERROR:
+            return "ERROR";
+        default:
+            return "UNKNOWN";
+    }
+}
+
+void obc_log_write(obc_log_level_t level, const char *format, ...)
 {
     char timestamp[32];
     char message[768];
