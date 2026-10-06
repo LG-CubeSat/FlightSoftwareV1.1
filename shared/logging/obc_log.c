@@ -9,7 +9,7 @@
 #include <pthread.h>
 
 static char *g_component;
-static pthread_mutex_t g_log_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int obc_log_init(const char *component)
 {
