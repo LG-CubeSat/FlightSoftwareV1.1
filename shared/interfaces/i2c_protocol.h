@@ -34,7 +34,7 @@ byte 4: pending frame length, low byte
 */
 
 #define I2C_STATUS_WIRE_SIZE 5U
-#define I2C_STATUS_DATA_RELAY 0x01U
+#define I2C_STATUS_DATA_READY 0x01U
 
 typedef struct {
     uint8_t flags;

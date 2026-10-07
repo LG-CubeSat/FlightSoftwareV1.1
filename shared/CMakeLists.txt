@@ -39,6 +39,6 @@ add_library(i2c_protocol STATIC
     interfaces/i2c_protocol.c
 )
 
-target_link_directories(i2c_protocol PUBLIC
+target_include_directories(i2c_protocol PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/interfaces
 )
