@@ -9,11 +9,11 @@ static int status_fields_valid(const I2cStatus_t *status)
     /*
     Reject currently undefined flag bits. A future protocol version can introduce more flags.
     */
-    if ((status->flags & (uint8_t)~I2C_STATUS_DATA_RELAY) != 0U) {
+    if ((status->flags & (uint8_t)~I2C_STATUS_DATA_READY) != 0U) {
         return 0;
     }
 
-    if ((status->flags & I2C_STATUS_DATA_RELAY) == 0U) {
+    if ((status->flags & I2C_STATUS_DATA_READY) == 0U) {
         /*
         No data means there must not be a pending frame length.
         */
