@@ -3,7 +3,7 @@ Bridges libcsp to the underlying comms_bus transport (see comms_bus.h) --
 sends/receives csp packets through whichever CSP_Transport_t was configured
 (SIM or real), without this layer ever knowing or caring which one it is.
 */
-#include "csp_if_spi.h"
+#include "csp_if_comms_bus.h"
 
 #include <csp/csp_debug.h>
 #include <csp/csp_id.h>
@@ -17,7 +17,7 @@ static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packe
     (void)from_me;
     (void)via; // CSP_NO_VIA_ADDRESS with no routing table configured -- not a real address, see packet->id.dst below
 
-    csp_if_spi_conf_t * ifconf = iface->driver_data; // create a interface config
+    csp_if_comms_bus_conf_t * ifconf = iface->driver_data; // create a interface config
 
     // TODO: check if full
 
@@ -52,7 +52,7 @@ static int csp_if_spi_rx_work(
     csp_iface_t *iface
 )
 {
-    csp_if_spi_conf_t *ifconf = iface->driver_data; // makes config interface
+    csp_if_comms_bus_conf_t *ifconf = iface->driver_data; // makes config interface
 
     csp_packet_t *packet = csp_buffer_get(0); // this is space in buffer we grab
     if (packet == NULL)
@@ -130,7 +130,7 @@ static void * csp_if_spi_rx_loop(void * param)
     return NULL;
 }
 
-void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf)
+void csp_if_spi_init(csp_iface_t * iface, csp_if_comms_bus_conf_t * ifconf)
 {
     pthread_attr_t attributes;
     int ret;

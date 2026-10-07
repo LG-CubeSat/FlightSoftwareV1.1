@@ -1,5 +1,5 @@
-#ifndef CSP_IF_SPI_H
-#define CSP_IF_SPI_H
+#ifndef CSP_IF_COMMS_BUS_H
+#define CSP_IF_COMMS_BUS_H
 
 #include <csp/csp.h>
 
@@ -22,17 +22,17 @@ typedef struct {
         uint8_t *buffer,
         uint16_t max_length
     );
-} CSP_Transport_t;
+} CSP_CommsBusTransport_t;
 
 typedef struct {
     // Transport abstraction
-    CSP_Transport_t *transport;
+    CSP_CommsBusTransport_t *transport;
 
     // RX Thread
     pthread_t rx_thread;
 
-} csp_if_spi_conf_t;
+} csp_if_comms_bus_conf_t;
 
-void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf);
+void csp_if_comms_bus_init(csp_iface_t * iface, csp_if_comms_bus_conf_t * ifconf);
 
 #endif
