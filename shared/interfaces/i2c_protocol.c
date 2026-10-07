@@ -1,6 +1,6 @@
 #include "i2c_protocol.h"
 
-static int status_fields_valids(const I2cStatus_t *status)
+static int status_fields_valid(const I2cStatus_t *status)
 {
     if (status == NULL) {
         return 0;
@@ -35,7 +35,7 @@ int i2c_status_encode(
 {
     if (wire_buffer == NULL ||
         wire_buffer_size < I2C_STATUS_WIRE_SIZE ||
-        !status_fields_valids(status)) {
+        !status_fields_valid(status)) {
         return -1;
     }
 
