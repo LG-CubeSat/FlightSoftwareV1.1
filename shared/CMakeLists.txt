@@ -8,7 +8,7 @@ target_include_directories(frame_codec
 )
 
 add_library(csp_interface STATIC
-    csp/csp_if_spi.c
+    csp/csp_if_comms_bus.c
     csp/csp_network.c
 )
 

@@ -34,7 +34,7 @@ FlightSoftwareV1/
 │   │   └── comms_bus.h         # comms_bus API (shared by sim and real; medium-agnostic)
 │   └── csp/                    # CSP protocol layer
 │       ├── csp_network.c/.h    # CSP bring-up, wraps the comms_bus transport
-│       └── csp_if_spi.c/.h     # CSP-to-transport glue (still SPI-named -- see note below)
+│       └── csp_if_comms_bus.c/.h # CSP-to-comms-bus glue
 ├── platform/                   # Platform abstraction layer (HW/SIM toggle)
 │   ├── CMakeLists.txt
 │   ├── sim/                    # Simulation implementations
@@ -70,19 +70,13 @@ FlightSoftwareV1/
 └── build/                       # CMake build output (gitignored)
 ```
 
-### A note on `comms_bus` vs. SPI naming you'll still see in the tree above
+### `comms_bus` and I2C naming
 
-`shared/interfaces/comms_bus.h` and both `platform/{real,sim}/drivers/comms_i2c.c`
-files were renamed off their old `v_bus`/SPI-flavored names — that part is done. Two
-things are **deliberately** still SPI-named, because renaming them would misrepresent
-code that hasn't changed yet:
-
-- `shared/csp/csp_if_spi.c/.h` — the CSP-to-transport glue layer. A real `csp_if_i2c.c`
-  is planned once the I2C SIM transport work is complete. Until then this file still does.
-- `platform/real/drivers/comms_i2c.c`'s HW-mode branch — still literal vendor
-  SPI HAL calls (`HAL_SPI_Init`, `SPI1`, `SPI_MODE_MASTER`, ...). I2C doesn't
-  even have some of the fields this code sets (`CLKPolarity`, `NSS`), so this
-  needs real driver work, not a rename, once real hardware bring-up starts.
+The shared CSP adapter is named `csp_if_comms_bus.c/.h` because it does not access
+hardware directly. It forwards CSP packets through the `CommsBus_t` interface. The
+selected platform backend then supplies either the simulated socket bus or the real
+Linux I2C master implementation. A future STM32 build will provide a separate I2C
+slave backend behind that same interface.
 
 ## Naming Conventions
 

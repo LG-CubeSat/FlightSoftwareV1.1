@@ -22,17 +22,17 @@ typedef struct {
         uint8_t *buffer,
         uint16_t max_length
     );
-} CSP_CommsBusTransport_t;
+} CspCommsBusTransport_t;
 
 typedef struct {
     // Transport abstraction
-    CSP_CommsBusTransport_t *transport;
+    CspCommsBusTransport_t *transport;
 
     // RX Thread
     pthread_t rx_thread;
 
-} csp_if_comms_bus_conf_t;
+} CspCommsBusConfig_t;
 
-void csp_if_comms_bus_init(csp_iface_t * iface, csp_if_comms_bus_conf_t * ifconf);
+void csp_if_comms_bus_init(csp_iface_t *iface, CspCommsBusConfig_t *config);
 
 #endif
