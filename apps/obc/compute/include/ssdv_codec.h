@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define SSDV_RADIO_PKT_SIZE 128 // e22 max payload is 240
+
 /*
 Callsign and image id are for ground station to reassemble images
 This is crucial if we are transmitting multiple at once
