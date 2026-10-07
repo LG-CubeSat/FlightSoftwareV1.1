@@ -64,6 +64,6 @@ int i2c_status_decode(
     const uint8_t *wire_buffer,
     size_t wire_length,
     I2cStatus_t *status_out
-)
+);
 
 #endif
