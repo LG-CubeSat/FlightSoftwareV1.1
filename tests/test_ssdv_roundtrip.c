@@ -19,7 +19,7 @@ int main(void)
         fprintf(stderr, "[FAIL] production SSDV wrapper encodes the test JPEG\n");
         return 1;
     }
-    if (encoded_length == 0 || encoded_length % SSDV_PKT_SIZE != 0) {
+    if (encoded_length == 0 || encoded_length % LG_SSDV_PACKET_SIZE != 0) {
         fprintf(stderr, "[FAIL] encoder output is not complete SSDV packets\n");
         return 1;
     }
@@ -34,15 +34,15 @@ int main(void)
 
     uint8_t decoded_storage[DECODED_CAPACITY] = {0};
     ssdv_t decoder;
-    if (ssdv_dec_init(&decoder, SSDV_PKT_SIZE) != SSDV_OK ||
+    if (ssdv_dec_init(&decoder, LG_SSDV_PACKET_SIZE) != SSDV_OK ||
         ssdv_dec_set_buffer(&decoder, decoded_storage, sizeof(decoded_storage)) != SSDV_OK) {
         fprintf(stderr, "[FAIL] SSDV decoder initializes\n");
         return 1;
     }
 
-    for (size_t offset = 0; offset < encoded_length; offset += SSDV_PKT_SIZE) {
+    for (size_t offset = 0; offset < encoded_length; offset += LG_SSDV_PACKET_SIZE) {
         int errors = 0;
-        if (ssdv_dec_is_packet(encoded + offset, SSDV_PKT_SIZE, &errors) != SSDV_OK) {
+        if (ssdv_dec_is_packet(encoded + offset, LG_SSDV_PACKET_SIZE, &errors) != SSDV_OK) {
             fprintf(stderr, "[FAIL] encoded packet at offset %zu is invalid\n", offset);
             return 1;
         }
@@ -62,7 +62,7 @@ int main(void)
     }
 
     printf("[PASS] encoded %u-byte JPEG into %zu bytes (%zu SSDV packets)\n",
-           test_jpeg_data_len, encoded_length, encoded_length / SSDV_PKT_SIZE);
+           test_jpeg_data_len, encoded_length, encoded_length / LG_SSDV_PACKET_SIZE);
     printf("[PASS] callsign, image id, and 16x16 dimensions survived the packet round-trip\n");
     printf("[PASS] decoder reconstructed a %zu-byte JPEG\n", decoded_length);
     printf("ssdv_roundtrip_test: PASS\n");

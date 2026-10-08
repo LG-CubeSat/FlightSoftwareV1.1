@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define LG_SSDV_PACKET_SIZE 214 // + 26 ccsds framing = 240 e22 max
+
 /*
 Callsign and image id are for ground station to reassemble images
 This is crucial if we are transmitting multiple at once
