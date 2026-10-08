@@ -17,7 +17,7 @@ int ssdv_encode_image(
     ssdv_t ssdv;
     uint8_t pkt[SSDV_PKT_SIZE];
 
-    if (ssdv_enc_init(&ssdv, SSDV_TYPE_NORMAL, (char *)callsign, image_id, SSDV_QUALITY, SSDV_RADIO_PKT_SIZE) != SSDV_OK) {
+    if (ssdv_enc_init(&ssdv, SSDV_TYPE_NORMAL, (char *)callsign, image_id, SSDV_QUALITY, LG_SSDV_PACKET_SIZE) != SSDV_OK) {
         return -1;
     }
     ssdv_enc_set_buffer(&ssdv, pkt);
@@ -40,9 +40,9 @@ int ssdv_encode_image(
         if (c == SSDV_EOI) break; /* whole image successfully packetized */
         if (c != SSDV_OK) return -1;
 
-        if (written + SSDV_RADIO_PKT_SIZE > out_cap) return -1;
-        memcpy(out + written, pkt, SSDV_RADIO_PKT_SIZE);
-        written += SSDV_RADIO_PKT_SIZE;
+        if (written + LG_SSDV_PACKET_SIZE > out_cap) return -1;
+        memcpy(out + written, pkt, LG_SSDV_PACKET_SIZE);
+        written += LG_SSDV_PACKET_SIZE;
     }
 
     *out_len = written;

@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define SSDV_RADIO_PKT_SIZE 128 // e22 max payload is 240
+#define LG_SSDV_PACKET_SIZE 214 // + 26 ccsds framing = 240 e22 max
 
 /*
 Callsign and image id are for ground station to reassemble images
