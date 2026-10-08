@@ -215,7 +215,7 @@ static int receive_one_frame(int fd, leftover_t *lo, Frame *frame_out, uint32_t 
         return COMMS_BUS_ERROR;
     }
 
-    int64_t deadline = start + (uint64_t)timeout_ms;
+    int64_t deadline = start + (int64_t)timeout_ms;
 
     while (1) {
         /*
@@ -235,7 +235,7 @@ static int receive_one_frame(int fd, leftover_t *lo, Frame *frame_out, uint32_t 
             }
 
             if (lo->len >= needed) {
-                if (frame_deserialize(lo->buf, lo->len, frame_out) < 0) {
+                if (frame_deserialize(lo->buf, needed, frame_out) < 0) {
                     return COMMS_BUS_ERROR;
                 }
                 // Shift any bytes belonging to the next frame down to the
@@ -328,7 +328,7 @@ static int receive_one_frame(int fd, leftover_t *lo, Frame *frame_out, uint32_t 
 
 int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
 {
-    if (bus_fd < 0) return -1;
+    if (bus_fd < 0) return COMMS_BUS_ERROR;
     // write() sends 'length' bytes from 'data' through the socket 'bus_fd'
     
     // creating a frame
@@ -341,7 +341,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
             length, 
             MAX_FRAME_PAYLOAD
         );
-        return -1;
+        return COMMS_BUS_ERROR;
     }
     
     frame.length = length;
@@ -350,7 +350,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
     uint8_t wire_buf[4 + MAX_FRAME_PAYLOAD];
     int wire_len = frame_serialize(&frame, wire_buf, sizeof(wire_buf));
 
-    int ret = -1;
+    int ret = COMMS_BUS_ERROR;
     if (bus_is_master) {
         // comms_bus_initialize() returns as soon as the accept thread is
         // spawned, before that thread has necessarily accepted anyone --
@@ -373,7 +373,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
         pthread_mutex_unlock(&connection_lock);
 
         for (int i=0; i < snapshot_count; i++) {
-            if (snapshot_fds[i] == -1) {
+            if (snapshot_fds[i] == COMMS_BUS_ERROR) {
                 continue; // this slot's connection already died -- skip, more may follow
             }
 
@@ -402,7 +402,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length)
     if (ret == wire_len) {
         return length;
     }
-    return -1;
+    return COMMS_BUS_ERROR;
 }
 
 int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length)
@@ -423,7 +423,7 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
         int live_connections = 0;
 
         for (int i = 0; i < snapshot_count; i++) {
-            if (snapshot_fds[i] != -1) {
+            if (snapshot_fds[i] != COMMS_BUS_ERROR) {
                 live_connections++;
             }
         }
@@ -470,7 +470,7 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
             break;
         }
     } else {
-        if (bus_fd < 0) return -1;
+        if (bus_fd < 0) return COMMS_BUS_ERROR;
         int result = receive_one_frame(
             bus_fd,
             &slave_leftover,
@@ -500,7 +500,7 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
         fprintf(stderr,
                 "[COMMS BUS] received payload of %u bytes exceeds caller buffer of %u bytes\n",
                 frame.length, max_length);
-        return -1;
+        return COMMS_BUS_ERROR;
     }
 
     if (src_addr_out != NULL) {

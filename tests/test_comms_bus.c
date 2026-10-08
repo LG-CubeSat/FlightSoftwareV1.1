@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <sys/wait.h>
 
@@ -36,6 +37,36 @@ static void fail(const char *who, const char *what) {
 #define OBC_ADDR  1
 #define ADCS_ADDR 2
 
+static int64_t monotonic_milliseconds(void)
+{
+    struct timespec now;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return -1;
+    }
+
+    return ((int64_t)now.tv_sec * 1000) +
+           ((int64_t)now.tv_nsec / 1000000);
+}
+
+static void verify_timeout_duration(
+    const char *who,
+    int64_t started_ms,
+    int64_t finished_ms
+)
+{
+    int64_t elapsed_ms = finished_ms - started_ms;
+
+    /*
+     * Allow scheduling tolerance while still catching an immediate return
+     * or an effectively unbounded wait.
+     */
+    if (elapsed_ms < (int64_t)(COMMS_BUS_RECEIVE_TIMEOUT_MS / 2U) ||
+        elapsed_ms > (int64_t)COMMS_BUS_RECEIVE_TIMEOUT_MS + 500) {
+        fail(who, "receive timeout duration was outside the expected range");
+    }
+}
+
 static void run_master(void) {
     alarm(TEST_TIMEOUT_SEC);
 
@@ -43,6 +74,10 @@ static void run_master(void) {
     if (bus.initialize(OBC_ADDR, 1) != COMMS_BUS_OK) {
         fail("OBC", "comms_bus_initialize failed");
     }
+
+    /* Let the connected slave exercise an idle receive timeout before the
+       first real frame arrives. */
+    usleep((COMMS_BUS_RECEIVE_TIMEOUT_MS + 50U) * 1000U);
 
     int sent = bus.send(ADCS_ADDR, (const uint8_t *)OBC_TO_ADCS_MSG, (uint16_t)strlen(OBC_TO_ADCS_MSG));
     if (sent != (int)strlen(OBC_TO_ADCS_MSG)) {
@@ -57,7 +92,25 @@ static void run_master(void) {
         fail("OBC", "did not receive the expected reply from ADCS");
     }
 
-    printf("[OBC]  PASS: sent %d bytes, received matching %d-byte reply\n", sent, received);
+    int64_t timeout_started_ms = monotonic_milliseconds();
+    if (timeout_started_ms < 0) {
+        fail("OBC", "could not read monotonic clock");
+    }
+
+    received = bus.receive(&src_addr, buf, sizeof(buf));
+
+    int64_t timeout_finished_ms = monotonic_milliseconds();
+    if (timeout_finished_ms < 0) {
+        fail("OBC", "could not read monotonic clock");
+    }
+
+    if (received != COMMS_BUS_TIMEOUT) {
+        fail("OBC", "idle receive did not return COMMS_BUS_TIMEOUT");
+    }
+
+    verify_timeout_duration("OBC", timeout_started_ms, timeout_finished_ms);
+
+    printf("[OBC]  PASS: message exchange and idle timeout succeeded\n");
     fflush(stdout);
     _exit(0);
 }
@@ -72,7 +125,27 @@ static void run_slave(void) {
 
     uint8_t buf[128] = {0};
     uint8_t src_addr = 0;
+
+    int64_t timeout_started_ms = monotonic_milliseconds();
+    if (timeout_started_ms < 0) {
+        fail("ADCS", "could not read monotonic clock");
+    }
+
     int received = bus.receive(&src_addr, buf, sizeof(buf));
+
+    int64_t timeout_finished_ms = monotonic_milliseconds();
+    if (timeout_finished_ms < 0) {
+        fail("ADCS", "could not read monotonic clock");
+    }
+
+    if (received != COMMS_BUS_TIMEOUT) {
+        fail("ADCS", "idle receive did not return COMMS_BUS_TIMEOUT");
+    }
+
+    verify_timeout_duration("ADCS", timeout_started_ms, timeout_finished_ms);
+
+    /* The timeout must leave this same connection usable. */
+    received = bus.receive(&src_addr, buf, sizeof(buf));
     if (received != (int)strlen(OBC_TO_ADCS_MSG) ||
         memcmp(buf, OBC_TO_ADCS_MSG, (size_t)received) != 0) {
         fail("ADCS", "did not receive the expected message from OBC");
@@ -83,7 +156,10 @@ static void run_slave(void) {
         fail("ADCS", "send() did not return the expected length");
     }
 
-    printf("[ADCS] PASS: received %d bytes, sent matching %d-byte reply\n", received, sent);
+    /* Keep the peer open while the master exercises its idle timeout. */
+    usleep((COMMS_BUS_RECEIVE_TIMEOUT_MS * 3U) * 1000U);
+
+    printf("[ADCS] PASS: timeout recovery and message exchange succeeded\n");
     fflush(stdout);
     _exit(0);
 }
