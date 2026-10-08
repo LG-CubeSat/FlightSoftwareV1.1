@@ -6,9 +6,9 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <errno.h>
 #include <arpa/inet.h>
-
+#include <poll.h>
+#include <time.h>
 #include <pthread.h>
 #include "frame.h"
 
@@ -67,6 +67,17 @@ CommsBus_t create_comms_bus(void)
     bus.receive = &comms_bus_receive;
 
     return bus;
+}
+
+static int64_t monotonic_milliseconds(void)
+{
+    struct timespec now;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return -1;
+    }
+
+    return ((int64_t)now.tv_sec * 1000) + ((int64_t)now.tv_nsec / 1000000);
 }
 
 static void * loop_accept_new_connections(void * param)
@@ -197,23 +208,35 @@ CommsBusStatus_t comms_bus_initialize(uint8_t my_address, int is_master)
 // full frame is available or a hard error/disconnect occurs. Any bytes
 // belonging to the *next* frame are kept in 'lo' for the following call,
 // not discarded.
-static int receive_one_frame(int fd, leftover_t *lo, Frame *frame_out)
+static int receive_one_frame(int fd, leftover_t *lo, Frame *frame_out, uint32_t timeout_ms)
 {
+    int64_t start = monotonic_milliseconds();
+    if(start < 0) {
+        return COMMS_BUS_ERROR;
+    }
+
+    int64_t deadline = start + (uint64_t)timeout_ms;
+
     while (1) {
-        if (lo->len >= 4) {
+        /*
+        First inspect bytes already collected by an earlier read or an earlier receive call.
+        */
+        if (lo->len >= (int)FRAME_HEADER_SIZE) {
             uint16_t net_length;
+
             memcpy(&net_length, &lo->buf[2], sizeof(net_length));
-            int needed = 4 + ntohs(net_length);
+            
+            int needed = (int)FRAME_HEADER_SIZE + ntohs(net_length);
 
             if (needed > LEFTOVER_BUF_SIZE) {
                 fprintf(stderr, "[COMMS BUS] frame claims %d bytes, exceeds buffer -- dropping connection\n", needed);
                 fflush(stderr);
-                return -1;
+                return COMMS_BUS_ERROR;
             }
 
             if (lo->len >= needed) {
                 if (frame_deserialize(lo->buf, lo->len, frame_out) < 0) {
-                    return -1;
+                    return COMMS_BUS_ERROR;
                 }
                 // Shift any bytes belonging to the next frame down to the
                 // front so they aren't lost before the next call.
@@ -224,20 +247,82 @@ static int receive_one_frame(int fd, leftover_t *lo, Frame *frame_out)
             }
         }
 
-        int ret;
-        do {
-            ret = (int)read(fd, lo->buf + lo->len, LEFTOVER_BUF_SIZE - lo->len);
-        } while (ret < 0 && errno == EINTR); // retry on benign signal interruption
+        int64_t now = monotonic_milliseconds();
+        if (now < 0) {
+            return COMMS_BUS_ERROR;
+        }
+        
+        int64_t remaining_ms = deadline - now;
+        if (remaining_ms <= 0) {
+            /*
+            Do not clear leftover. A partial frame may be completed during the next receive call.
+            */
+            return COMMS_BUS_TIMEOUT;
+        }
 
-        if (ret < 0) {
-            fprintf(stderr, "[COMMS BUS] read() failed: %s\n", strerror(errno));
-            fflush(stderr);
-            return -1;
+        struct pollfd descriptor = {
+            .fd = fd,
+            .events = POLLIN,
+            .revents = 0,
+        };
+
+        int poll_result = poll(
+            &descriptor,
+            1,
+            (int)remaining_ms
+        );
+
+        if (poll_result == 0) {
+            return COMMS_BUS_TIMEOUT;
         }
-        if (ret == 0) {
-            return -1; // peer closed the connection
+
+        if (poll_result < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+
+            fprintf(
+                stderr,
+                "[COMS BUS] poll() failed: %s\n",
+                strerror(errno)
+            );
+            return COMMS_BUS_ERROR;
         }
-        lo->len += ret;
+
+        /*
+        POLLIN can appear together with POLLHUP when buffered bytes remain.
+        Read those bytes before treating the connection as closed.
+        */
+        if ((descriptor.revents & POLLIN) == 0) {
+            return COMMS_BUS_ERROR;
+        }
+
+        int available = LEFTOVER_BUF_SIZE - lo->len;
+
+        int bytes_read;
+
+        do {
+            bytes_read = (int)read(
+                fd,
+                lo->buf + lo->len,
+                (size_t)available
+            );
+        } while (bytes_read < 0 && errno == EINTR);
+
+        if (bytes_read < 0) {
+            fprintf(
+                stderr,
+                "[COMMS BUS] read() failed: %s\n",
+                strerror(errno)
+            );
+            return COMMS_BUS_ERROR;
+        }
+
+        if (bytes_read == 0) {
+            return COMMS_BUS_ERROR;
+        }
+
+        lo->len += bytes_read;
     }
 }
 
@@ -335,6 +420,24 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
         memcpy(snapshot_fds, connections_fd, sizeof(snapshot_fds));
         pthread_mutex_unlock(&connection_lock);
 
+        int live_connections = 0;
+
+        for (int i = 0; i < snapshot_count; i++) {
+            if (snapshot_fds[i] != -1) {
+                live_connections++;
+            }
+        }
+
+        if (live_connections == 0) {
+            return COMMS_BUS_TIMEOUT;
+        }
+
+        uint32_t timeout_per_connection = COMMS_BUS_RECEIVE_TIMEOUT_MS / (uint32_t)live_connections;
+
+        if (timeout_per_connection == 0U) {
+            timeout_per_connection = 1U;
+        }
+
         for (int i=0; i < snapshot_count; i++) {
             if (snapshot_fds[i] == -1) {
                 continue; // this slot's connection already died -- skip, more may follow
@@ -344,10 +447,22 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
             // ever appends (dead slots are nulled in place, not removed),
             // so slot i is always the same physical connection across
             // calls, matching master_leftover[i].
-            if (receive_one_frame(snapshot_fds[i], &master_leftover[i], &frame) < 0) {
-                mark_connection_dead(i);
-                continue; // this connection's read failed -- try the next
+            int result = receive_one_frame(
+                snapshot_fds[i],
+                &master_leftover[i],
+                &frame,
+                timeout_per_connection
+            );
+
+            if (result == COMMS_BUS_TIMEOUT) {
+                continue;
             }
+
+            if (result == COMMS_BUS_ERROR) {
+                mark_connection_dead(i);
+                continue;
+            }
+
             if (frame.dest_addr != my_bus_address) {
                 continue; // not addressed to us -- discard, per the broadcast/filter design
             }
@@ -356,17 +471,29 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
         }
     } else {
         if (bus_fd < 0) return -1;
-        if (receive_one_frame(bus_fd, &slave_leftover, &frame) < 0) {
-            return -1;
+        int result = receive_one_frame(
+            bus_fd,
+            &slave_leftover,
+            &frame,
+            COMMS_BUS_RECEIVE_TIMEOUT_MS
+        );
+
+        if (result == COMMS_BUS_TIMEOUT) {
+            return COMMS_BUS_TIMEOUT;
         }
+
+        if (result == COMMS_BUS_ERROR) {
+            return COMMS_BUS_ERROR;
+        }
+
         if (frame.dest_addr != my_bus_address) {
-            return 0; // not for us
+            return COMMS_BUS_TIMEOUT; // not for us
         }
         found = 1;
     }
 
     if (!found) {
-        return -1;
+        return COMMS_BUS_TIMEOUT;
     }
 
     if (frame.length > max_length) {

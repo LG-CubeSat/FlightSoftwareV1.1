@@ -9,6 +9,7 @@ sends/receives CSP packets through whichever CspCommsBusTransport_t was configur
 #include <csp/csp_id.h>
 #include <string.h>
 #include <unistd.h>
+#include "comms_bus.h"
 
 #include "../../libs/libcsp/include/csp/csp_types.h"
 
@@ -71,6 +72,11 @@ static int csp_if_comms_bus_rx_work(
         packet->frame_begin,
         sizeof(packet->data) + header_size
     );
+
+    if (len == COMMS_BUS_TIMEOUT) {
+        csp_buffer_free(packet);
+        return CSP_ERR_NONE;
+    }
 
     // len is not a real number
     if (len < 0) {
