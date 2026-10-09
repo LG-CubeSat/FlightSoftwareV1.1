@@ -43,23 +43,6 @@ if (NOT HW_MODE)
         RESOURCE_LOCK comms_bus_socket
     )
 
-    add_executable(eps_command_test test_eps_command.c)
-    target_link_libraries(eps_command_test PRIVATE csp_interface pthread)
-    target_include_directories(eps_command_test PRIVATE
-        ${CMAKE_SOURCE_DIR}/shared/csp
-        ${CMAKE_SOURCE_DIR}/shared/interfaces
-    )
-    target_compile_definitions(eps_command_test PRIVATE
-        EPS_SIM_PATH="$<TARGET_FILE:eps_sim>"
-    )
-    add_dependencies(eps_command_test eps_sim)
-
-    add_test(NAME eps_command_test COMMAND eps_command_test)
-    set_tests_properties(eps_command_test PROPERTIES
-        TIMEOUT 30
-        RESOURCE_LOCK comms_bus_socket
-    )
-
     add_executable(full_constellation_test test_full_constellation.c)
     target_compile_definitions(full_constellation_test PRIVATE
         OBC_SUPERVISOR_PATH="$<TARGET_FILE:obc_supervisor>"

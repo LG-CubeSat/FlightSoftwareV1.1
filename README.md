@@ -14,7 +14,7 @@ this file is the practical "clone it, build it, run it" reference for the softwa
 | OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. CCSDS 121.0 (ground-station packetization/link) is a separate, in-progress effort tracked outside this repo's `compute` process. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. **OBC's real backend now exists** (`platform/real/drivers/comms_i2c.c` — Linux `i2c-dev`/`ioctl`, round-robin polls known boards since real I2C can't do broadcast-and-listen like the SIM transport does), verified to compile against real Linux/i2c-dev headers, but only exercised via Docker so far — no physical bus yet. MCU-side (ADCS/Thermals real I2C slave) is still a stub, and the OBC/MCU split into separate real backends hasn't happened yet (see Known gaps). |
 | Thermals | Not yet scaffolded as a CSP board — same pattern as ADCS, not started. |
-| EPS | **Software done (SIM)** — `apps/eps` is a full FreeRTOS CSP-node app mirroring ADCS: battery/solar/rail sensor tasks, power estimation, a power manager with BOOT→SAFE→NOMINAL/LOW_POWER modes, command handler + ACK/NACK, explicit big-endian telemetry, and a local fault/watchdog path (under/over-voltage, over-current, over-temperature, solar failure). Confirmed **V1 hardware is still a passive buck converter with no MCU**; this targets the V2 MCU board (see `docs/satellite_architecture.md`). |
+| EPS | Not a CSP board at all — real hardware is a passive buck converter with no MCU. Address reserved in code in case future battery-monitoring hardware needs it. See `docs/satellite_architecture.md`. |
 | Camera / Comms (radio) | Not CSP boards — both are OBC-local peripherals (Arducam OV5647 over CSI ribbon, E22 LoRa module over UART). Their *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; real backends aren't written yet. |
 
 ## Architecture at a glance
@@ -27,7 +27,7 @@ physical picture (why EPS/Camera/Comms aren't in this table):
 |---|---|---|---|---|
 | OBC | 1 | — | — | done (SIM) |
 | ADCS | 2 | 10 | 20 | **done** |
-| EPS | 3 | 11 | 21 | **done (SIM)** — V1 hardware has no MCU, but the V2-target software exists, see `docs/satellite_architecture.md` |
+| EPS | 3 | 11 | 21 | reserved — not a real board, see `docs/satellite_architecture.md` |
 | THERMALS | 4 | 12 | 22 | reserved, not built |
 
 **The bus contract** (`shared/interfaces/comms_bus.h`) is medium-agnostic: `initialize`,
@@ -351,9 +351,10 @@ run them at the same time as each other or as a manually-launched binary using t
   sensor/actuator, an RTC) this session doesn't have yet.
 - **`time`'s sync source is the OBC Linux box's own system clock**, not a real RTC/GPS
   reference — fine for proving the sync mechanism works, not for real timekeeping.
-  `time_sync.c`'s `known_boards[]` table includes EPS, and `apps/eps` now has a
-  `CMD_TIME_SYNC`-capable command handler, so the sync is ACKed and applied there
-  (the same send still goes nowhere on V1 hardware, which has no EPS MCU).
+  `time_sync.c`'s `known_boards[]` table also includes EPS even though EPS has no
+  command handler and, per `docs/satellite_architecture.md`, isn't a real MCU board at
+  all — same intentional "free" scalability as `autonomy.c`'s table; the send just goes
+  nowhere.
 - **`autonomy.c`'s action table has exactly one entry** (point ADCS to the sun). The
   table-driven shape is built to scale to other subsystems (e.g. telling a thermal board
   to heat the bio-chamber), but nothing else is wired in yet.

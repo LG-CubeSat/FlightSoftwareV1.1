@@ -104,15 +104,14 @@ the specific E22 variant uses — transparent mode or its command-mode framing, 
 ## 2. CSP Bus / Software Architecture
 
 Only boards with their own MCU and firmware are CSP nodes. That's **OBC, ADCS, and Thermals** —
-three nodes on the shared I2C bus, OBC as master. EPS has no MCU on the confirmed V1 hardware
-(see §1), but `apps/eps` is written as a CSP node for the planned V2 EPS microcontroller board;
+three nodes on the shared I2C bus, OBC as master. EPS has no MCU (see §1) and is not a node;
 Camera and Comms are OBC-local peripherals (USB/UART), not I2C/CSP nodes.
 
 | Node | CSP Addr | Cmd Port | Telem Port | Status |
 |---|---|---|---|---|
 | OBC | 1 | — | — | done (SIM); real I2C HAL still stale, see README's Known Gaps |
 | ADCS | 2 | 10 | 20 | **done** (reference implementation) |
-| EPS | 3 | 11 | 21 | **software done (SIM)** — V1 hardware is a passive buck converter with no MCU, but `apps/eps` is a full FreeRTOS CSP-node app targeting the planned V2 EPS MCU |
+| EPS | 3 | 11 | 21 | **reserved, not a real board** — kept only in case future battery-monitoring hardware is added to that PCB; no software targets this today |
 | THERMALS | 4 | 12 | 22 | reserved, not built — same scaffolding pattern as ADCS, not started |
 
 These addresses and ports match what's already defined in `shared/csp/csp_commands.h`
@@ -135,12 +134,10 @@ at a glance" section — this document doesn't repeat that.
 These are places where the current source code still assumes the old, incorrect topology. Not
 changed as part of this documentation pass — noted here so they aren't lost:
 
-- **`apps/eps/` is now a real CSP-node EPS application** (FreeRTOS, mirroring ADCS: battery/
-  solar/rail sensors, power estimation, a power manager, command handler, and telemetry). This
-  intentionally runs ahead of the confirmed V1 hardware, which has no EPS MCU at all — the app is
-  written for the planned V2 EPS microcontroller board and today runs only in simulation against
-  the mock drivers. Wiring up `platform/real/drivers/` backends and an ARM toolchain (§4.B.3) is
-  what's left once V2 hardware is confirmed.
+- **`apps/eps/` scaffolds a CSP-node EPS** (a FreeRTOS app with command/telemetry tasks) that no
+  longer matches real hardware — EPS has no MCU at all. Whether to delete, repurpose (e.g. if a
+  battery-monitoring board does get added later), or leave as an unused reference is an open
+  decision for whenever EPS's actual future is confirmed.
 - **`shared/csp/csp_commands.h` still defines `CAMERA` (address 5) and `COMMS` (address 6)** as
   CSP addresses. Neither is a real bus node under the confirmed hardware — both are OBC-local
   peripherals (USB and UART respectively). These constants are currently unused but not removed.

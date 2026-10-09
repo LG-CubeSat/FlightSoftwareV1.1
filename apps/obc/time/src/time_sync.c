@@ -35,6 +35,7 @@ typedef struct {
 static const time_sync_target_t targets[] = {
     { ADCS_ADDRESS, ADCS_CMD_PORT },
     { EPS_ADDRESS, EPS_CMD_PORT },
+    // EPS has no command_handler yet -- harmless no-op until it does
 };
 
 static int send_time_sync_to(uint8_t addr, uint8_t cmd_port, uint32_t seq)
