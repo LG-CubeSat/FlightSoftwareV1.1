@@ -178,42 +178,43 @@ static void * telemetry_rx_loop(void * arg) {
     return NULL;
 }
 
-static int send_and_expect_ack(
+/* Sends one command and returns the status the board reported for it: ACK,
+   NACK, or -1 when no matching reply arrived. */
+static int send_command_get_status(
     uint8_t command_id,
     uint32_t seq,
     const void * payload,
     size_t payload_length) {
     csp_conn_t * conn = csp_connect(CSP_PRIO_NORM, EPS_ADDRESS, EPS_CMD_PORT, 1000, CSP_O_NONE);
     if (conn == NULL) {
-        return 0;
+        return -1;
     }
 
     csp_packet_t * packet = csp_buffer_get(0);
     if (packet == NULL) {
         csp_close(conn);
-        return 0;
+        return -1;
     }
 
     memcpy(packet->data, payload, payload_length);
     packet->length = (uint16_t)payload_length;
     csp_send(conn, packet);
 
-    int acked = 0;
+    int status = -1;
     csp_packet_t * reply;
     while ((reply = csp_read(conn, 500)) != NULL) {
         if (reply->length >= sizeof(command_ack_t)) {
             command_ack_t ack;
             memcpy(&ack, reply->data, sizeof(ack));
             if (ack.ack_command_id == command_id &&
-                ack.ack_seq == seq &&
-                ack.status == ACK) {
-                acked = 1;
+                ack.ack_seq == seq) {
+                status = (int)ack.status;
             }
         }
         csp_buffer_free(reply);
     }
     csp_close(conn);
-    return acked;
+    return status;
 }
 
 int main(void) {
@@ -244,7 +245,7 @@ int main(void) {
             .envelope = { .command_id = EPS_WIRE_COMMAND_SET_MODE, .seq = (uint32_t)(i * 3 + 0) },
             .mode = EPS_MODE_NOMINAL_WIRE
         };
-        if (send_and_expect_ack(EPS_WIRE_COMMAND_SET_MODE, (uint32_t)(i * 3 + 0), &mode_cmd, sizeof(mode_cmd))) {
+        if (send_command_get_status(EPS_WIRE_COMMAND_SET_MODE, (uint32_t)(i * 3 + 0), &mode_cmd, sizeof(mode_cmd)) == ACK) {
             acked++;
         }
 
@@ -253,7 +254,7 @@ int main(void) {
             .rail_id = POWER_RAIL_PAYLOAD,
             .enabled = (uint8_t)(i % 2)
         };
-        if (send_and_expect_ack(EPS_WIRE_COMMAND_SET_RAIL, (uint32_t)(i * 3 + 1), &rail_cmd, sizeof(rail_cmd))) {
+        if (send_command_get_status(EPS_WIRE_COMMAND_SET_RAIL, (uint32_t)(i * 3 + 1), &rail_cmd, sizeof(rail_cmd)) == ACK) {
             acked++;
         }
 
@@ -261,7 +262,7 @@ int main(void) {
             .envelope = { .command_id = CMD_TIME_SYNC, .seq = (uint32_t)(i * 3 + 2) },
             .unix_time_sec = 1700000000
         };
-        if (send_and_expect_ack(CMD_TIME_SYNC, (uint32_t)(i * 3 + 2), &sync_cmd, sizeof(sync_cmd))) {
+        if (send_command_get_status(CMD_TIME_SYNC, (uint32_t)(i * 3 + 2), &sync_cmd, sizeof(sync_cmd)) == ACK) {
             acked++;
         }
 
@@ -270,6 +271,31 @@ int main(void) {
 
         sleep(SEND_INTERVAL_SEC);
     }
+
+    /* Boundary: malformed / out-of-range commands must be NACKed, and a valid
+       command right after must still be ACKed -- proving bad input does not
+       wedge the handler (same idea as test_command_ack.c). */
+    eps_mode_command_payload_t bad_mode = {
+        .envelope = { .command_id = EPS_WIRE_COMMAND_SET_MODE, .seq = 900 },
+        .mode = 99
+    };
+    check_true("Out-of-range EPS mode is NACKed",
+               send_command_get_status(EPS_WIRE_COMMAND_SET_MODE, 900, &bad_mode, sizeof(bad_mode)) == NACK);
+
+    eps_rail_command_payload_t bad_rail = {
+        .envelope = { .command_id = EPS_WIRE_COMMAND_SET_RAIL, .seq = 901 },
+        .rail_id = 7,
+        .enabled = 1
+    };
+    check_true("Out-of-range EPS rail id is NACKed",
+               send_command_get_status(EPS_WIRE_COMMAND_SET_RAIL, 901, &bad_rail, sizeof(bad_rail)) == NACK);
+
+    eps_mode_command_payload_t good_mode = {
+        .envelope = { .command_id = EPS_WIRE_COMMAND_SET_MODE, .seq = 902 },
+        .mode = EPS_MODE_NOMINAL_WIRE
+    };
+    check_true("Valid command after NACKs is ACKed",
+               send_command_get_status(EPS_WIRE_COMMAND_SET_MODE, 902, &good_mode, sizeof(good_mode)) == ACK);
 
     usleep(1200000);
 
