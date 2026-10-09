@@ -401,7 +401,14 @@ void adcs_task_entry(void *pvParameters) {
 
 ## 8. MCU — EPS Task
 
-**Location:** `apps/adcs/src/tasks/eps_task.c` (to be created)
+**Location:** `apps/eps/` (implemented; the sketch below is the original plan)
+
+> Implemented shape: `apps/eps` mirrors `apps/adcs` — a `manager/` (power manager +
+> fault manager), `communication/` (command handler + explicit big-endian telemetry
+> codec), `tasks/` (sensor, estimation, housekeeping, telemetry, command), and
+> `simulation/` + `drivers/` behind `shared/interfaces/{battery,solar_array,power_rail}.h`.
+> The `eps_state_t`/`eps_task_entry` sketch that follows is superseded by
+> `eps_sensor_packet_t`/`eps_manager_state_t` in `apps/eps/include/communication/message.h`.
 
 ### Public API
 

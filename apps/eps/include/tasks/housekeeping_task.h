@@ -1,14 +1,15 @@
 /*
-Housekeeping Task
-Maintains basic homeostasis
-Stack usage, CPU usage, Temp, Task heartbeat
-*/
-
-#ifndef HOUSEKEEPING_TASK_H
-#define HOUSEKEEPING_TASK_H
+ * Housekeeping Task
+ * Maintains basic homeostasis: fault evaluation, health counters, stack
+ * margin, watchdog petting, and the periodic manager update (1Hz).
+ */
+#ifndef EPS_TASKS_HOUSEKEEPING_TASK_H
+#define EPS_TASKS_HOUSEKEEPING_TASK_H
 
 #include "FreeRTOS.h"
 #include "task.h"
+
+extern TaskHandle_t xHousekeepingHandle;
 
 void housekeeping_task_init(void);
 

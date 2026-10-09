@@ -144,7 +144,7 @@ To add a new SPI-attached sensor driver (e.g., `magnetometer`):
 ## CSP Port Assignment Convention
 
 See `satellite_architecture.md`'s CSP node/address table for the authoritative, current
-assignment (OBC=1, ADCS=2, EPS=3 [reserved, not a real board], THERMALS=4). Camera and
+assignment (OBC=1, ADCS=2, EPS=3 [V2 MCU target; V1 hardware has no MCU], THERMALS=4). Camera and
 Comms are OBC-local peripherals (USB/UART), not CSP nodes — see that document. The port
 pattern:
 

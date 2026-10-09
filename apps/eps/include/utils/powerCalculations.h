@@ -1,1 +1,0 @@
-// See: powercalculations.c

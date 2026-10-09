@@ -26,6 +26,7 @@ ADCS telemetry = 20).
 
 #define ADCS_STATUS_PORT 25 // board-initiated reset notices, telemetry range (20-29)
 #define TIME_SYNC_REQUEST_PORT 26
+#define EPS_STATUS_PORT 27 // EPS board-initiated reset notices, telemetry range (20-29)
 
 typedef struct {
     uint8_t command_id;
@@ -39,7 +40,12 @@ typedef enum {
     CMD_SHUTDOWN = 3,
     CMD_TIME_SYNC = 4,
     // ADCS COMMANDS
-    CMD_POINT_TO_SUN = 5
+    CMD_POINT_TO_SUN = 5,
+    // EPS COMMANDS
+    CMD_SET_SAFE_MODE = 6,
+    EPS_WIRE_COMMAND_SET_MODE = 80,
+    EPS_WIRE_COMMAND_SET_RAIL = 81,
+    EPS_WIRE_COMMAND_POWER_CYCLE = 82
 } command_id_t;
 
 // ------
@@ -87,5 +93,23 @@ typedef struct {
 typedef struct {
     uint8_t requester_addr; // e.g. ADCS_ADRESS
 } time_sync_request_t;
+
+/* OBC -> EPS, port EPS_CMD_PORT. mode is an eps_mode_t wire value. */
+typedef struct {
+    command_envelope_t envelope;
+    uint8_t mode;
+} eps_mode_command_payload_t;
+
+/* OBC -> EPS, port EPS_CMD_PORT. rail_id is a power_rail_id_t wire value. */
+typedef struct {
+    command_envelope_t envelope;
+    uint8_t rail_id;
+    uint8_t enabled;
+} eps_rail_command_payload_t;
+
+typedef struct {
+    command_envelope_t envelope;
+    uint8_t rail_id;
+} eps_power_cycle_command_payload_t;
 
 #endif
