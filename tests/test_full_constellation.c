@@ -415,7 +415,7 @@ int main(void) {
     check_contains("mission requested compression of the photo", sup_log, "[PAYLOAD COMMANDER] Requesting compression of");
     check_contains("compute finished the compression job", sup_log, "[PAYLOAD COMMANDER] Compression done:");
     check_contains("mission asked data to stream the (compressed) photo back", sup_log, "[STORAGE] Streaming");
-    check_contains("radio downlink fired with the retrieved bytes", sup_log, "[RADIO] (mock) would transmit");
+    check_contains("radio downlink fired with the retrieved bytes", sup_log, "[RADIO] (sim) transmitted");
 
     check_contains(
         "Mission downlinked stored telemetry through the radio abstraction",
