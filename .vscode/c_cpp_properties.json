@@ -2,13 +2,35 @@
     "configurations": [
         {
             "name": "Mac",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
             "includePath": [
-                "${workspaceFolder}/**",
-                "/usr/include"
+                "${workspaceFolder}/apps/adcs/include",
+                "${workspaceFolder}/apps/eps/include",
+                "${workspaceFolder}/apps/obc/include",
+                "${workspaceFolder}/apps/obc/commands/include",
+                "${workspaceFolder}/apps/obc/compute/include",
+                "${workspaceFolder}/apps/obc/data/include",
+                "${workspaceFolder}/apps/obc/fdir/include",
+                "${workspaceFolder}/apps/obc/ipc/include",
+                "${workspaceFolder}/apps/obc/mission/include",
+                "${workspaceFolder}/apps/obc/progress/include",
+                "${workspaceFolder}/apps/obc/supervisor/include",
+                "${workspaceFolder}/apps/obc/telemetry/include",
+                "${workspaceFolder}/apps/obc/time/include",
+                "${workspaceFolder}/shared/interfaces",
+                "${workspaceFolder}/shared/csp",
+                "${workspaceFolder}/platform/real/include",
+                "${workspaceFolder}/rtos/kernels/include",
+                "${workspaceFolder}/rtos/ports/posix",
+                "${workspaceFolder}/rtos/config",
+                "${workspaceFolder}/libs/libcsp/include",
+                "${workspaceFolder}/build/libs/libcsp/include"
             ],
-            "defines": [],
+            "defines": [
+                "SIM_MODE"
+            ],
             "compilerPath": "/usr/bin/clang",
-            "cStandard": "c17",
+            "cStandard": "c11",
             "cppStandard": "c++14",
             "intelliSenseMode": "macos-clang-arm64"
         }

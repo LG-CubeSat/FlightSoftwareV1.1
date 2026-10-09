@@ -4,6 +4,13 @@ project(FlightSoftwareV1 C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# Emit compile_commands.json so editor tooling (clangd / the VS Code C/C++
+# extension) resolves the exact per-target include paths and defines the
+# compiler uses. Without it, identically-named headers across subsystems
+# (e.g. communication/message.h in both apps/adcs and apps/eps) can resolve to
+# the wrong copy in IntelliSense.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 option(HW_MODE "Decide whether to build for hardware (ON) or simulation (OFF)" OFF)
 
 if (HW_MODE)
