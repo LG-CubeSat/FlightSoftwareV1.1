@@ -33,4 +33,4 @@ endif()
 
 # frame_serialize/frame_deserialize are medium-agnostic (shared/interfaces/frame.c)
 # -- both the sim and real backends encode/decode the same wire format.
-target_link_libraries(platform PUBLIC frame_codec)
+target_link_libraries(platform PUBLIC frame_codec i2c_protocol)
