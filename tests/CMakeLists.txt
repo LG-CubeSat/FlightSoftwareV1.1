@@ -266,3 +266,20 @@ set_tests_properties(mission_state_test PROPERTIES
     TIMEOUT 20
     RESOURCE_LOCK obc_ipc_sockets
 )
+
+add_executable(i2c_protocol_test
+    test_i2c_protocol.c
+)
+
+target_link_libraries(i2c_protocol_test PRIVATE
+    i2c_protocol
+)
+
+add_test(
+    NAME i2c_protocol_test
+    COMMAND i2c_protocol_test
+)
+
+set_tests_properties(i2c_protocol_test PROPERTIES
+    TIMEOUT 5
+)

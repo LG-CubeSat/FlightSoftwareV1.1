@@ -24,10 +24,17 @@ typedef enum {
     COMMS_BUS_TIMEOUT = -2
 } CommsBusStatus_t;
 
+/* 
+maximum time one receive call waits for a complete frame.
+a quiet but functional bus returns COMMS_BUS_TIMEOUT after this period.
+It is not treated as a hardware or protocol failure.
+*/
+#define COMMS_BUS_RECEIVE_TIMEOUT_MS 100U
+
 typedef struct {
     CommsBusStatus_t (*initialize)(uint8_t my_address, int is_master);
     int (*send)(uint8_t dest_addr, const uint8_t *data, uint16_t length);
-    int (*receive)(uint8_t *sdrc_addr_out, uint8_t *buffer, uint16_t max_length);
+    int (*receive)(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length);
 } CommsBus_t;
 
 CommsBus_t create_comms_bus();

@@ -5,8 +5,15 @@
 #include "heartbeat.h"
 #include "autonomy.h"
 #include "mission_health.h"
+#include "obc_log.h"
 
 int main(void) {
+    if (obc_log_init("mission") != 0) {
+        fprintf(stderr, "[OBC MISSION] Failed to initialize logging.\n");
+    }
+
+    LOG_INFO("Initializing");
+
     printf("[OBC MISSION] Initializing.\n");
     fflush(stdout);
 

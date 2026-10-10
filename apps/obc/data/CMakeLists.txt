@@ -12,7 +12,7 @@ target_include_directories(obc_data PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
-target_link_libraries(obc_data PRIVATE obc_ipc pthread obc_progress obc_telemetry)
+target_link_libraries(obc_data PRIVATE obc_ipc pthread obc_progress obc_telemetry obc_logging)
 
 if (HW_MODE)
     target_compile_definitions(

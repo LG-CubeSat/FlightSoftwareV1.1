@@ -1,5 +1,5 @@
 #include "csp_network.h"
-#include "csp_if_spi.h"
+#include "csp_if_comms_bus.h"
 
 #include <csp/csp.h>
 
@@ -9,17 +9,17 @@
 
 #include "comms_bus.h"
 
-static csp_iface_t csp_spi_iface;
-static csp_if_spi_conf_t csp_spi_conf;
-static CSP_Transport_t csp_spi_transport;
-static CommsBus_t csp_comms_bus;
+static csp_iface_t csp_comms_bus_iface;
+static CspCommsBusConfig_t csp_comms_bus_config;
+static CspCommsBusTransport_t csp_comms_bus_transport;
+static CommsBus_t comms_bus;
 
 /*
- * csp_if_spi.c never calls transport->initialize() -- the comms bus is
+ * csp_if_comms_bus.c never calls transport->initialize() -- the comms bus is
  * initialized directly below, before the interface is registered, so this
- * only needs to satisfy the CSP_Transport_t struct.
+ * only needs to satisfy the CspCommsBusTransport_t struct.
  */
-static int csp_transport_initialize_loop(void)
+static int csp_comms_bus_transport_initialize(void)
 {
     return 0;
 }
@@ -40,28 +40,28 @@ static void * csp_router_thread(void * param)
 
 void csp_network_init(uint16_t my_address, int is_master)
 {
-    csp_comms_bus = create_comms_bus();
+    comms_bus = create_comms_bus();
 
-    if (csp_comms_bus.initialize(my_address, is_master) != COMMS_BUS_OK) {
+    if (comms_bus.initialize(my_address, is_master) != COMMS_BUS_OK) {
         fprintf(stderr, "[CSP] comms bus initialize failed\n");
         fflush(stderr);
         return;
     }
 
-    csp_spi_transport.initialize = csp_transport_initialize_loop;
-    csp_spi_transport.send = csp_comms_bus.send;
-    csp_spi_transport.receive = csp_comms_bus.receive;
+    csp_comms_bus_transport.initialize = csp_comms_bus_transport_initialize;
+    csp_comms_bus_transport.send = comms_bus.send;
+    csp_comms_bus_transport.receive = comms_bus.receive;
 
-    csp_spi_conf.transport = &csp_spi_transport;
+    csp_comms_bus_config.transport = &csp_comms_bus_transport;
 
     csp_init();
 
     /* Single-interface node: no routing table (CSP_USE_RTABLE is off), so
      * marking this interface default is the entire routing setup needed. */
-    csp_spi_iface.addr = my_address;
-    csp_spi_iface.is_default = 1;
+    csp_comms_bus_iface.addr = my_address;
+    csp_comms_bus_iface.is_default = 1;
 
-    csp_if_spi_init(&csp_spi_iface, &csp_spi_conf);
+    csp_if_comms_bus_init(&csp_comms_bus_iface, &csp_comms_bus_config);
 
     pthread_t router_thread;
     int ret = pthread_create(&router_thread, NULL, csp_router_thread, NULL);
