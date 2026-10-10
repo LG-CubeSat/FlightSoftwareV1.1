@@ -1,11 +1,12 @@
 if (HW_MODE)
+    # HW_MODE currently builds the Raspberry Pi OBC only. The Cortex-M
+    # board_reset/board_shutdown implementations belong to the future STM32
+    # platform target and cannot be assembled by the Pi's AArch64 compiler.
     add_library(platform STATIC
         real/drivers/comms_i2c.c
-        real/drivers/board_reset.c
-        real/drivers/board_shutdown.c
         real/drivers/camera.c
         real/drivers/radio.c
-        )
+    )
     target_compile_definitions(platform PRIVATE HW_MODE)
 else()
     add_library(platform STATIC
