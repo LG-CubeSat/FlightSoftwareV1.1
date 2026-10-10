@@ -344,7 +344,7 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
 
     while(monotonic_ms() < deadline_ms) {
         for (size_t offset = 0; offset < NUM_KNOWN_SLAVES; offset++) {
-            size_t i = (next_slave_start + offset) % NUM_KNOWN_SLAVES;
+            size_t index = (next_slave_start + offset) % NUM_KNOWN_SLAVES;
             
             const known_slave_t *slave = &known_slaves[index];
 
