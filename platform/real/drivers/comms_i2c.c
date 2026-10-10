@@ -94,7 +94,7 @@ static int get_slave_status(
     I2cStatus_t *status_out
 )
 {
-    if (stuats_out == NULL) {
+    if (status_out == NULL) {
         return COMMS_BUS_ERROR;
     }
 
@@ -159,7 +159,7 @@ static int read_slave_frame(
             .buf = &command
         },
         {
-            .addr = i2c-addr,
+            .addr = i2c_addr,
             .flags = I2C_M_RD,
             .len = announced_wire_length,
             .buf = frame_wire
@@ -200,7 +200,7 @@ static int lookup_i2c_addr(
 
     for (size_t i = 0; i < NUM_KNOWN_SLAVES; ++i) {
         if (known_slaves[i].csp_addr == csp_addr) {
-            *i2c_addr_out = known_slaves[i].i2c_addr
+            *i2c_addr_out = known_slaves[i].i2c_addr;
             return 0;
         }
     }
@@ -316,7 +316,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length) {
     struct i2c_msg msg = {
         .addr = i2c_addr, // which chip
         .flags = 0, // 0 = write, 1 = read
-        .len = (uint16_t)(1 + frame_length), // how many bytes
+        .len = (uint16_t)(1 + frame.length), // how many bytes
         .buf = transaction_buffer, // where do they come/go-to
     };
 
@@ -346,9 +346,9 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
         for (size_t offset = 0; offset < NUM_KNOWN_SLAVES; offset++) {
             size_t i = (next_slave_start + offset) % NUM_KNOWN_SLAVES;
             
-            const known_slave_t *slave = &knwon_slaves[index];
+            const known_slave_t *slave = &known_slaves[index];
 
-            I2c_Status_t status;
+            I2cStatus_t status;
 
             if (get_slave_status(
                 slave->i2c_addr,
