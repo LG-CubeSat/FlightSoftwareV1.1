@@ -15,7 +15,7 @@
 #include <linux/i2c.h> // struct i2c_msg, struct i2c_rdwer_ioctl_data
 
 #define I2C_BUS_PATH "/dev/i2c-1"
-#define WIRE_BUF_SIZE (1U + MAX_FRAME_WIRE_SIZE) // fixed-size read block, see receive() below
+#define I2C_WRITE_BUFFER_SIZE (1U + MAX_FRAME_WIRE_SIZE) // fixed-size read block, see receive() below
 
 typedef struct {
     uint8_t csp_addr;
@@ -158,10 +158,10 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length) {
         .buf = transaction_buffer,
     };
 
-    if (i2c_transfer(&message, 1U) != COMMS_BUS_OK) {
+    if (i2c_transfer(&msg, 1U) != COMMS_BUS_OK) {
         fprintf(
             stderr,
-            "[COMMS BUS] send to physical address 0x%02x failed: %s\n".
+            "[COMMS BUS] send to physical address 0x%02x failed: %s\n",
             i2c_addr,
             strerror(errno)
         );
@@ -180,11 +180,11 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
             size_t i = (next_slave_start + offset) % NUM_KNOWN_SLAVES;
             uint8_t i2c_addr = known_slaves[i].i2c_addr;
 
-            uint8_t wire_buf[WIRE_BUF_SIZE];
+            uint8_t wire_buf[I2C_WRITE_BUFFER_SIZE];
             struct i2c_msg msg = {
                 .addr = i2c_addr,
                 .flags = I2C_M_RD, // flag for reading. as opposed to 0 for write
-                .len = WIRE_BUF_SIZE,
+                .len = I2C_WRITE_BUFFER_SIZE,
                 .buf = wire_buf,
             };
             struct i2c_rdwr_ioctl_data packet = { .msgs = &msg, .nmsgs = 1};
@@ -194,7 +194,7 @@ int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_lengt
             }
 
             Frame frame;
-            if (frame_deserialize(wire_buf, WIRE_BUF_SIZE, &frame) < 0) {
+            if (frame_deserialize(wire_buf, I2C_WRITE_BUFFER_SIZE, &frame) < 0) {
                 fprintf(stderr, "[COMMS BUS] receive: malformed frame from 0x%02x\n", i2c_addr);
                 continue;
             }
