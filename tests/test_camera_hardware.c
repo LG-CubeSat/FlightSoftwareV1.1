@@ -77,6 +77,12 @@ static int validate_jpeg(const char *path, long *file_size_out)
 {
     FILE *file = fopen(path, "rb");
     if (file == NULL) {
+        fprintf(stderr, "[TEST] fopen failed: %s\n", strerror(errno));
+        return -1;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
         return -1;
     }
 
@@ -108,11 +114,18 @@ static int validate_jpeg(const char *path, long *file_size_out)
 
     fclose(file);
 
+    printf(
+        "[INFO] JPEG markers: start=%02X %02X, end=%02X %02X\n",
+        start[0],
+        start[1],
+        end[0],
+        end[1]
+    );
+
     if (start[0] != 0xFFU ||
         start[1] != 0xD8U ||
         end[0] != 0xFFU ||
-        end[1] != 0xD9U
-    ) {
+        end[1] != 0xD9U) {
         return -1;
     }
 
