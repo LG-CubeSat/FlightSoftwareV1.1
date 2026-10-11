@@ -108,10 +108,10 @@ static int validate_jpeg(const char *path, long *file_size_out)
 
     fclose(file);
 
-    if (start[0] != 0xFF ||
-        start[1] != 0xD8 ||
-        end[0] != 0xFF ||
-        end[1] != 0xD9
+    if (start[0] != 0xFFU ||
+        start[1] != 0xD8U ||
+        end[0] != 0xFFU ||
+        end[1] != 0xD9U
     ) {
         return -1;
     }
