@@ -5,6 +5,11 @@ add_executable(eps_sim
     src/tasks/housekeeping_task.c
     src/tasks/sensor_task.c
     src/tasks/telemetry_task.c
+    src/utils/convertions.c
+    src/utils/powerCalculations.c
+    src/manager/eps_manager.c
+    src/manager/fault_manager.c
+    src/communication/telemetry.c
 )
 
 target_include_directories(eps_sim PRIVATE

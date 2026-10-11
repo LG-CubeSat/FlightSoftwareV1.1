@@ -7,3 +7,6 @@ volts and millivolts,
 amperes and milliamperes,
 Kelvin and Celsius.
 */
+
+#include "utils/convertions.h"
+
