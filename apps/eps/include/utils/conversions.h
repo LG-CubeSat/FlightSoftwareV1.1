@@ -1,2 +1,19 @@
 // See conversions.c
 
+#ifndef CONVERSIONS_H
+#define CONVERSIONS_H
+
+float eps_conv_mw_to_w(float mv);
+float eps_conv_w_to_mw(float v);
+float eps_conv_j_to_wh(float j);
+float eps_conv_wh_to_j(float wh);
+float eps_conv_c_to_ah(float c);
+float eps_conv_ah_to_c(float ah);
+float eps_conv_mv_to_v(float mv);
+float eps_conv_v_to_mv(float v);
+float eps_conv_ma_to_a(float ma);
+float eps_conv_a_to_ma(float a);
+float eps_conv_kelvin_to_celsius(float kelvin);
+float eps_conv_celsius_to_kelvin(float celsius);
+
+#endif
