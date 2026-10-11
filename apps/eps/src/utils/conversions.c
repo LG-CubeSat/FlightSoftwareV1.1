@@ -8,5 +8,5 @@ amperes and milliamperes,
 Kelvin and Celsius.
 */
 
-#include "utils/convertions.h"
+#include "utils/conversions.h"
 
