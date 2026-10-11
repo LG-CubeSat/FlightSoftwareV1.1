@@ -5,6 +5,7 @@
 #include <linux/gpio.h>
 #include <poll.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -29,16 +30,22 @@ pins from the obc schematic (pi zero 2 w).
 
 #define AUX_IDLE_TIMEOUT_MS 5000 // slow air rates take a while to send 240 bytes
 #define AUX_BUSY_WAIT_MS 50      // time for aux to drop after we hand it bytes
+#define AUX_SETTLE_MS 5          // aux high = buffer empty, not always rf done. small gap before next packet
 #define RX_TIMEOUT_MS 1000
-#define RX_GAP_MS 20 // uart quiet this long = end of packet
+#define RX_GAP_MS 20             // uart quiet this long = end of packet
+#define RX_PACKET_MAX_MS 500     // 240 bytes at 9600 baud is ~250ms, stop even if the line never goes quiet
+#define INIT_RETRY_MS 1000       // don't hammer a missing module with reinit attempts
 
-static pthread_once_t init_once = PTHREAD_ONCE_INIT;
+/* lock order: init_lock -> tx_lock -> rx_lock */
+static pthread_mutex_t init_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t tx_lock = PTHREAD_MUTEX_INITIALIZER; // keeps two senders' packets from interleaving
 static pthread_mutex_t rx_lock = PTHREAD_MUTEX_INITIALIZER;
 static int uart_fd = -1;
 static int mode_fd = -1; // m0 + m1
 static int aux_fd = -1;
-static int ready = 0;
+static atomic_int ready = 0;
+static int init_attempted = 0;
+static long last_init_ms = 0;
 
 static long now_ms(void)
 {
@@ -143,15 +150,50 @@ static int open_gpio(void)
     return 0;
 }
 
-static void radio_init(void)
+static void close_all(void)
 {
-    if (open_gpio() != 0 || open_uart() != 0) return;
+    if (uart_fd >= 0) close(uart_fd);
+    if (mode_fd >= 0) close(mode_fd);
+    if (aux_fd >= 0) close(aux_fd);
+    uart_fd = mode_fd = aux_fd = -1;
+}
 
+static int radio_init(void)
+{
+    if (open_gpio() != 0 || open_uart() != 0) {
+        close_all(); // don't leak half-opened fds into the next attempt
+        return -1;
+    }
     if (wait_for_aux(1, AUX_IDLE_TIMEOUT_MS) != 0) { // module ready after mode switch
         fprintf(stderr, "[RADIO] e22 never went idle after init\n");
-        return;
+        close_all();
+        return -1;
     }
-    ready = 1;
+    return 0;
+}
+
+/* opens the radio if it isn't open. retries after a failure, at most once per INIT_RETRY_MS */
+static int ensure_ready(void)
+{
+    pthread_mutex_lock(&init_lock);
+    if (!atomic_load(&ready)) {
+        long now = now_ms();
+        if (!init_attempted || now - last_init_ms >= INIT_RETRY_MS) {
+            init_attempted = 1;
+            last_init_ms = now;
+
+            // nobody can be mid send/receive on the old fds while we swap them
+            pthread_mutex_lock(&tx_lock);
+            pthread_mutex_lock(&rx_lock);
+            close_all();
+            atomic_store(&ready, radio_init() == 0);
+            pthread_mutex_unlock(&rx_lock);
+            pthread_mutex_unlock(&tx_lock);
+        }
+    }
+    int ok = atomic_load(&ready);
+    pthread_mutex_unlock(&init_lock);
+    return ok ? 0 : -1;
 }
 
 static int write_all(const uint8_t *data, size_t length)
@@ -173,8 +215,7 @@ int radio_send(const uint8_t *data, size_t length)
 {
     if (data == NULL || length == 0) return -1;
 
-    pthread_once(&init_once, radio_init);
-    if (!ready) return -1;
+    if (ensure_ready() != 0) return -1;
 
     int result = 0;
     pthread_mutex_lock(&tx_lock);
@@ -190,12 +231,16 @@ int radio_send(const uint8_t *data, size_t length)
 
         /* aux drops while the e22 transmits. waiting for it to come back
            up keeps each chunk its own packet instead of merging with the next */
-        (void)wait_for_aux(0, AUX_BUSY_WAIT_MS);
+        if (wait_for_aux(0, AUX_BUSY_WAIT_MS) != 0) {
+            // not fatal: a short packet at a fast air rate can finish between checks
+            fprintf(stderr, "[RADIO] aux never went busy after %zu bytes, e22 may not have taken them\n", chunk);
+        }
         if (wait_for_aux(1, AUX_IDLE_TIMEOUT_MS) != 0) {
             fprintf(stderr, "[RADIO] aux stuck busy after send\n");
             result = -1;
             break;
         }
+        sleep_ms(AUX_SETTLE_MS);
     }
 
     pthread_mutex_unlock(&tx_lock);
@@ -206,14 +251,15 @@ int radio_receive(uint8_t *buffer, uint16_t max_length)
 {
     if (buffer == NULL || max_length == 0) return -1;
 
-    pthread_once(&init_once, radio_init);
-    if (!ready) return -1;
+    if (ensure_ready() != 0) return -1;
 
     pthread_mutex_lock(&rx_lock);
 
     uint8_t packet[RADIO_MAX_PACKET_SIZE];
     size_t total = 0;
     int wait_ms = RX_TIMEOUT_MS;
+    long deadline = 0;
+    int failed = 0;
 
     /* the e22 hands us a received packet as a burst of uart bytes.
        keep reading until the line goes quiet or we have a full packet */
@@ -222,23 +268,39 @@ int radio_receive(uint8_t *buffer, uint16_t max_length)
         int ready_fds = poll(&pfd, 1, wait_ms);
         if (ready_fds < 0) {
             if (errno == EINTR) continue;
-            pthread_mutex_unlock(&rx_lock);
-            return -1;
+            failed = 1;
+            break;
         }
         if (ready_fds == 0) break; // quiet
+        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) { // uart disconnected or broken
+            failed = 1;
+            break;
+        }
 
         ssize_t n = read(uart_fd, packet + total, sizeof(packet) - total);
         if (n < 0) {
             if (errno == EINTR || errno == EAGAIN) continue;
-            pthread_mutex_unlock(&rx_lock);
-            return -1;
+            failed = 1;
+            break;
         }
+        if (n == 0) { // poll said readable but nothing came = hangup
+            failed = 1;
+            break;
+        }
+
+        if (total == 0) deadline = now_ms() + RX_PACKET_MAX_MS;
         total += (size_t)n;
+        if (now_ms() >= deadline) break;
         wait_ms = RX_GAP_MS;
     }
 
     pthread_mutex_unlock(&rx_lock);
 
+    if (failed) {
+        fprintf(stderr, "[RADIO] uart receive failed, will reopen\n");
+        atomic_store(&ready, 0); // reopen on the next call
+        return -1;
+    }
     if (total == 0) return 0; // timed out, nothing heard
     if (total > max_length) return -1;
 
