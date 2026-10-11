@@ -12,3 +12,6 @@
  * I don't know if battery is gonna provide needed info for this, but if it doesn't we can probably implement all of these.
  * They seem to be general math utils so we can probably just use a library or ai generate one (ofc if so check thoroughly)
 */
+
+#include "utils/power_calculations.h"
+
