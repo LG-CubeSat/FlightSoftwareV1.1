@@ -3,8 +3,8 @@
 #ifndef CONVERSIONS_H
 #define CONVERSIONS_H
 
-float eps_conv_mw_to_w(float mv);
-float eps_conv_w_to_mw(float v);
+float eps_conv_mw_to_w(float mw);
+float eps_conv_w_to_mw(float w);
 float eps_conv_j_to_wh(float j);
 float eps_conv_wh_to_j(float wh);
 float eps_conv_c_to_ah(float c);

@@ -10,3 +10,6 @@ Kelvin and Celsius.
 
 #include "utils/conversions.h"
 
+float eps_conv_mw_to_w(float mw) {
+    return mw * 1000;
+}
