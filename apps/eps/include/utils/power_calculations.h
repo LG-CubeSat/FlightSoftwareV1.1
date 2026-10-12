@@ -1,4 +1,4 @@
-// See: powercalculations.c
+// See: power_calculations.c
 
 #ifndef EPS_UTILS_POWER_CALCULATIONS_H
 #define EPS_UTILS_POWER_CALCULATIONS_H

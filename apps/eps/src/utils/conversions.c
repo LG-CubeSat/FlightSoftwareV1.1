@@ -7,7 +7,6 @@ volts and millivolts,
 amperes and milliamperes,
 Kelvin and Celsius.
 
-Update: Finished
 */
 
 #include "utils/conversions.h"
@@ -28,11 +27,11 @@ float eps_conv_wh_to_j(float wh){
     return wh * 3600;
 }
 
-float eps_conv_c_to_as(float c){
+float eps_conv_c_to_as(float c){  
     return c;
 }
 
-float eps_conv_as_to_c(float as){
+float eps_conv_as_to_c(float as){ 
     return as;
 }
 
