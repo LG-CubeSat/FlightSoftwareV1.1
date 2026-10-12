@@ -1,7 +1,7 @@
 // See: powercalculations.c
 
-#ifndef POWER_CALCULATIONS_H
-#define POWER_CALCULATIONS_H
+#ifndef EPS_UTILS_POWER_CALCULATIONS_H
+#define EPS_UTILS_POWER_CALCULATIONS_H
 
 #include <stddef.h>
 

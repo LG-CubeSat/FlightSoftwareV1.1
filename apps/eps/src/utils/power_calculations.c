@@ -40,6 +40,7 @@ float eps_energy_watt_hours(float energy_joules){
 }
 
 float eps_average_power(float energy_joules, float seconds){
+    if (seconds == 0) return 0.0F;
     return energy_joules / seconds;
 }
 
@@ -61,11 +62,11 @@ float eps_power_loss(float power_in, float power_out){
 }
 
 float eps_state_of_charge(float remaining_charge, float full_capacity){
+    if (full_capacity == 0) return 0.0F;
     return remaining_charge / full_capacity;
 }
 
 float eps_efficiency(float power_in, float power_out){
+    if (power_in == 0) return 0.0F;
     return power_out / power_in;
 }
-
-

@@ -1,7 +1,7 @@
 // See conversions.c
 
-#ifndef CONVERSIONS_H
-#define CONVERSIONS_H
+#ifndef EPS_UTILS_CONVERSIONS_H
+#define EPS_UTILS_CONVERSIONS_H
 
 float eps_conv_mw_to_w(float mw);
 float eps_conv_w_to_mw(float w);
