@@ -1,4 +1,5 @@
 #include "radio.h"
+#include "radio_queue.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -15,10 +16,11 @@
 #include <unistd.h>
 
 /*
-real e22-900t30d over uart in normal (transparent) mode.
+real e22-400t30d (433 mhz) over uart in normal (transparent) mode.
 m0 + m1 low = normal mode. aux high = idle, aux low = busy.
 gpio uses the linux gpio chardev directly, no libgpiod needed.
 pins from the obc schematic (pi zero 2 w).
+radio_send queues into radio_queue.c, its tx thread calls send_packet.
 */
 
 #define RADIO_UART_DEVICE "/dev/serial0" // gpio14 txd0 / gpio15 rxd0
@@ -35,6 +37,16 @@ pins from the obc schematic (pi zero 2 w).
 #define RX_GAP_MS 20             // uart quiet this long = end of packet
 #define RX_PACKET_MAX_MS 500     // 240 bytes at 9600 baud is ~250ms, stop even if the line never goes quiet
 #define INIT_RETRY_MS 1000       // don't hammer a missing module with reinit attempts
+
+/* e22 registers written at every startup so the module always comes up the same */
+#define RADIO_CHANNEL 24         // e22-400t30d: 410.125 + channel mhz, 24 = 434.125 mhz
+#define RADIO_REG0 0x62          // uart 9600 8n1, air rate 2.4k (factory default)
+#define RADIO_REG1 0x00          // 240 byte sub-packet, 30 dbm
+#define RADIO_REG3 0x03          // transparent mode, no rssi byte, lbt off
+#define CONFIG_SET_TEMP 0xC2     // write registers without saving to flash
+#define CONFIG_REPLY 0xC1
+#define CONFIG_REPLY_TIMEOUT_MS 1000
+#define MODE_SWITCH_MS 2         // e22 wants a short wait after aux goes high on a mode change
 
 /* lock order: init_lock -> tx_lock -> rx_lock */
 static pthread_mutex_t init_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -141,13 +153,83 @@ static int open_gpio(void)
     close(chip_fd); // line fds stay valid without the chip fd
 
     if (mode_fd < 0 || aux_fd < 0) return -1;
+    return 0;
+}
 
-    struct gpio_v2_line_values normal_mode = { .bits = 0, .mask = 0x3 }; // m0 = 0, m1 = 0
-    if (ioctl(mode_fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &normal_mode) < 0) {
-        perror("[RADIO] set normal mode");
+/* m0 = bit 0, m1 = bit 1, same order the lines were requested in */
+static int set_mode(int m0, int m1)
+{
+    struct gpio_v2_line_values values = {
+        .bits = (uint64_t)(m0 ? 1 : 0) | (uint64_t)(m1 ? 2 : 0),
+        .mask = 0x3
+    };
+    if (ioctl(mode_fd, GPIO_V2_LINE_SET_VALUES_IOCTL, &values) < 0) {
+        perror("[RADIO] set mode pins");
         return -1;
     }
+    if (wait_for_aux(1, AUX_IDLE_TIMEOUT_MS) != 0) return -1;
+    sleep_ms(MODE_SWITCH_MS);
     return 0;
+}
+
+static int read_exact(uint8_t *buf, size_t length, int timeout_ms)
+{
+    long deadline = now_ms() + timeout_ms;
+    size_t got = 0;
+    while (got < length) {
+        int left = (int)(deadline - now_ms());
+        if (left <= 0) return -1;
+
+        struct pollfd pfd = { .fd = uart_fd, .events = POLLIN };
+        int ready_fds = poll(&pfd, 1, left);
+        if (ready_fds < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        }
+        if (ready_fds == 0 || (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) return -1;
+
+        ssize_t n = read(uart_fd, buf + got, length - got);
+        if (n < 0) {
+            if (errno == EINTR || errno == EAGAIN) continue;
+            return -1;
+        }
+        if (n == 0) return -1;
+        got += (size_t)n;
+    }
+    return 0;
+}
+
+static int write_all(const uint8_t *data, size_t length);
+
+/* config mode is m0 = 0, m1 = 1. the e22 echoes the registers back to confirm */
+static int configure_radio(void)
+{
+    const uint8_t command[] = {
+        CONFIG_SET_TEMP, 0x00, 0x09, // write 9 registers starting at 0x00
+        0x00, 0x00,                  // module address
+        0x00,                        // network id
+        RADIO_REG0, RADIO_REG1, RADIO_CHANNEL, RADIO_REG3,
+        0x00, 0x00                   // no encryption key
+    };
+    uint8_t reply[sizeof(command)];
+
+    if (set_mode(0, 1) != 0) {
+        fprintf(stderr, "[RADIO] couldn't enter config mode\n");
+        return -1;
+    }
+    tcflush(uart_fd, TCIFLUSH);
+
+    int ok = write_all(command, sizeof(command)) == 0 &&
+             read_exact(reply, sizeof(reply), CONFIG_REPLY_TIMEOUT_MS) == 0 &&
+             reply[0] == CONFIG_REPLY &&
+             memcmp(reply + 1, command + 1, 9) == 0; // address, length, settings. key reads back as 0 anyway
+    if (!ok) fprintf(stderr, "[RADIO] e22 didn't confirm config\n");
+
+    if (set_mode(0, 0) != 0) {
+        fprintf(stderr, "[RADIO] couldn't return to normal mode\n");
+        return -1;
+    }
+    return ok ? 0 : -1;
 }
 
 static void close_all(void)
@@ -160,13 +242,9 @@ static void close_all(void)
 
 static int radio_init(void)
 {
-    if (open_gpio() != 0 || open_uart() != 0) {
+    // configure_radio leaves the module in normal mode on success
+    if (open_gpio() != 0 || open_uart() != 0 || configure_radio() != 0) {
         close_all(); // don't leak half-opened fds into the next attempt
-        return -1;
-    }
-    if (wait_for_aux(1, AUX_IDLE_TIMEOUT_MS) != 0) { // module ready after mode switch
-        fprintf(stderr, "[RADIO] e22 never went idle after init\n");
-        close_all();
         return -1;
     }
     return 0;
@@ -211,40 +289,42 @@ static int write_all(const uint8_t *data, size_t length)
     return tcdrain(uart_fd); // wait until the pi's uart has actually shifted every byte out
 }
 
-int radio_send(const uint8_t *data, size_t length)
+/* called by the tx thread in radio_queue.c with one packet (<= 240 bytes) at a time */
+static int send_packet(const uint8_t *data, size_t length)
 {
-    if (data == NULL || length == 0) return -1;
-
     if (ensure_ready() != 0) return -1;
 
     int result = 0;
     pthread_mutex_lock(&tx_lock);
 
-    for (size_t offset = 0; offset < length; offset += RADIO_MAX_PACKET_SIZE) {
-        size_t chunk = length - offset;
-        if (chunk > RADIO_MAX_PACKET_SIZE) chunk = RADIO_MAX_PACKET_SIZE;
-
-        if (wait_for_aux(1, AUX_IDLE_TIMEOUT_MS) != 0 || write_all(data + offset, chunk) != 0) {
-            result = -1;
-            break;
-        }
-
+    if (wait_for_aux(1, AUX_IDLE_TIMEOUT_MS) != 0 || write_all(data, length) != 0) {
+        result = -1;
+    } else {
         /* aux drops while the e22 transmits. waiting for it to come back
            up keeps each chunk its own packet instead of merging with the next */
         if (wait_for_aux(0, AUX_BUSY_WAIT_MS) != 0) {
             // not fatal: a short packet at a fast air rate can finish between checks
-            fprintf(stderr, "[RADIO] aux never went busy after %zu bytes, e22 may not have taken them\n", chunk);
+            fprintf(stderr, "[RADIO] aux never went busy after %zu bytes, e22 may not have taken them\n", length);
         }
         if (wait_for_aux(1, AUX_IDLE_TIMEOUT_MS) != 0) {
             fprintf(stderr, "[RADIO] aux stuck busy after send\n");
             result = -1;
-            break;
         }
         sleep_ms(AUX_SETTLE_MS);
     }
 
     pthread_mutex_unlock(&tx_lock);
     return result;
+}
+
+int radio_send(const uint8_t *data, size_t length)
+{
+    if (data == NULL || length == 0) return -1;
+
+    // fail now instead of queueing data the radio can't send
+    if (ensure_ready() != 0) return -1;
+
+    return radio_queue_push(data, length, send_packet);
 }
 
 int radio_receive(uint8_t *buffer, uint16_t max_length)

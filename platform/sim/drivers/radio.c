@@ -1,4 +1,5 @@
 #include "radio.h"
+#include "radio_queue.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -15,6 +16,7 @@
 /*
 sim e22: each radio packet = one udp datagram on localhost.
 udp drops packets if nobody is listening, same as rf.
+radio_send queues into radio_queue.c, its tx thread calls send_packet.
 */
 
 #define RADIO_SIM_DEFAULT_TX_PORT 5600 // fake ground station listens here
@@ -76,6 +78,18 @@ static void open_rx(void)
     setsockopt(rx_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 }
 
+/* called by the tx thread in radio_queue.c with one packet at a time */
+static int send_packet(const uint8_t *data, size_t length)
+{
+    if (drop_percent > 0 && rand() % 100 < drop_percent) return 0; // lost in the air, sender never knows
+
+    if (sendto(tx_fd, data, length, 0, (struct sockaddr *)&tx_addr, sizeof(tx_addr)) < 0) {
+        perror("[RADIO] (sim) sendto");
+        return -1;
+    }
+    return 0;
+}
+
 int radio_send(const uint8_t *data, size_t length)
 {
     if (data == NULL || length == 0) return -1;
@@ -83,21 +97,9 @@ int radio_send(const uint8_t *data, size_t length)
     pthread_once(&tx_once, open_tx);
     if (tx_fd < 0) return -1;
 
-    size_t packets = 0;
-    for (size_t offset = 0; offset < length; offset += RADIO_MAX_PACKET_SIZE) {
-        size_t chunk = length - offset;
-        if (chunk > RADIO_MAX_PACKET_SIZE) chunk = RADIO_MAX_PACKET_SIZE;
-        packets++;
+    if (radio_queue_push(data, length, send_packet) != 0) return -1;
 
-        if (drop_percent > 0 && rand() % 100 < drop_percent) continue; // lost in the air
-
-        if (sendto(tx_fd, data + offset, chunk, 0, (struct sockaddr *)&tx_addr, sizeof(tx_addr)) < 0) {
-            perror("[RADIO] (sim) sendto");
-            return -1;
-        }
-    }
-
-    printf("[RADIO] (sim) transmitted %zu bytes in %zu packets\n", length, packets);
+    printf("[RADIO] (sim) queued %zu bytes\n", length);
     fflush(stdout);
     return 0;
 }
