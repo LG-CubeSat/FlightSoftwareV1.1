@@ -159,8 +159,8 @@ int payload_commander_downlink_photo(const char *photo_path)
         return -1;
     }
 
-    // sending it
-    if (radio_send(photo_buf, total) != 0) {
+    // sending it. the compressed photo is whole ssdv packets, the radio frames each one
+    if (radio_send_ssdv(photo_buf, total) != 0) {
         fprintf(stderr, "[PAYLOAD COMMANDER] downlink failed.\n");
         return -1;
     }
