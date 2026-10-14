@@ -4,8 +4,17 @@
 #include "filesystem.h"
 #include "heartbeat.h"
 #include "data_health.h"
+#include "obc_log.h"
 
 int main(void) {
+
+    if (obc_log_init("data") != 0) {
+        fprintf(stderr, "[OBC DATA] Failed to initialize logging.\n");
+    }
+
+    LOG_INFO("Initializing");
+
+
     printf("[OBC DATA] Initializing.\n");
     fflush(stdout);
 

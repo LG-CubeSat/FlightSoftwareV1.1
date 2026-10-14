@@ -6,8 +6,16 @@
 #include "dispatch.h"
 #include "heartbeat.h"
 #include "compute_health.h"
+#include "obc_log.h"
 
 int main(void) {
+    if (obc_log_init("compute") != 0) {
+        fprintf(stderr, "[OBC COMPUTE] Failed to initialize logging.\n");
+    }
+
+    LOG_INFO("Initializing");
+
+
     printf("[OBC COMPUTE] Initializing.\n");
     fflush(stdout);
 

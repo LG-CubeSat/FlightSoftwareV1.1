@@ -80,16 +80,29 @@ static void run_master(void) {
  * slave -- receive() correctly discards those (returns 0), but the caller
  * still has to ask again for the real one. Loop until a real match shows
  * up; alarm() is the timeout safety net, same as every other test here. */
-static int receive_for_me(CommsBus_t *bus, uint8_t *src_addr_out, uint8_t *buf, uint16_t buf_len) {
+static int receive_for_me(
+    CommsBus_t *bus,
+    uint8_t *src_addr_out,
+    uint8_t *buffer,
+    uint16_t buffer_length
+)
+{
     while (1) {
-        int n = bus->receive(src_addr_out, buf, buf_len);
-        if (n > 0) {
-            return n;
+        int received = bus->receive(
+            src_addr_out,
+            buffer,
+            buffer_length
+        );
+
+        if (received > 0) {
+            return received;
         }
-        if (n < 0) {
-            return n;
+
+        if (received == COMMS_BUS_TIMEOUT) {
+            continue;
         }
-        /* n == 0: not addressed to us, try again */
+
+        return received;
     }
 }
 

@@ -1,23 +1,24 @@
 /*
 Bridges libcsp to the underlying comms_bus transport (see comms_bus.h) --
-sends/receives csp packets through whichever CSP_Transport_t was configured
+sends/receives CSP packets through whichever CspCommsBusTransport_t was configured
 (SIM or real), without this layer ever knowing or caring which one it is.
 */
-#include "csp_if_spi.h"
+#include "csp_if_comms_bus.h"
 
 #include <csp/csp_debug.h>
 #include <csp/csp_id.h>
 #include <string.h>
 #include <unistd.h>
+#include "comms_bus.h"
 
 #include "../../libs/libcsp/include/csp/csp_types.h"
 
-static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packet, int from_me)
+static int csp_if_comms_bus_tx(csp_iface_t *iface, uint16_t via, csp_packet_t *packet, int from_me)
 {
     (void)from_me;
     (void)via; // CSP_NO_VIA_ADDRESS with no routing table configured -- not a real address, see packet->id.dst below
 
-    csp_if_spi_conf_t * ifconf = iface->driver_data; // create a interface config
+    CspCommsBusConfig_t *config = iface->driver_data;
 
     // TODO: check if full
 
@@ -30,7 +31,7 @@ static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packe
     csp_id_prepend(packet); // give an id to the packet
 
     // send packet through the transport
-    int ret = ifconf->transport->send(
+    int ret = config->transport->send(
         dest_addr,
         packet->frame_begin,
         packet->frame_length
@@ -48,11 +49,11 @@ static int csp_if_spi_tx(csp_iface_t * iface, uint16_t via, csp_packet_t * packe
 }
 
 // check if we recieved anything
-static int csp_if_spi_rx_work(
+static int csp_if_comms_bus_rx_work(
     csp_iface_t *iface
 )
 {
-    csp_if_spi_conf_t *ifconf = iface->driver_data; // makes config interface
+    CspCommsBusConfig_t *config = iface->driver_data;
 
     csp_packet_t *packet = csp_buffer_get(0); // this is space in buffer we grab
     if (packet == NULL)
@@ -66,11 +67,16 @@ static int csp_if_spi_rx_work(
     // frame; not used for CSP routing (CSP's own header carries that), only
     // needed to satisfy the addressed comms_bus contract
     uint8_t src_addr;
-    int len = ifconf->transport->receive(
+    int len = config->transport->receive(
         &src_addr,
         packet->frame_begin,
         sizeof(packet->data) + header_size
     );
+
+    if (len == COMMS_BUS_TIMEOUT) {
+        csp_buffer_free(packet);
+        return CSP_ERR_NONE;
+    }
 
     // len is not a real number
     if (len < 0) {
@@ -111,13 +117,13 @@ static int csp_if_spi_rx_work(
     return CSP_ERR_NONE;
 }
 
-static void * csp_if_spi_rx_loop(void * param) 
+static void *csp_if_comms_bus_rx_loop(void *param)
 {
     csp_iface_t *iface = param;
     
     while(1)
     {
-        int ret = csp_if_spi_rx_work(iface);
+        int ret = csp_if_comms_bus_rx_work(iface);
 
         if (ret == CSP_ERR_NOMEM) {
             usleep(10000); // if recieve is blocking
@@ -130,22 +136,22 @@ static void * csp_if_spi_rx_loop(void * param)
     return NULL;
 }
 
-void csp_if_spi_init(csp_iface_t * iface, csp_if_spi_conf_t * ifconf)
+void csp_if_comms_bus_init(csp_iface_t *iface, CspCommsBusConfig_t *config)
 {
     pthread_attr_t attributes;
     int ret;
 
-    iface->driver_data = ifconf; // setting that ifconf that we use above
+    iface->driver_data = config;
 
-    ret = pthread_create(&ifconf->rx_thread, NULL, csp_if_spi_rx_loop, iface);
+    ret = pthread_create(&config->rx_thread, NULL, csp_if_comms_bus_rx_loop, iface);
     if (ret != 0) {
-        csp_print("csp_if_spi_init: pthread_create failed: %s: %d\n", strerror(ret), ret);
+        csp_print("csp_if_comms_bus_init: pthread_create failed: %s: %d\n", strerror(ret), ret);
     }
 
     // note: we let the csp_network initialize the transport
 
     // register the interface
     iface->name = "COMMS";
-    iface->nexthop = csp_if_spi_tx;
+    iface->nexthop = csp_if_comms_bus_tx;
     csp_iflist_add(iface);    
 }

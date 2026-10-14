@@ -45,6 +45,7 @@
 
 #define ASCENT_OVERRIDE_SEC     "2"
 #define TIME_SYNC_OVERRIDE_SEC  "1"
+#define AUTONOMY_OVERRIDE_SEC   "1"
 #define TELEMETRY_DOWNLINK_OVERRIDE_SEC "1"
 #define CAPTURE_SEC             10
 #define TEST_TIMEOUT_SEC        30
@@ -111,6 +112,7 @@ static pid_t spawn_logged(const char * path, const char * log_path, int set_asce
         if (set_ascent_override) {
             setenv("MISSION_ASCENT_WAIT_SEC", ASCENT_OVERRIDE_SEC, 1);
             setenv("TIME_SYNC_INTERVAL_SEC", TIME_SYNC_OVERRIDE_SEC, 1);
+            setenv("MISSION_AUTONOMY_INTERVAL_SEC", AUTONOMY_OVERRIDE_SEC, 1);
             setenv("OBC_TELEMETRY_LOG_PATH", TELEMETRY_LOG, 1);
             setenv(
                 "MISSION_TELEMETRY_DOWNLINK_INTERVAL_SEC",

@@ -2,19 +2,20 @@
 #include "frame.h"
 #include "csp_commands.h" // has the csp addresses
 #include "i2c_addresses.h" // has the addresses for i2c
-
+#include "i2c_protocol.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+
 /* The following may be red/error because you are not on a Linux device. */
 #include <linux/i2c-dev.h> // I2C_RDWR, I2C_M_RD
 #include <linux/i2c.h> // struct i2c_msg, struct i2c_rdwer_ioctl_data
 
 #define I2C_BUS_PATH "/dev/i2c-1"
-#define WIRE_BUF_SIZE (4 + MAX_FRAME_PAYLOAD) // fixed-size read block, see receive() below
+#define WIRE_BUF_SIZE (1U + MAX_FRAME_WIRE_SIZE) // fixed-size read block, see receive() below
 
 typedef struct {
     uint8_t csp_addr;
@@ -33,6 +34,35 @@ static const known_slave_t known_slaves[] = {
 static int bus_fd = -1;
 static uint8_t my_bus_address;
 static size_t next_slave_start = 0; // rotates who gets polled first, see receive function
+
+static int i2c_transfer(
+    struct i2c_msg *messages,
+    uint32_t message_count
+) {
+    struct i2c_rdwr_ioctl_data transfer = {
+        .msgs = messages,
+        .nmsgs = message_count,
+    };
+
+    int result;
+
+    do {
+        result = ioctl(bus_fd, I2C_RDWR, &transfer);
+    } while (result < 0 && errno ==EINTR);
+
+    if (result < 0) {
+        return COMMS_BUS_ERROR;
+    }
+
+    /*
+    I2C_RDWR returns the number of messages executed, not the number of payload bytes transferred.
+    */
+    if ((uint32_t)result != message_count) {
+        return COMMS_BUS_ERROR;
+    }
+
+    return COMMS_BUS_OK;
+}
 
 CommsBus_t create_comms_bus(void)
 {
@@ -75,44 +105,70 @@ static int lookup_i2c_addr(uint8_t csp_addr, uint8_t *i2c_addr_out)
 
 // one i2c msg is on ioctl cal
 int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length) {
-    if (bus_fd < 0) return -1;
+    if (bus_fd < 0 || data == NULL) return -1;
+
+    if (length > MAX_FRAME_PAYLOAD) {
+        fprintf(
+            stderr,
+            stderr,
+            "[COMMS BUS] send: payload length %u exceeds limit\n",
+            length
+        );
+        return COMMS_BUS_ERROR;
+    }
 
     uint8_t i2c_addr;
+
     if (lookup_i2c_addr(dest_addr, &i2c_addr) < 0) {
-        fprintf(stderr, "[COMMS BUS] send: no known I2C address for CSP addr %u\n", dest_addr);
-        return -1;
-    }
-    if (length > MAX_FRAME_PAYLOAD) {
-        fprintf(stderr, "[COMMS BUS] send: payload length %u exceeds limit\n", length);
-        return -1;
+        fprintf(
+            stderr,
+            "[COMMS BUS] send: no physical I2C address for CSP address %u\n",
+            dest_addr
+        );
     }
 
     // create the actual frame
-    Frame frame;
-    frame.dest_addr = dest_addr;
-    frame.src_addr = my_bus_address;
-    frame.length = length;
-    memcpy(frame.payload, data, length); // copy in the payload/data
-    
+    Frame frame = {
+        .dest_addr = dest_addr,
+        .src_addr = my_bus_address,
+        .length = length,
+    };
 
-    uint8_t wire_buf[WIRE_BUF_SIZE];
-    int wire_len = frame_serialize(&frame, wire_buf, sizeof(wire_buf));
-    if (wire_len < 0) return -1;
+    memcpy(frame.payload, data, length); // copy in the payload/data
+
+    uint8_t transaction_buffer[I2C_WRITE_BUFFER_SIZE];
+
+    /*
+    Byte zero tells the STM32 how to interpret the rest of this I2C write.
+    */
+    transaction_buffer[0] = (uint8_t)I2C_CMD_WRITE_FRAME;
+
+    int frame_length = frame_serialize(
+        &frame,
+        &transaction_buffer[1],
+        MAX_FRAME_WIRE_SIZE
+    );
+
+    if (frame_length < 0) return COMMS_BUS_ERROR;
 
     struct i2c_msg msg = {
         .addr = i2c_addr,
         .flags = 0, // 0 = write
-        .len = (uint16_t)wire_len,
-        .buf = wire_buf,
+        .len = (uint16_t)(1 + frame_length),
+        .buf = transaction_buffer,
     };
-    struct i2c_rdwr_ioctl_data packet = { .msgs = &msg, .nmsgs = 1}; // wrap i2c_msg in a ioctl data. nmsgs is number
 
-    if (ioctl(bus_fd, I2C_RDWR, &packet) < 0) {
-        fprintf(stderr, "[COMMS BUS] send: write to 0x%02x failed: %s\n", i2c_addr, strerror(errno));
-        return -1;
+    if (i2c_transfer(&message, 1U) != COMMS_BUS_OK) {
+        fprintf(
+            stderr,
+            "[COMMS BUS] send to physical address 0x%02x failed: %s\n".
+            i2c_addr,
+            strerror(errno)
+        );
+        return COMMS_BUS_ERROR;
     }
 
-    return length; // report payload length
+    return length; // public transport reports caller payload bytes but not framing or command bytes
 }
 
 int comms_bus_receive(uint8_t *src_addr_out, uint8_t *buffer, uint16_t max_length)

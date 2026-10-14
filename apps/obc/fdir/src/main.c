@@ -18,8 +18,16 @@ Then it hands it off to the Supervisor
 #include "watchdog.h"
 #include "fallback.h"
 #include "health_monitor.h"
+#include "obc_log.h"
 
 int main(void) {
+    if (obc_log_init("fdir") != 0) {
+        fprintf(stderr, "[OBC FDIR] Failed to initialize logging.\n");
+    }
+
+    LOG_INFO("Initializing");
+
+
     printf("[OBC FDIR] Initializing.\n");
 
     /* Init here */

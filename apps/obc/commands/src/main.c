@@ -10,9 +10,16 @@
 #include "obc_ipc.h"
 #include "obc_relay_protocol.h"
 #include "commands_health.h"
+#include "obc_log.h"
 
 int main(void) {
-    printf("[OBC COMMAND P] Program started.\n");
+    if (obc_log_init("command") != 0) {
+        fprintf(stderr, "[OBC COMMAND] Failed to initialize logging.\n");
+    }
+
+    LOG_INFO("Initializing");
+
+    printf("[OBC COMMAND] Program started.\n");
 
     /*
     init stuff here

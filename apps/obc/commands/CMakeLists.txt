@@ -19,4 +19,5 @@ target_link_libraries(
         pthread 
         obc_progress
         obc_telemetry
+        obc_logging
 )

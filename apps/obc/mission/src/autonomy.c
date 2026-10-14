@@ -1,12 +1,16 @@
 #include "autonomy.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include "time.h"
 #include "pthread.h"
 
 #include "payload_commander.h"
 #include "obc_sleep_until.h"
 #include "mission_health.h"
+
+#define DEFAULT_AUTONOMY_INTERVAL_SEC 600
+#define AUTONOMY_INTERVAL_ENV "MISSION_AUTONOMY_INTERVAL_SEC"
 
 typedef struct {
     const char *name;
@@ -16,9 +20,25 @@ typedef struct {
 } autonomy_action_t;
 
 static autonomy_action_t actions[] = {
-    { "point ADCS to sun", 600, {0}, payload_commander_point_to_sun },
+    {
+        "point ADCS to sun",
+        DEFAULT_AUTONOMY_INTERVAL_SEC,
+        {0},
+        payload_commander_point_to_sun
+    },
     // new commands here
 };
+
+static int get_autonomy_interval_sec(void)
+{
+    const char *text = getenv(AUTONOMY_INTERVAL_ENV);
+    if (text == NULL || text[0] == '\0') {
+        return DEFAULT_AUTONOMY_INTERVAL_SEC;
+    }
+
+    int interval = atoi(text);
+    return interval > 0 ? interval : DEFAULT_AUTONOMY_INTERVAL_SEC;
+}
 
 int init_autonomy_thread(void)
 {
@@ -37,6 +57,11 @@ int init_autonomy_thread(void)
 void *autonomy_thread(void *arg)
 {
     (void)arg;
+
+    int interval_sec = get_autonomy_interval_sec();
+    for (size_t i = 0; i < sizeof(actions) / sizeof(actions[0]); i++) {
+        actions[i].interval_sec = interval_sec;
+    }
 
     struct timespec next;
     clock_gettime(CLOCK_MONOTONIC, &next);

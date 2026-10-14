@@ -31,4 +31,10 @@ add_dependencies(obc_supervisor
     obc_time
 )
 
-target_link_libraries(obc_compute PRIVATE obc_ipc pthread obc_ssdv_codec obc_progress)
+target_link_libraries(obc_compute PRIVATE
+    obc_ipc 
+    pthread 
+    obc_ssdv_codec 
+    obc_progress 
+    obc_logging
+)

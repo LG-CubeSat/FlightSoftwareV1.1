@@ -5,8 +5,15 @@
 #include "time_sync.h"
 #include "heartbeat.h"
 #include "time_health.h"
+#include "obc_log.h"
 
 int main(void) {
+    if (obc_log_init("time") != 0) {
+        fprintf(stderr, "[OBC TIME] Failed to initialize logging.\n");
+    }
+
+    LOG_INFO("Initializing");
+
     printf("[OBC TIME] Initializing.\n");
     fflush(stdout);
 
