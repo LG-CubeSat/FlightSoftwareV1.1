@@ -1,4 +1,5 @@
 #include "radio.h"
+#include "radio_deframer.h"
 #include "radio_queue.h"
 
 #include <errno.h>
@@ -20,7 +21,8 @@ real e22-400t30d (433 mhz) over uart in normal (transparent) mode.
 m0 + m1 low = normal mode. aux high = idle, aux low = busy.
 gpio uses the linux gpio chardev directly, no libgpiod needed.
 pins from the obc schematic (pi zero 2 w).
-radio_send queues into radio_queue.c, its tx thread calls send_packet.
+radio_send queues into radio_queue.c, its tx thread frames each chunk in ccsds and calls send_packet.
+radio_receive pulls whole ccsds packets out of the uart stream with radio_deframer.c.
 */
 
 #define RADIO_UART_DEVICE "/dev/serial0" // gpio14 txd0 / gpio15 rxd0
@@ -34,8 +36,8 @@ radio_send queues into radio_queue.c, its tx thread calls send_packet.
 #define AUX_BUSY_WAIT_MS 50      // time for aux to drop after we hand it bytes
 #define AUX_SETTLE_MS 5          // aux high = buffer empty, not always rf done. small gap before next packet
 #define RX_TIMEOUT_MS 1000
-#define RX_GAP_MS 20             // uart quiet this long = end of packet
-#define RX_PACKET_MAX_MS 500     // 240 bytes at 9600 baud is ~250ms, stop even if the line never goes quiet
+#define RX_GAP_MS 20             // uart quiet this long mid packet = packet broke
+#define RX_PACKET_MAX_MS 500     // 240 bytes at 9600 baud is ~250ms of extra time once a packet starts
 #define INIT_RETRY_MS 1000       // don't hammer a missing module with reinit attempts
 
 /* e22 registers written at every startup so the module always comes up the same */
@@ -58,6 +60,7 @@ static int aux_fd = -1;
 static atomic_int ready = 0;
 static int init_attempted = 0;
 static long last_init_ms = 0;
+static radio_deframer_t rx_deframer; // holds a partial packet between radio_receive calls
 
 static long now_ms(void)
 {
@@ -264,6 +267,7 @@ static int ensure_ready(void)
             pthread_mutex_lock(&tx_lock);
             pthread_mutex_lock(&rx_lock);
             close_all();
+            radio_deframer_reset(&rx_deframer);
             atomic_store(&ready, radio_init() == 0);
             pthread_mutex_unlock(&rx_lock);
             pthread_mutex_unlock(&tx_lock);
@@ -317,14 +321,22 @@ static int send_packet(const uint8_t *data, size_t length)
     return result;
 }
 
-int radio_send(const uint8_t *data, size_t length)
+static int queue(lg_ccsds_content_type_t content, const uint8_t *data, size_t length)
 {
-    if (data == NULL || length == 0) return -1;
-
     // fail now instead of queueing data the radio can't send
     if (ensure_ready() != 0) return -1;
 
-    return radio_queue_push(data, length, send_packet);
+    return radio_queue_push(content, data, length, send_packet);
+}
+
+int radio_send(const uint8_t *data, size_t length)
+{
+    return queue(LG_CCSDS_CONTENT_RAW_TELEMETRY, data, length);
+}
+
+int radio_send_ssdv(const uint8_t *data, size_t length)
+{
+    return queue(LG_CCSDS_CONTENT_SSDV, data, length);
 }
 
 int radio_receive(uint8_t *buffer, uint16_t max_length)
@@ -336,14 +348,25 @@ int radio_receive(uint8_t *buffer, uint16_t max_length)
     pthread_mutex_lock(&rx_lock);
 
     uint8_t packet[RADIO_MAX_PACKET_SIZE];
-    size_t total = 0;
-    int wait_ms = RX_TIMEOUT_MS;
-    long deadline = 0;
+    size_t packet_length = 0;
+    long start = now_ms();
+    long give_up = start + RX_TIMEOUT_MS + RX_PACKET_MAX_MS; // hard stop even if garbage never ends
     int failed = 0;
 
-    /* the e22 hands us a received packet as a burst of uart bytes.
-       keep reading until the line goes quiet or we have a full packet */
-    while (total < sizeof(packet)) {
+    /* read one byte at a time into the deframer. it keeps partial packets between
+       calls and uses the ccsds length to know where each packet ends */
+    while (packet_length == 0) {
+        long now = now_ms();
+        if (now >= give_up) break;
+
+        int wait_ms;
+        if (radio_deframer_buffered(&rx_deframer) > 0) {
+            wait_ms = RX_GAP_MS; // mid packet, the rest should be right behind
+        } else {
+            wait_ms = (int)(start + RX_TIMEOUT_MS - now);
+            if (wait_ms <= 0) break; // timed out, nothing heard
+        }
+
         struct pollfd pfd = { .fd = uart_fd, .events = POLLIN };
         int ready_fds = poll(&pfd, 1, wait_ms);
         if (ready_fds < 0) {
@@ -351,13 +374,19 @@ int radio_receive(uint8_t *buffer, uint16_t max_length)
             failed = 1;
             break;
         }
-        if (ready_fds == 0) break; // quiet
+        if (ready_fds == 0) {
+            // line went quiet in the middle of a packet, that packet is broken
+            radio_stats_rx_skipped(radio_deframer_buffered(&rx_deframer));
+            radio_deframer_reset(&rx_deframer);
+            continue;
+        }
         if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) { // uart disconnected or broken
             failed = 1;
             break;
         }
 
-        ssize_t n = read(uart_fd, packet + total, sizeof(packet) - total);
+        uint8_t byte;
+        ssize_t n = read(uart_fd, &byte, 1);
         if (n < 0) {
             if (errno == EINTR || errno == EAGAIN) continue;
             failed = 1;
@@ -368,10 +397,8 @@ int radio_receive(uint8_t *buffer, uint16_t max_length)
             break;
         }
 
-        if (total == 0) deadline = now_ms() + RX_PACKET_MAX_MS;
-        total += (size_t)n;
-        if (now_ms() >= deadline) break;
-        wait_ms = RX_GAP_MS;
+        radio_deframer_push(&rx_deframer, byte);
+        packet_length = radio_deframer_next(&rx_deframer, packet);
     }
 
     pthread_mutex_unlock(&rx_lock);
@@ -381,9 +408,12 @@ int radio_receive(uint8_t *buffer, uint16_t max_length)
         atomic_store(&ready, 0); // reopen on the next call
         return -1;
     }
-    if (total == 0) return 0; // timed out, nothing heard
-    if (total > max_length) return -1;
+    if (packet_length == 0) return 0; // timed out, nothing heard
 
-    memcpy(buffer, packet, total);
-    return (int)total;
+    lg_ccsds_profile_view_t view;
+    lg_ccsds_profile_parse(packet, packet_length, &view); // already checked by the deframer
+    if (view.payload_length > max_length) return -1;
+
+    memcpy(buffer, view.payload, view.payload_length);
+    return (int)view.payload_length;
 }

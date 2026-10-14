@@ -7,6 +7,7 @@ if (HW_MODE)
         real/drivers/camera.c
         real/drivers/radio.c
         common/radio_queue.c
+        common/radio_deframer.c
     )
     target_compile_definitions(platform PRIVATE HW_MODE)
 else()
@@ -17,6 +18,7 @@ else()
         sim/drivers/camera.c
         sim/drivers/radio.c
         common/radio_queue.c
+        common/radio_deframer.c
     )
     target_compile_definitions(platform PRIVATE SIM_MODE)
 endif()
@@ -38,5 +40,5 @@ endif()
 
 # frame_serialize/frame_deserialize are medium-agnostic (shared/interfaces/frame.c)
 # -- both the sim and real backends encode/decode the same wire format.
-# pthread: radio_queue.c runs the radio tx thread
-target_link_libraries(platform PUBLIC frame_codec i2c_protocol pthread)
+# radio_queue.c runs the radio tx thread (pthread) and frames packets with ccsds
+target_link_libraries(platform PUBLIC frame_codec i2c_protocol pthread ccsds)

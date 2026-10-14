@@ -1,4 +1,5 @@
 #include "radio.h"
+#include "radio_deframer.h"
 #include "radio_queue.h"
 
 #include <arpa/inet.h>
@@ -16,7 +17,7 @@
 /*
 sim e22: each radio packet = one udp datagram on localhost.
 udp drops packets if nobody is listening, same as rf.
-radio_send queues into radio_queue.c, its tx thread calls send_packet.
+radio_send queues into radio_queue.c, its tx thread frames each chunk in ccsds and calls send_packet.
 */
 
 #define RADIO_SIM_DEFAULT_TX_PORT 5600 // fake ground station listens here
@@ -90,18 +91,26 @@ static int send_packet(const uint8_t *data, size_t length)
     return 0;
 }
 
-int radio_send(const uint8_t *data, size_t length)
+static int queue(lg_ccsds_content_type_t content, const uint8_t *data, size_t length)
 {
-    if (data == NULL || length == 0) return -1;
-
     pthread_once(&tx_once, open_tx);
     if (tx_fd < 0) return -1;
 
-    if (radio_queue_push(data, length, send_packet) != 0) return -1;
+    if (radio_queue_push(content, data, length, send_packet) != 0) return -1;
 
     printf("[RADIO] (sim) queued %zu bytes\n", length);
     fflush(stdout);
     return 0;
+}
+
+int radio_send(const uint8_t *data, size_t length)
+{
+    return queue(LG_CCSDS_CONTENT_RAW_TELEMETRY, data, length);
+}
+
+int radio_send_ssdv(const uint8_t *data, size_t length)
+{
+    return queue(LG_CCSDS_CONTENT_SSDV, data, length);
 }
 
 int radio_receive(uint8_t *buffer, uint16_t max_length)
@@ -111,14 +120,32 @@ int radio_receive(uint8_t *buffer, uint16_t max_length)
     pthread_once(&rx_once, open_rx);
     if (rx_fd < 0) return -1;
 
-    uint8_t packet[RADIO_MAX_PACKET_SIZE + 1]; // +1 so oversized datagrams get caught
-    ssize_t n = recv(rx_fd, packet, sizeof(packet), 0);
-    if (n < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) return 0; // timed out, nothing heard
-        return -1;
-    }
-    if (n > RADIO_MAX_PACKET_SIZE || n > max_length) return -1;
+    for (;;) {
+        uint8_t datagram[RADIO_MAX_PACKET_SIZE + 1]; // +1 so oversized datagrams get caught
+        ssize_t n = recv(rx_fd, datagram, sizeof(datagram), 0);
+        if (n < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) return 0; // timed out, nothing heard
+            return -1;
+        }
+        if (n > RADIO_MAX_PACKET_SIZE) { // no real e22 packet is this big
+            radio_stats_rx_invalid();
+            continue;
+        }
 
-    memcpy(buffer, packet, (size_t)n);
-    return (int)n;
+        // one datagram = one radio packet, run it through the same checks as the real uart path
+        radio_deframer_t deframer;
+        uint8_t packet[RADIO_MAX_PACKET_SIZE];
+        radio_deframer_reset(&deframer);
+        for (ssize_t i = 0; i < n; i++) radio_deframer_push(&deframer, datagram[i]);
+        size_t packet_length = radio_deframer_next(&deframer, packet);
+        radio_stats_rx_skipped(radio_deframer_buffered(&deframer));
+        if (packet_length == 0) continue; // bad packet, wait for the next one
+
+        lg_ccsds_profile_view_t view;
+        lg_ccsds_profile_parse(packet, packet_length, &view); // already checked by the deframer
+        if (view.payload_length > max_length) return -1;
+
+        memcpy(buffer, view.payload, view.payload_length);
+        return (int)view.payload_length;
+    }
 }
