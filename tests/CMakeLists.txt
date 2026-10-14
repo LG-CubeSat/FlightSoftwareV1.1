@@ -77,6 +77,35 @@ if (NOT HW_MODE)
     )
 endif()
 
+# This is intentionally HW-only: it follows Mission's production photo path
+# into platform/real/drivers/camera.c and therefore operates the physical CSI
+# camera through rpicam-jpeg. It is never registered in an ordinary SIM run.
+if (HW_MODE)
+    add_executable(camera_hardware_test
+        test_camera_hardware.c
+        ${CMAKE_SOURCE_DIR}/apps/obc/mission/src/payload_commander.c
+    )
+
+    target_include_directories(camera_hardware_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/apps/obc/mission/include
+        ${CMAKE_SOURCE_DIR}/apps/obc/include
+        ${CMAKE_SOURCE_DIR}/shared/interfaces
+        ${CMAKE_SOURCE_DIR}/shared/csp
+    )
+
+    target_link_libraries(camera_hardware_test PRIVATE
+        platform
+        obc_telemetry
+    )
+
+    add_test(NAME camera_hardware_test COMMAND camera_hardware_test)
+    set_tests_properties(camera_hardware_test PROPERTIES
+        TIMEOUT 45
+        LABELS "hardware;camera"
+        RUN_SERIAL TRUE
+    )
+endif()
+
 # These tests exercise code shared by SIM and the Raspberry Pi build. They
 # deliberately do not link `platform`, so HW_MODE does not pull in a real
 # camera, radio, or Linux I2C device just to test portable logic.
