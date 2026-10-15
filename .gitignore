@@ -14,3 +14,8 @@ AGENTS.md
 build-hw/
 build_hw/
 build-sim/
+
+# STM CubeIDE generate
+firmware/adcs_stm32/Debug
+firmware/adcs_stm32/Release
+firmware/adcs_stm32/.settings/
