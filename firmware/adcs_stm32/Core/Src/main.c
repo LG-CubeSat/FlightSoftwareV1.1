@@ -21,7 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "adcs_log.h"
 
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -95,6 +97,28 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  adcs_log_init(&huart1);
+
+  adcs_log_write(
+    ADCS_LOG_LEVEL_INFO,
+    "BOOT",
+    "ADCS firmware started"
+  );
+
+  adcs_log_write(
+    ADCS_LOG_LEVEL_INFO,
+    "BOOT",
+    "System clock=%lu Hz",
+    (unsigned long)HAL_RCC_GetSysClockFreq()
+  );
+
+  /*
+  This is deliberately tests that ordinary printf() is also routed to USART1
+  */
+  printf("[PRINTF TEST] stdout is connected to USART1\r\n");
+
+  uint32_t last_heartbeat_ms = HAL_GetTick();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -104,11 +128,23 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_GPIO_WritePin(
-        LED_Status_GPIO_Port,
-        LED_Status_Pin,
-        GPIO_PIN_RESET
-    );
+    uint32_t now_ms = HAL_GetTick();
+
+    if ((now_ms - last_heartbeat_ms) >= 1000U)
+    {
+        last_heartbeat_ms = now_ms;
+
+        HAL_GPIO_TogglePin(
+            LED_Status_GPIO_Port,
+            LED_Status_Pin
+        );
+
+        adcs_log_write(
+            ADCS_LOG_LEVEL_INFO,
+            "HEALTH",
+            "Main loop alive"
+        );
+    }
   }
   /* USER CODE END 3 */
 }
