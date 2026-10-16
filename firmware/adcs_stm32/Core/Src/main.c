@@ -21,8 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "adcs_i2c_slave.h"
 #include "adcs_log.h"
-
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -112,7 +112,7 @@ int main(void)
     (unsigned long)HAL_RCC_GetSysClockFreq()
   );
 
-  if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+  if (adcs_i2c_slave_init(&hi2c1) != HAL_OK)
   {
     adcs_log_write(
       ADCS_LOG_LEVEL_ERROR,
