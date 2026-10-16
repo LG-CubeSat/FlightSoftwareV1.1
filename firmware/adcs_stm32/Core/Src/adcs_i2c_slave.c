@@ -32,4 +32,6 @@ HAL_StatusTypeDef adcs_i2c_slave_init(I2C_HandleTypeDef *i2c)
         */
         s_i2c = NULL;
    }
+
+   return status;
 }
