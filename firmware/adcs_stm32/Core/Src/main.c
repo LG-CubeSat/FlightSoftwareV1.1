@@ -112,6 +112,23 @@ int main(void)
     (unsigned long)HAL_RCC_GetSysClockFreq()
   );
 
+  if (HAL_I2C_EnableListen_IT(&hi2c1) != HAL_OK)
+  {
+    adcs_log_write(
+      ADCS_LOG_LEVEL_ERROR,
+      "I2C",
+      "Failed to enter slave listen mode"   
+    );
+
+    Error_Handler();
+  }
+
+  adcs_log_write(
+    ADCS_LOG_LEVEL_INFO,
+    "I2C",
+    "Listening as slave address 0x42"
+  );
+
   /*
   This is deliberately tests that ordinary printf() is also routed to USART1
   */
