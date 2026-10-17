@@ -280,7 +280,7 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length) {
         return COMMS_BUS_ERROR;
     }
 
-    uint8_t i2c_addr;
+    uint8_t i2c_addr = 0U;
 
     if (lookup_i2c_addr(dest_addr, &i2c_addr) < 0) {
         fprintf(
@@ -288,6 +288,8 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length) {
             "[COMMS BUS] send: no physical I2C address for CSP address %u\n",
             dest_addr
         );
+        errno = EDESTADDRREQ;
+        return COMMS_BUS_ERROR;
     }
 
     // create the actual frame
@@ -316,7 +318,8 @@ int comms_bus_send(uint8_t dest_addr, const uint8_t *data, uint16_t length) {
     struct i2c_msg msg = {
         .addr = i2c_addr, // which chip
         .flags = 0, // 0 = write, 1 = read
-        .len = (uint16_t)(1 + frame.length), // how many bytes
+        /* Command byte plus the complete serialized frame header and payload. */
+        .len = (uint16_t)(1 + serialized_length),
         .buf = transaction_buffer, // where do they come/go-to
     };
 

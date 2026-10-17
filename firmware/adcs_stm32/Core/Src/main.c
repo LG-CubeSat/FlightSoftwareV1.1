@@ -134,7 +134,23 @@ int main(void)
   */
   printf("[PRINTF TEST] stdout is connected to USART1\r\n");
 
+  adcs_log_write(
+    ADCS_LOG_LEVEL_INFO,
+    "BOOT",
+    "Entering main loop"
+  );
+
   uint32_t last_heartbeat_ms = HAL_GetTick();
+
+  adcs_log_write(
+    ADCS_LOG_LEVEL_INFO,
+    "I2C",
+    "OAR1=0x%08lX CR1=0x%08lX ISR=0x%08lX state=0x%02lX",
+    (unsigned long)hi2c1.Instance->OAR1,
+    (unsigned long)hi2c1.Instance->CR1,
+    (unsigned long)hi2c1.Instance->ISR,
+    (unsigned long)HAL_I2C_GetState(&hi2c1)
+  );
 
   /* USER CODE END 2 */
 
