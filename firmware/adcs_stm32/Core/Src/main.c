@@ -47,7 +47,7 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-
+static bool s_logger_ready = false;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -61,6 +61,128 @@ static void MX_USART1_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void adcs_log_i2c_events(void)
+{
+  uint32_t events = adcs_i2c_slave_take_events();
+  adcs_i2c_stats_t stats;
+
+  if (events == 0U)
+  {
+    return;
+  }
+
+  adcs_i2c_slave_get_stats(&stats);
+
+  if ((events & ADCS_I2C_EVENT_ERROR) != 0U)
+  {
+    adcs_log_write(
+      ADCS_LOG_LEVEL_ERROR,
+      "I2C",
+      "error=0x%08lX errors=%lu callback_errors=%lu",
+      (unsigned long)stats.last_error,
+      (unsigned long)stats.error_count,
+      (unsigned long)stats.callback_error_count
+    );
+  }
+
+  if ((events & ADCS_I2C_EVENT_INVALID_COMMAND) != 0U)
+  {
+    adcs_log_write(
+      ADCS_LOG_LEVEL_WARN,
+      "I2C",
+      "Rejected command/address; command=0x%02X match=0x%02X count=%lu",
+      (unsigned int)stats.last_command,
+      (unsigned int)stats.last_address_match,
+      (unsigned long)stats.invalid_command_count
+    );
+  }
+
+  if ((events & ADCS_I2C_EVENT_MALFORMED_FRAME) != 0U)
+  {
+    adcs_log_write(
+      ADCS_LOG_LEVEL_WARN,
+      "I2C",
+      "Malformed or truncated write count=%lu",
+      (unsigned long)stats.malformed_frame_count
+    );
+  }
+
+  if ((events & ADCS_I2C_EVENT_RX_OVERRUN) != 0U)
+  {
+    adcs_log_write(
+      ADCS_LOG_LEVEL_WARN,
+      "I2C",
+      "Receive frame dropped because main loop was busy; count=%lu",
+      (unsigned long)stats.receive_overrun_count
+    );
+  }
+
+  if ((events & ADCS_I2C_EVENT_RECOVERED) != 0U)
+  {
+    adcs_log_write(
+      ADCS_LOG_LEVEL_INFO,
+      "I2C",
+      "Listen mode recovered; count=%lu",
+      (unsigned long)stats.recovery_count
+    );
+  }
+
+  if ((events & ADCS_I2C_EVENT_ACTIVITY) != 0U)
+  {
+    adcs_log_write(
+      ADCS_LOG_LEVEL_INFO,
+      "I2C",
+      "addr=%lu rx=%lu/%lu tx=%lu/%lu listen=%lu cmd=0x%02X dir=%u",
+      (unsigned long)stats.address_match_count,
+      (unsigned long)stats.receive_start_count,
+      (unsigned long)stats.receive_complete_count,
+      (unsigned long)stats.transmit_start_count,
+      (unsigned long)stats.transmit_complete_count,
+      (unsigned long)stats.listen_complete_count,
+      (unsigned int)stats.last_command,
+      (unsigned int)stats.last_direction
+    );
+  }
+}
+
+static void adcs_handle_received_frames(void)
+{
+  adcs_i2c_frame_t frame;
+  uint8_t destination;
+
+  if (!adcs_i2c_slave_take_received_frame(&frame))
+  {
+    return;
+  }
+
+  adcs_log_write(
+    ADCS_LOG_LEVEL_INFO,
+    "I2C",
+    "WRITE_FRAME accepted: wire_length=%u dest=%u src=%u payload=%u",
+    (unsigned int)frame.length,
+    (unsigned int)frame.bytes[0],
+    (unsigned int)frame.bytes[1],
+    (unsigned int)(frame.length - ADCS_I2C_FRAME_HEADER_SIZE)
+  );
+
+  /*
+   * Bring-up behavior: queue the validated frame back to the sender with the
+   * source and destination exchanged. This proves WRITE_FRAME, GET_STATUS,
+   * and READ_FRAME before libcsp routing is connected.
+   */
+  destination = frame.bytes[0];
+  frame.bytes[0] = frame.bytes[1];
+  frame.bytes[1] = destination;
+
+  if (adcs_i2c_slave_queue_transmit_frame(frame.bytes, frame.length) != HAL_OK)
+  {
+    adcs_log_write(
+      ADCS_LOG_LEVEL_WARN,
+      "I2C",
+      "Could not queue round-trip frame because a response is already pending"
+    );
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -93,11 +215,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_I2C1_Init();
   MX_USART1_UART_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-
-  adcs_log_init(&huart1);
 
   adcs_log_write(
     ADCS_LOG_LEVEL_INFO,
@@ -126,7 +246,8 @@ int main(void)
   adcs_log_write(
     ADCS_LOG_LEVEL_INFO,
     "I2C",
-    "Listening as slave address 0x42"
+    "Listening as 7-bit slave address 0x%02X",
+    (unsigned int)ADCS_I2C_7BIT_ADDRESS
   );
 
   /*
@@ -162,6 +283,10 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     uint32_t now_ms = HAL_GetTick();
+
+    adcs_i2c_slave_process();
+    adcs_handle_received_frames();
+    adcs_log_i2c_events();
 
     if ((now_ms - last_heartbeat_ms) >= 1000U)
     {
@@ -236,10 +361,17 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE BEGIN I2C1_Init 1 */
 
+  /* USART1 is initialized first; make I2C initialization failures visible. */
+  if (!s_logger_ready)
+  {
+    adcs_log_init(&huart1);
+    s_logger_ready = true;
+  }
+
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
   hi2c1.Init.Timing = 0x00503D58;
-  hi2c1.Init.OwnAddress1 = 84;
+  hi2c1.Init.OwnAddress1 = ADCS_I2C_HAL_OWN_ADDRESS;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
   hi2c1.Init.OwnAddress2 = 0;
@@ -361,10 +493,23 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+  if (s_logger_ready)
+  {
+    (void)adcs_log_write(
+      ADCS_LOG_LEVEL_ERROR,
+      "FATAL",
+      "Error_Handler entered"
+    );
+  }
+
   __disable_irq();
   while (1)
   {
+    HAL_GPIO_TogglePin(LED_Status_GPIO_Port, LED_Status_Pin);
+    for (volatile uint32_t delay = 0U; delay < 200000U; ++delay)
+    {
+      __NOP();
+    }
   }
   /* USER CODE END Error_Handler_Debug */
 }

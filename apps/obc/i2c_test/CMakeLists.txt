@@ -8,5 +8,6 @@ target_include_directories(obc_adcs_i2c_test PRIVATE
 )
 
 target_link_libraries(obc_adcs_i2c_test PRIVATE
+    frame_codec
     i2c_protocol
 )
