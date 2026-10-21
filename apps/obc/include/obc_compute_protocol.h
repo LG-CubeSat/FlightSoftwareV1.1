@@ -9,7 +9,8 @@ typedef enum {
     COMPUTE_STATUS_OK = 0,
     COMPUTE_STATUS_FAILED = 1,
     COMPUTE_STATUS_CANCELLED = 2,
-    COMPUTE_STATUS_BUSY = 3   // rejected: a job is already running
+    COMPUTE_STATUS_BUSY = 3,   // rejected: a job is already running
+    COMPUTE_STATUS_TIMEOUT = 4
 } compute_status_t;
 
 /* role -> ROLE_COMPUTE: compress in_path, write result to out_path.

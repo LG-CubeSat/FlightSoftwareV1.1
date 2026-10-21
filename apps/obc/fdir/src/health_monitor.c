@@ -1,6 +1,8 @@
 #include "health_monitor.h"
 
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
 #include <pthread.h>
 #include <unistd.h>
 
@@ -17,6 +19,10 @@ Turns the flags given from watchdog and limit checker into real issue states (ho
 
 static int reset_counts[COMMS + 1]; // indexed by board address (OBC_ADDRESS unused)
 
+static struct timespec last_heartbeat[ROLE_COUNT];
+static int heartbeat_seen[ROLE_COUNT];
+static pthread_mutex_t role_health_lock = PTHREAD_MUTEX_INITIALIZER;
+
 /* Each board's own command port, so a shutdown goes to the right
    place -- add a line here as boards come online, same idea as
    ingest.c's routing table. */
@@ -28,6 +34,67 @@ static uint8_t cmd_port_for_board(uint8_t board_addr)
         default:           return 0;
     }
 }
+
+static int is_monitored_role(OBC_Roles_t role)
+{
+    switch (role) {
+        case ROLE_COMMANDS:
+        case ROLE_COMPUTE:
+        case ROLE_DATA:
+        case ROLE_MISSION:
+        case ROLE_TIME:
+            return 1;
+        
+        default:
+            return 0;
+    }
+}
+
+static void record_role_heartbeat(OBC_Roles_t role)
+{
+    if (!is_monitored_role(role)) {
+        return;
+    }
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    // uses mutex because watchdog will read from last heartbeat
+    pthread_mutex_lock(&role_health_lock);
+
+    int first_heartbeat = !heartbeat_seen[role];
+    last_heartbeat[role] = now;
+    heartbeat_seen[role] = 1;
+
+    pthread_mutex_unlock(&role_health_lock);
+
+    if (first_heartbeat) {
+        printf("[HEALTH MONITOR] first heartbeat received from role %d\n", role);
+        fflush(stdout);
+    }
+}
+
+int health_monitor_get_last_heartbeat(
+    OBC_Roles_t role,
+    struct timespec *last_seen_out
+)
+{
+    if (!is_monitored_role(role) || last_seen_out == NULL) {
+        return 0;
+    }
+
+    pthread_mutex_lock(&role_health_lock);
+
+    int seen = heartbeat_seen[role];
+    if (seen) {
+        *last_seen_out = last_heartbeat[role];
+    }
+
+    pthread_mutex_unlock(&role_health_lock);
+
+    return seen;
+}
+
 
 int health_monitor_thread_init(void)
 {
@@ -49,10 +116,47 @@ void *health_monitor_thread(void *arg)
 
     for (;;) {
         OBC_Roles_t src;
+        uint8_t buffer[sizeof(board_reset_notice_t)];
+
+        int len = IPC_receive(
+            &src,
+            buffer,
+            sizeof(buffer)
+        );
+
+        /*
+        A zero-payload message is an internal OBC heartbeat.
+        The role identity comes from the IPC header through src
+        */
+        if (len == 0) {
+            record_role_heartbeat(src);
+            continue;
+        }
+
+        /*
+        Board reset notices must have exactly the expected wire size
+        */
+        if (len != sizeof(board_reset_notice_t)) {
+            continue;
+        }
+        
+        /*
+        If something wants to reset another board, it must come from the Commands. This prevents roles to spoof a board reset.
+        */
+        if (src != ROLE_COMMANDS) {
+            fprintf(
+                stderr,
+                "[HEALTH MONITOR] ignoring reset notice from role %d\n",
+                src
+            );
+            continue;
+        }
+
         board_reset_notice_t notice;
-        int len = IPC_receive(&src, (uint8_t *)&notice, sizeof(notice));
-        if (len != sizeof(notice) || notice.board_addr > COMMS) {
-            continue; // malformed or out-of-range address, ignore
+        memcpy(&notice, buffer, sizeof(notice));
+
+        if (notice.board_addr > COMMS) {
+            continue;
         }
 
         reset_counts[notice.board_addr]++;

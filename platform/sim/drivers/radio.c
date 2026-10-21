@@ -17,7 +17,7 @@ int radio_send(const uint8_t *data, size_t length)
 
 int radio_receive(uint8_t *buffer, uint16_t max_length) {
     (void)*buffer;
-    printf("[RADIO] (mock) would receive up to %zu bytes from ground\n", max_length);
+    printf("[RADIO] (mock) would receive up to %zu bytes from ground\n", (size_t) max_length);
     fflush(stdout);
     return 0;
 }

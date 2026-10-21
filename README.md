@@ -192,7 +192,7 @@ shared/
 │   ├── camera.h            # Photo capture, mock only for now (mission's payload_commander)
 │   ├── radio.h             # Ground downlink, mock only -- real driver owned separately, see above
 │   ├── frame.h / frame.c   # Wire framing (addressing + serialization), shared by every backend
-├── csp/                    # CSP-to-transport glue (csp_network.c, csp_if_spi.c, csp_commands.h)
+├── csp/                    # CSP-to-transport glue (csp_network.c, csp_if_comms_bus.c, csp_commands.h)
 
 platform/
 ├── sim/drivers/    # comms_i2c.c, board_reset.c, board_shutdown.c, camera.c, radio.c -- build against today

@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include "supervisor.h"
 #include "processes.h"
+#include "obc_log.h"
 
 static volatile sig_atomic_t g_shutdown_requested = 0;
 
@@ -14,6 +15,12 @@ static void handle_sigterm(int sig)
 }
 
 int main(void) {
+    if (obc_log_init("supervisor") != 0) {
+        fprintf(stderr, "[OBC SUPERVISOR] Failed to initialize logging.\n");
+    }
+
+    LOG_INFO("Initializing");
+
     // build signal
     struct sigaction sa = {0}; // 0 inits everything to default vanilla
     sa.sa_handler = handle_sigterm; // pass in the actual sigterm

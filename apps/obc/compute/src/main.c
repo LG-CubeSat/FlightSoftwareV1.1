@@ -5,8 +5,17 @@
 #include "worker.h"
 #include "dispatch.h"
 #include "heartbeat.h"
+#include "compute_health.h"
+#include "obc_log.h"
 
 int main(void) {
+    if (obc_log_init("compute") != 0) {
+        fprintf(stderr, "[OBC COMPUTE] Failed to initialize logging.\n");
+    }
+
+    LOG_INFO("Initializing");
+
+
     printf("[OBC COMPUTE] Initializing.\n");
     fflush(stdout);
 
@@ -15,8 +24,20 @@ int main(void) {
         return 1;
     }
 
-    dispatch_thread_init();
-    heartbeat_thread_init();
+    if (compute_health_init() != 0) {
+        fprintf(stderr, "[OBC COMPUTE] Failed to initialize health tracking.\n");
+        return 1;
+    }
+
+    if (dispatch_thread_init() != 0) {
+        fprintf(stderr, "[OBC COMPUTE] Failed to start dispatch thread.\n");
+        return 1;
+    }
+    
+    if (heartbeat_thread_init() != 0) {
+        fprintf(stderr, "[OBC COMPUTE] Failed to start heart thread.\n");
+        return 1;
+    }
 
     for (;;) sleep(1);
     return 0;

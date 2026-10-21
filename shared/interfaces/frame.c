@@ -7,9 +7,15 @@
 // parses frames into sendable bytes. Uses big endian.
 int frame_serialize(const Frame *frame, uint8_t *out_buf, size_t out_buf_size)
 {
+    if (frame->length > MAX_FRAME_PAYLOAD) {
+        printf("[COMMS BUS] Payload size of %d exceeds frame limit of %d\n",
+               frame->length, MAX_FRAME_PAYLOAD);
+        return -1;
+    }
+
     // We are doing +4 because dest_addr, src_addr, and length (2 bytes) means a four byte header
     if (frame->length + 4 > out_buf_size) {
-        printf("[COMMS BUS] Payload size of %d exceeds limit of %zu", frame->length, out_buf_size);
+        printf("[COMMS BUS] Payload size of %d exceeds limit of %zu\n", frame->length, out_buf_size);
         return -1;
     }
 

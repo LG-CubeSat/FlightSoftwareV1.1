@@ -8,6 +8,9 @@
 #include "pthread.h"
 #include "obc_ipc.h"
 #include "obc_relay_protocol.h"
+#include "commands_health.h"
+
+#define RELAY_POLL_TIMEOUT_MS 1000
 
 int relay_thread_init()
 {
@@ -31,8 +34,23 @@ void *relay_thread(void *arg)
     for (;;) {
         OBC_Roles_t src;
         uint8_t buf[sizeof(relay_request_t)];
-        int len = IPC_receive(&src, buf, sizeof(buf));
-        if (len != sizeof(relay_request_t)) continue; // malformed, not correct fit
+        int len = IPC_receive_timeout(
+            &src,
+            buf,
+            sizeof(buf),
+            RELAY_POLL_TIMEOUT_MS
+        );
+        if (len == IPC_TIMEOUT) {
+            commands_health_relay_progress();
+            continue;
+        }
+        if (len < 0) {
+            continue;
+        }
+        if (len != sizeof(relay_request_t)) {
+            commands_health_relay_progress();
+            continue;
+        }
         
         relay_request_t req;
         memcpy(&req, buf, sizeof(req));
@@ -45,6 +63,7 @@ void *relay_thread(void *arg)
         csp_conn_t *conn = csp_connect(CSP_PRIO_NORM, req.dest_addr, req.dest_port, 1000, CSP_O_NONE);
         if (conn == NULL) {
             fprintf(stderr, "[RELAY] Connect to addr=%d port=%d failed\n", req.dest_addr, req.dest_port);
+            commands_health_relay_progress();
             continue;
         }
         printf("[RELAY] DEBUG: connected, sending now\n");
@@ -54,6 +73,7 @@ void *relay_thread(void *arg)
         if (packet == NULL) {
             fprintf(stderr, "[RELAY] out of packet buffers\n");
             csp_close(conn);
+            commands_health_relay_progress();
             continue;
         }
 
@@ -61,6 +81,7 @@ void *relay_thread(void *arg)
         packet->length = req.length;
         csp_send(conn, packet);
         csp_close(conn);
+        commands_health_relay_progress();
     }
     return NULL;
 }

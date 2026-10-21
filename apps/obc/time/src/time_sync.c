@@ -10,8 +10,10 @@
 #include "obc_ipc.h"
 #include "obc_sleep_until.h"
 #include "time.h"
+#include "time_health.h"
 
 #define TIME_SYNC_INTERVAL_SEC (300) // 5 min, tune later
+#define REQUEST_POLL_TIMEOUT_MS 1000
 
 /* Overridable so an integration test can see multiple broadcast ticks in
    seconds instead of waiting out the real 5 minute interval. Production
@@ -77,9 +79,12 @@ void *time_sync_broadcast_thread(void *arg)
     int interval_sec = get_time_sync_interval_sec();
 
     for (;;) {
+        time_health_broadcast_begin();
         for (size_t i = 0; i < sizeof(targets)/sizeof(targets[0]); i++) {
             send_time_sync_to(targets[i].addr, targets[i].cmd_port, seq);
+            time_health_broadcast_progress();
         }
+        time_health_broadcast_end();
         seq++;
 
         next.tv_sec += interval_sec;
@@ -111,8 +116,23 @@ void *time_sync_request_thread(void *arg)
     for (;;) {
         OBC_Roles_t src;
         uint8_t buf[sizeof(time_sync_request_t)];
-        int len = IPC_receive(&src, buf, sizeof(buf));
-        if (len != sizeof(time_sync_request_t)) continue;
+        int len = IPC_receive_timeout(
+            &src,
+            buf,
+            sizeof(buf),
+            REQUEST_POLL_TIMEOUT_MS
+        );
+        if (len == IPC_TIMEOUT) {
+            time_health_request_progress();
+            continue;
+        }
+        if (len < 0) {
+            continue;
+        }
+        if (len != sizeof(time_sync_request_t)) {
+            time_health_request_progress();
+            continue;
+        }
     
         time_sync_request_t req;
         memcpy(&req, buf, sizeof(req));
@@ -123,6 +143,7 @@ void *time_sync_request_thread(void *arg)
                 break;
             }
         }
+        time_health_request_progress();
     }
     
     return NULL;

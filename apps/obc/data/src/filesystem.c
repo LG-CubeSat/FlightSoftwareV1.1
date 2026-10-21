@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "obc_data_protocol.h"
+#include "data_health.h"
 
 #define IPC_SEND_MAX_RETRIES 20
 #define IPC_SEND_RETRY_DELAY_USEC 2000 // 2ms
@@ -62,6 +63,8 @@ void filesystem_stream_file(const char *path, OBC_Roles_t requester)
            break;
        }
 
+       data_health_storage_progress();
+
        offset += (uint32_t)n;
        if (reply.is_last) break;
     }
@@ -77,6 +80,9 @@ void filesystem_write_chunk(const char *path, uint32_t offset, uint16_t length,
     FILE *f = fopen(path, offset == 0 ? "wb" : "ab");
     if (f != NULL) {
         size_t written = fwrite(payload, 1, length, f);
+        if (written > 0) {
+            data_health_storage_progress();
+        }
         fclose(f);
         if (written == length) {
             ack.status = 0;
