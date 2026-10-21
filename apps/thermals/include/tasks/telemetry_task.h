@@ -1,0 +1,13 @@
+#ifndef TELEMETRY_TASK_H
+#define TELEMETRY_TASK_H
+
+#include "FreeRTOS.h"
+#include "task.h"
+
+extern TaskHandle_t xTelemetryHandle;
+
+void telemetry_task_init(void);
+
+void telemetry_task(void *pvParameters);
+
+#endif // TELEMETRY_TASK_H
