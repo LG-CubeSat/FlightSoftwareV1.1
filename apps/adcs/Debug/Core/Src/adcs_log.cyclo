@@ -1,0 +1,3 @@
+../Core/Src/adcs_log.c:47:6:adcs_log_init	1
+../Core/Src/adcs_log.c:56:19:adcs_log_write	7
+../Core/Src/adcs_log.c:131:5:_write	7

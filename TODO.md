@@ -21,7 +21,7 @@ not a real cross-compiled link. Verify 0.1/0.3 with an actual HW_MODE build once
       `radio_receive`. The ground-uplink listener and real E22 behavior remain deferred with the
       rest of the radio work; current OBC testing is downlink-path only.
 - [X] **0.3 — Stop building ADCS/EPS in the Pi (HW_MODE) build.** Root `CMakeLists.txt` adds
-      `apps/adcs` and `apps/eps` unconditionally. Under `HW_MODE=ON` on a Pi these would link
+      `firmware/adcs_stm32/Application` and `apps/eps` unconditionally. Under `HW_MODE=ON` on a Pi these would link
       the Linux-only real I2C driver and the POSIX FreeRTOS port — nonsense for an STM32, and it
       currently just compiles and hides the problem. Gate both behind `if (NOT HW_MODE)` until
       the ARM cross-compilation split happens (see `docs/satellite_architecture.md` §4 item B.3).

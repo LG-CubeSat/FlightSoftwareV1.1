@@ -1,0 +1,16 @@
+../Core/Src/adcs_i2c_slave.c:56:13:adcs_leave_critical	2
+../Core/Src/adcs_i2c_slave.c:64:13:adcs_set_event	1
+../Core/Src/adcs_i2c_slave.c:87:13:adcs_note_callback_error	1
+../Core/Src/adcs_i2c_slave.c:123:13:adcs_prepare_status_response	2
+../Core/Src/adcs_i2c_slave.c:94:13:adcs_note_malformed_receive	4
+../Core/Src/adcs_i2c_slave.c:134:19:adcs_i2c_slave_init	3
+../Core/Src/adcs_i2c_slave.c:163:6:adcs_i2c_slave_process	4
+../Core/Src/adcs_i2c_slave.c:203:10:adcs_i2c_slave_take_events	1
+../Core/Src/adcs_i2c_slave.c:212:6:adcs_i2c_slave_get_stats	2
+../Core/Src/adcs_i2c_slave.c:241:6:adcs_i2c_slave_take_received_frame	3
+../Core/Src/adcs_i2c_slave.c:264:19:adcs_i2c_slave_queue_transmit_frame	6
+../Core/Src/adcs_i2c_slave.c:293:6:HAL_I2C_AddrCallback	11
+../Core/Src/adcs_i2c_slave.c:391:6:HAL_I2C_SlaveRxCpltCallback	12
+../Core/Src/adcs_i2c_slave.c:484:6:HAL_I2C_SlaveTxCpltCallback	6
+../Core/Src/adcs_i2c_slave.c:505:6:HAL_I2C_ListenCpltCallback	7
+../Core/Src/adcs_i2c_slave.c:537:6:HAL_I2C_ErrorCallback	5

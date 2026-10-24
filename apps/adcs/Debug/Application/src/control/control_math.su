@@ -1,0 +1,14 @@
+../Application/src/control/control_math.c:8:16:pid_config_is_valid	0	static
+../Application/src/control/control_math.c:22:6:adcs_quaternion_multiply.part.0	24	static
+../Application/src/control/control_math.c:22:6:adcs_quaternion_multiply	4	static
+../Application/src/control/control_math.c:43:6:adcs_pid_init	16	static
+../Application/src/control/control_math.c:54:6:adcs_pid_reset	0	static
+../Application/src/control/control_math.c:115:7:adcs_clampf	0	static
+../Application/src/control/control_math.c:64:15:adcs_pid_update	8	static
+../Application/src/control/control_math.c:161:6:adcs_vector_cross	16	static
+../Application/src/control/control_math.c:287:9:adcs_values_are_finite	0	static
+../Application/src/control/control_math.c:128:7:adcs_vector_norm	8	static
+../Application/src/control/control_math.c:138:15:adcs_vector_normalize	32	static
+../Application/src/control/control_math.c:177:15:adcs_vector_limit	24	static
+../Application/src/control/control_math.c:210:15:adcs_quaternion_normalize	32	static
+../Application/src/control/control_math.c:240:15:adcs_quaternion_error_vector	88	static

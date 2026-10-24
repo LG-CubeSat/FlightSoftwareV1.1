@@ -45,7 +45,7 @@ part of the bus software architecture (see §2's note on the reserved EPS addres
 ### ADCS — STM32 + RTOS board, I2C
 
 A separate physical board carrying an **STM32 microcontroller running an RTOS** (the existing
-`apps/adcs` FreeRTOS reference implementation targets this role already). Connects to the OBC
+`firmware/adcs_stm32/Application` FreeRTOS reference implementation targets this role already). Connects to the OBC
 over the shared **I2C** bus as a CSP node.
 
 ### Thermals — STM32 + RTOS board, I2C
@@ -230,7 +230,7 @@ boards (ADCS, Thermals) — each needing different real backends and different t
 9. **FreeRTOS port matching the STM32's Cortex-M core variant.** The repo currently only has a
    working POSIX port (used for SIM); the hardware port needs picking/wiring per the actual
    core (M0/M3/M4/M4F/M7 — depends on the part).
-10. **Real watchdog.** `apps/adcs/src/manager/fault_manager.c`'s watchdog thread is
+10. **Real watchdog.** `firmware/adcs_stm32/Application/src/manager/fault_manager.c`'s watchdog thread is
     `pthread`-based today (POSIX-only) — real hardware needs the STM32's IWDG peripheral kicked
     directly. Separate from `board_reset.c`/`board_shutdown.c`, which are already genuinely
     hardware-ready (ARM-architectural registers, not vendor-specific) and just need real-silicon

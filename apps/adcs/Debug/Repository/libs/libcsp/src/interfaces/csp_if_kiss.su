@@ -1,0 +1,3 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_kiss.c:25:5:csp_kiss_tx	40	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_kiss.c:78:6:csp_kiss_rx	40	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_kiss.c:213:5:csp_kiss_add_interface	8	static

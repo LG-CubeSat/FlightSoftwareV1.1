@@ -312,3 +312,16 @@ add_test(
 set_tests_properties(i2c_protocol_test PROPERTIES
     TIMEOUT 5
 )
+
+if(NOT HW_MODE)
+    add_executable(stm32_platform_test
+        test_stm32_platform.c
+        ${CMAKE_SOURCE_DIR}/firmware/adcs_stm32/Platform/Src/adcs_environment_stm32.c
+        ${CMAKE_SOURCE_DIR}/firmware/adcs_stm32/Platform/Src/adcs_sensors_unavailable.c)
+    target_include_directories(stm32_platform_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/stm32_support
+        ${CMAKE_SOURCE_DIR}/firmware/adcs_stm32/Application/include
+        ${CMAKE_SOURCE_DIR}/shared/interfaces)
+    add_test(NAME stm32_platform_test COMMAND stm32_platform_test)
+    set_tests_properties(stm32_platform_test PROPERTIES TIMEOUT 5)
+endif()

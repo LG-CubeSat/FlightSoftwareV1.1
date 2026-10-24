@@ -1,0 +1,2 @@
+../Application/src/guidance/target_generator.c:60:15:adcs_guidance_target_from_vector	152	static
+../Application/src/guidance/target_generator.c:94:15:adcs_guidance_target_from_attitude	72	static

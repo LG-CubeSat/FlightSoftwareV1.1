@@ -1,0 +1,3 @@
+../Application/src/control/slew_controller.c:6:6:adcs_slew_init	14
+../Application/src/control/slew_controller.c:34:6:adcs_slew_reset	2
+../Application/src/control/slew_controller.c:45:15:adcs_slew_update	26

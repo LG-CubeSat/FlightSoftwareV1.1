@@ -1,0 +1,6 @@
+../Platform/Src/adcs_environment_stm32.c:12:6:adcs_environment_step	0	static
+../Platform/Src/adcs_environment_stm32.c:13:10:adcs_monotonic_time_us	16	static
+../Platform/Src/adcs_environment_stm32.c:23:10:adcs_unix_time_us	16	static
+../Platform/Src/adcs_environment_stm32.c:32:15:adcs_set_unix_time_us	16	static
+../Platform/Src/adcs_environment_stm32.c:41:15:adcs_get_orbit	8	static
+../Platform/Src/adcs_environment_stm32.c:46:15:adcs_inject_simulator_faults	0	static

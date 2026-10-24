@@ -1,0 +1,3 @@
+../Application/src/tasks/command_task.c:189:6:command_task	21
+../Application/src/tasks/command_task.c:32:5:command_task_send	4
+../Application/src/tasks/command_task.c:49:6:command_task_init	3

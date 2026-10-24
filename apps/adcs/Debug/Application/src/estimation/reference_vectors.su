@@ -1,0 +1,4 @@
+../Application/src/estimation/reference_vectors.c:25:15:adcs_reference_sun_vector	72	static
+../Application/src/estimation/reference_vectors.c:61:15:adcs_reference_magnetic_field	72	static
+../Application/src/estimation/reference_vectors.c:116:15:adcs_reference_nadir_vector	24	static
+../Application/src/estimation/reference_vectors.c:130:15:adcs_reference_vectors_compute	24	static

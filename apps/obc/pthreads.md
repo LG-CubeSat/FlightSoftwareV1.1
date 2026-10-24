@@ -2,7 +2,7 @@
 
 `threading.md` decides *which* pattern a thread should use — reactive or
 periodic. This doc is the *how*: the mechanics of actually standing one up
-correctly. Same spirit as `apps/adcs/include/tasks/building_a_task.md`, just
+correctly. Same spirit as `firmware/adcs_stm32/Application/include/tasks/building_a_task.md`, just
 for POSIX threads instead of FreeRTOS tasks.
 
 ## The init/thread pair convention

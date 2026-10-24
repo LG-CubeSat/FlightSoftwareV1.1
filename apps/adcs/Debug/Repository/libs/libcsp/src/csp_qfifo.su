@@ -1,0 +1,4 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_qfifo.c:13:6:csp_qfifo_init	8	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_qfifo.c:17:5:csp_qfifo_read	8	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_qfifo.c:25:6:csp_qfifo_write	24	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_qfifo.c:62:6:csp_qfifo_wake_up	16	static

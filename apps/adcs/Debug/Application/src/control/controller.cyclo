@@ -1,0 +1,3 @@
+../Application/src/control/controller.c:15:6:adcs_controller_init	3
+../Application/src/control/controller.c:34:6:adcs_controller_reset	2
+../Application/src/control/controller.c:44:15:adcs_controller_update	19

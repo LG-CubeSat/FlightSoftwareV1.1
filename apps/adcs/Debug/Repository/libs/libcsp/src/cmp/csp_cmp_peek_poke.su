@@ -1,0 +1,4 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_peek_poke.c:8:5:csp_cmp_peek_handler	8	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_peek_poke.c:31:5:csp_cmp_poke_handler	8	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_peek_poke.c:58:5:csp_cmp_peek_v2_handler	16	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_peek_poke.c:81:5:csp_cmp_poke_v2_handler	16	static

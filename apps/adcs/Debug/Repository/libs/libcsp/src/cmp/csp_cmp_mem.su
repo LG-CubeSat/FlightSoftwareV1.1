@@ -1,0 +1,6 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_mem.c:15:12:csp_cmp_memcpy	8	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_mem.c:21:12:csp_cmp_memread64	0	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_mem.c:28:12:csp_cmp_memwrite64	0	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_mem.c:35:6:csp_cmp_set_memcpy	0	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_mem.c:39:6:csp_cmp_set_memread64	0	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/cmp/csp_cmp_mem.c:43:6:csp_cmp_set_memwrite64	0	static

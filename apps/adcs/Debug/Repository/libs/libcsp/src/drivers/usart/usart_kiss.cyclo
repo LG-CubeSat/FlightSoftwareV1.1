@@ -1,0 +1,3 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/drivers/usart/usart_kiss.c:28:13:kiss_driver_rx	1
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/drivers/usart/usart_kiss.c:19:12:kiss_driver_tx	1
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/drivers/usart/usart_kiss.c:34:5:csp_usart_open_and_add_kiss_interface	4

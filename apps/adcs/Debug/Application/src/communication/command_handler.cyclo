@@ -1,0 +1,3 @@
+../Application/src/communication/command_handler.c:18:29:enqueue_command	1
+../Application/src/communication/command_handler.c:221:13:receiver_task	34
+../Application/src/communication/command_handler.c:226:6:command_handler_init	2

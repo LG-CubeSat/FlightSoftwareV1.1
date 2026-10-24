@@ -1,0 +1,4 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_hmac.c:93:5:csp_hmac_memory	272	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_hmac.c:115:5:csp_hmac_set_key	40	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_hmac.c:127:5:csp_hmac_append	40	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_hmac.c:154:5:csp_hmac_verify	48	static

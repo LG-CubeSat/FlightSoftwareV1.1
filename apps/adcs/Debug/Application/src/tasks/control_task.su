@@ -1,0 +1,2 @@
+../Application/src/tasks/control_task.c:81:6:control_task	536	static
+../Application/src/tasks/control_task.c:64:6:control_task_init	136	static

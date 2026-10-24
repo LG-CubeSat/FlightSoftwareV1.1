@@ -1,0 +1,6 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_port.c:32:16:csp_port_get_callback	0	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_port.c:56:16:csp_port_get_socket	0	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_port.c:77:5:csp_listen	8	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_port.c:83:5:csp_bind	8	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_port.c:107:5:csp_bind_callback	8	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_port.c:134:5:csp_socket_close	16	static

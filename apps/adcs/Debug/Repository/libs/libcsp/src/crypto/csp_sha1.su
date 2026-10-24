@@ -1,0 +1,5 @@
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_sha1.c:72:13:csp_sha1_compress	376	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_sha1.c:138:6:csp_sha1_init	0	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_sha1.c:149:6:csp_sha1_process	32	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_sha1.c:174:6:csp_sha1_done	24	static
+/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/crypto/csp_sha1.c:208:6:csp_sha1_memory	104	static

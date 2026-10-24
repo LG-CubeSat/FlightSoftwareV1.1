@@ -22,3 +22,5 @@ firmware/adcs_stm32/.settings/
 firmware/adcs_stm32/.metadata/
 firmware/adcs_stm32/.osx.project
 firmware/adcs_stm32/.mxproject
+# Standalone STM32 CMake output
+build-stm32/
