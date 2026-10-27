@@ -45,8 +45,8 @@ static uint8_t sensors_ready_locked(void) {
     return state.latest_sensors.timestamp_us != 0U &&
            (state.latest_sensors.valid_mask & required) == required &&
            adcs_values_are_finite(
-            sensor->angular_rate_rad-s, ADCS_VECTOR_LENGTH) &&
-            adcs_values_are_finite(sensors->magnetic_field_t, ADCS_VECTOR_LENGTH);
+            sensor->angular_rate_rad_s, ADCS_VECTOR_LENGTH) &&
+            adcs_values_are_finite(sensor->magnetic_field_t, ADCS_VECTOR_LENGTH);
 }
 
 static uint8_t attitude_ready_locked(void) {
