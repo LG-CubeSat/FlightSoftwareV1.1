@@ -35,7 +35,7 @@ Rebuild the code using:
 ```
 CUBEIDE="/Applications/STM32CubeIDE.app/Contents/MacOS/STM32CubeIDE"
 CUBE_WORKSPACE="/tmp/flightsoftware-cubeide-workspace"
-ADCS_PROJECT="$PWD/firmware/adcs_stm32"
+ADCS_PROJECT="$PWD/apps/adcs"
 
 mkdir -p "$CUBE_WORKSPACE"
 
@@ -45,7 +45,7 @@ mkdir -p "$CUBE_WORKSPACE"
   -application org.eclipse.cdt.managedbuilder.core.headlessbuild \
   -data "$CUBE_WORKSPACE" \
   -import "$ADCS_PROJECT" \
-  -cleanBuild "adcs_stm32/Debug" \
+  -cleanBuild "adcs/Debug" \
   -no-indexer \
   -printErrorMarkers
 ```
@@ -71,7 +71,7 @@ You may need to do button reset.
 
 # Then flash it on using:
 ```
-FIRMWARE="$PWD/firmware/adcs_stm32/Debug/adcs_stm32.elf"
+FIRMWARE="$PWD/apps/adcs/Debug/adcs_stm32.elf"
 
 test -f "$FIRMWARE" && echo "Firmware found"
 
