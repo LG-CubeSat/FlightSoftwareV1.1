@@ -40,7 +40,7 @@ add_subdirectory(sys)
 # of which is correct for real silicon -- so they're SIM-only until the ARM
 if (NOT HW_MODE)
     # Keep the simulator executable path stable after relocating its sources.
-    add_subdirectory(firmware/adcs_stm32/Application apps/adcs)
+    add_subdirectory(apps/adcs/Application apps/adcs)
     add_subdirectory(apps/eps)
 endif()
 

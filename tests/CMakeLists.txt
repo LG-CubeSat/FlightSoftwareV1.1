@@ -1,4 +1,17 @@
 if (NOT HW_MODE)
+    add_executable(adcs_estimator_test
+        test_adcs_estimator.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/control/control_math.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/estimation/kalman_filter.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/estimation/attitude_estimator.c
+    )
+    target_include_directories(adcs_estimator_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/include
+    )
+    target_link_libraries(adcs_estimator_test PRIVATE m)
+    add_test(NAME adcs_estimator_test COMMAND adcs_estimator_test)
+    set_tests_properties(adcs_estimator_test PROPERTIES TIMEOUT 5)
+
     add_executable(comms_bus_test test_comms_bus.c)
     target_link_libraries(comms_bus_test PRIVATE platform)
 
@@ -316,11 +329,11 @@ set_tests_properties(i2c_protocol_test PROPERTIES
 if(NOT HW_MODE)
     add_executable(stm32_platform_test
         test_stm32_platform.c
-        ${CMAKE_SOURCE_DIR}/firmware/adcs_stm32/Platform/Src/adcs_environment_stm32.c
-        ${CMAKE_SOURCE_DIR}/firmware/adcs_stm32/Platform/Src/adcs_sensors_unavailable.c)
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Platform/Src/adcs_environment_stm32.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Platform/Src/adcs_sensors_unavailable.c)
     target_include_directories(stm32_platform_test PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/stm32_support
-        ${CMAKE_SOURCE_DIR}/firmware/adcs_stm32/Application/include
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/include
         ${CMAKE_SOURCE_DIR}/shared/interfaces)
     add_test(NAME stm32_platform_test COMMAND stm32_platform_test)
     set_tests_properties(stm32_platform_test PROPERTIES TIMEOUT 5)
