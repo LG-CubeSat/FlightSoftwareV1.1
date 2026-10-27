@@ -39,10 +39,14 @@ static uint8_t quaternion_is_valid(const versor quaternion) {
 }
 
 static uint8_t sensors_ready_locked(void) {
+    const adcs_sensor_packet_t *sensor = &state.latest_sensors;
     uint32_t required = ADCS_SENSOR_VALID_GYROSCOPE |
                         ADCS_SENSOR_VALID_MAGNETOMETER;
     return state.latest_sensors.timestamp_us != 0U &&
-           (state.latest_sensors.valid_mask & required) == required;
+           (state.latest_sensors.valid_mask & required) == required &&
+           adcs_values_are_finite(
+            sensor->angular_rate_rad-s, ADCS_VECTOR_LENGTH) &&
+            adcs_values_are_finite(sensors->magnetic_field_t, ADCS_VECTOR_LENGTH);
 }
 
 static uint8_t attitude_ready_locked(void) {
@@ -53,17 +57,14 @@ static uint8_t attitude_ready_locked(void) {
            quaternion_is_valid(state.latest_attitude.quaternion);
 }
 
-static uint8_t state_is_fresh_locked(uint64_t now_us) {
-    if (now_us == 0U || state.latest_sensors.timestamp_us == 0U ||
-        state.latest_attitude.timestamp_us == 0U ||
-        state.latest_sensors.timestamp_us > now_us ||
-        state.latest_attitude.timestamp_us > now_us) {
-        return 0U;
-    }
-    return now_us - state.latest_sensors.timestamp_us <=
-               manager_config.sensor_stale_after_us &&
-           now_us - state.latest_attitude.timestamp_us <=
-               manager_config.estimate_stale_after_us;
+static uint8_t sensors_fresh_locked(uint64_t now_us) {
+    uint64_t timestamp_us = state.latest_sensors.timestamp_us;
+
+    return now_us != 0U &&
+        timestamp_us != 0U &&
+        timestamp_us <= now_us &&
+        now_us - timestamp_us <=
+            manager_config.sensor_stale_after_us;
 }
 
 static uint8_t transition_is_allowed_locked(adcs_mode_t requested) {
@@ -196,8 +197,7 @@ void adcs_manager_update(uint64_t now_us) {
     }
 
     if (state.mode == ADCS_MODE_BOOT) {
-        if (sensors_ready_locked() && attitude_ready_locked() &&
-            state_is_fresh_locked(now_us)) {
+        if (sensors_ready_locked() && sensors_fresh_locked(now_us)) {
             enter_mode_locked(ADCS_MODE_SAFE);
         } else {
             adcs_mutex_unlock(&manager_lock);
