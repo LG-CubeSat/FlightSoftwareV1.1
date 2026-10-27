@@ -1,9 +1,10 @@
 #include "estimation/attitude_estimator.h"
+#include "control/control_math.h"
 
 #include <math.h>
 #include <string.h>
 
-#include "control/control_math.h"
+#define SIMPLE_ESTIMATOR_MAX_FIX_AGE_US 1000000ULL
 
 static void rotation_matrix_to_quaternion(float matrix[3][3], versor quaternion) {
     float trace = matrix[0][0] + matrix[1][1] + matrix[2][2];
@@ -143,6 +144,7 @@ adcs_result_t adcs_attitude_estimator_reset(
     result = adcs_kalman_filter_reset(&estimator->filter, quaternion, zero_bias);
     if (result == ADCS_RESULT_OK) {
         estimator->previous_timestamp_us = 0U;
+        estimator->last_absolute_fix_us = 0U;
         estimator->accepted_corrections = 0U;
         estimator->consecutive_rejected_updates = 0U;
         estimator->has_absolute_solution = 0U;
@@ -196,16 +198,15 @@ adcs_result_t adcs_attitude_estimator_update(
                1000000.0F;
         if (dt_s > estimator->config.maximum_sample_gap_s) {
             estimator->filter.seeded = 0U;
-            estimator->has_absolute_fix_us = 0U;
             estimator->last_absolute_fix_us = 0U;
         } else if (estimator->filter.seeded != 0U) {
             result = adcs_kalman_filter_predict(
                 &estimator->filter,
-                sensor->angular_rate_rad_s,
+                sensors->angular_rate_rad_s,
                 dt_s
             );
             if (result != ADCS_RESULT_OK) {
-                estimator->previous_timestamp_us = sensor->timestamp_us;
+                estimator->previous_timestamp_us = sensors->timestamp_us;
                 return filter_state_is_corrupt(&estimator->filter) != 0U ? ADCS_RESULT_OUT_OF_RANGE : result;
             }
         }
@@ -221,39 +222,39 @@ adcs_result_t adcs_attitude_estimator_update(
 
         if (
             triad_attitude(
-                sensor->sun_vector_body,
-                sensor->magnetic_field_t,
+                sensors->sun_vector_body,
+                sensors->magnetic_field_t,
                 references->sun_eci_unit,
                 references->magnetic_field_eci_t,
                 triad_quaternion) == ADCS_RESULT_OK &&
             adcs_kalman_filter_reset(
-                &estimator->filtr,
+                &estimator->filter,
                 triad_quaternion,
                 zero_bias) == ADCS_RESULT_OK
             ) {
 
             got_triad_fix = 1U;
             estimator->has_absolute_solution = 1U;
-            estimator->last_absolute_fix_us = sensor->timestamp_us;
+            estimator->last_absolute_fix_us = sensors->timestamp_us;
             ++estimator->accepted_corrections;
         }
     }
 
     if (got_triad_fix != 0U) {
         estimator->consecutive_rejected_updates = 0U;
-    } else if (estimator->consectuive_rejected_updates < UINT32_MAX) {
+    } else if (estimator->consecutive_rejected_updates < UINT32_MAX) {
         ++estimator->consecutive_rejected_updates;
     }
 
     result = adcs_kalman_filter_get_state(
         &estimator->filter,
-        sensor->timestamp_us,
+        sensors->timestamp_us,
         sensors->angular_rate_rad_s,
         attitude
     );
 
     if (result == ADCS_RESULT_UNAVAILABLE) {
-        attitude->timestamp_us = sensor->timestamp_us;
+        attitude->timestamp_us = sensors->timestamp_us;
         attitude->quaternion[3] = 1.0F;
         attitude->valid = 0U;
         return ADCS_RESULT_INVALID_DATA;
@@ -269,7 +270,7 @@ adcs_result_t adcs_attitude_estimator_update(
      but it cannot make that attiude trustworthy forever
     */
     if (estimator->last_absolute_fix_us == 0U ||
-        sensor->timestamp_us - estimator->last_absolute_fix_us >
+        sensors->timestamp_us - estimator->last_absolute_fix_us >
             SIMPLE_ESTIMATOR_MAX_FIX_AGE_US ||
         estimator->consecutive_rejected_updates >
             estimator->config.maximum_consecutive_rejections) {

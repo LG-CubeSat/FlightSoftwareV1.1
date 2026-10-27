@@ -1,9 +1,8 @@
 #include "estimation/kalman_filter.h"
+#include "control/control_math.h"
 
 #include <string.h>
-
-uint8_t initialized; // Config is ready.
-uint8_t seeded; // A quat has been supplied by TRIAD
+#include <math.h>
 
 void adcs_kalman_filter_init(
     adcs_kalman_filter_t *filter,
@@ -35,9 +34,9 @@ adcs_result_t adcs_kalman_filter_reset(
     versor normalized;
 
     if (filter == NULL || quaternion == NULL || gyro_bias_rad_s == NULL) {
-        return ADCS_RETURN_INVALID_ARGUMENT;
+        return ADCS_RESULT_INVALID_ARGUMENT;
     }
-    if (filter->initalized == 0U) {
+    if (filter->initialized == 0U) {
         return ADCS_RESULT_NOT_INITIALIZED;
     }
     if (adcs_quaternion_normalize(quaternion, normalized) != ADCS_RESULT_OK || 
@@ -47,10 +46,10 @@ adcs_result_t adcs_kalman_filter_reset(
     }
 
     memcpy(filter->quaternion, normalized, sizeof(versor));
-    memcpy(filter->gyro_bias_rad_s, gyro_bias_rad_s, sieof(filter->gyro_bias_rad_s))
+    memcpy(filter->gyro_bias_rad_s, gyro_bias_rad_s, sizeof(filter->gyro_bias_rad_s));
 
     filter->seeded = 1U;
-    return ADCS_RESULT_OK
+    return ADCS_RESULT_OK;
 }
 
 adcs_result_t adcs_kalman_filter_predict(
@@ -65,15 +64,15 @@ adcs_result_t adcs_kalman_filter_predict(
     versor updated;
 
     if (filter == NULL || angular_rate_rad_s == NULL ||
-        !adcs_value_are_finite(angular_rate_rad_s, ADCS_VECTOR_LENGTH) ||
-        !isfinite(dt_s) || dt_s < 0.0F) {
+        !adcs_values_are_finite(angular_rate_rad_s, ADCS_VECTOR_LENGTH) ||
+        !isfinite(dt_s) || dt_s <= 0.0F) {
         return ADCS_RESULT_INVALID_ARGUMENT;
     }
     if (filter->initialized == 0U) {
         return ADCS_RESULT_NOT_INITIALIZED;
     }
 
-    if (filter->seeded == OU) {
+    if (filter->seeded == 0U) {
         return ADCS_RESULT_UNAVAILABLE;
     }
 

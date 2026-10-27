@@ -16,11 +16,12 @@ typedef struct {
 } adcs_kalman_config_t;
 
 typedef struct {
+    uint8_t initialized; // Config is ready.
+    uint8_t seeded; // A quat has been supplied by TRIAD
     adcs_kalman_config_t config;
     versor quaternion;
     float gyro_bias_rad_s[ADCS_VECTOR_LENGTH];
     float covariance[ADCS_COVARIANCE_ELEMENT_COUNT];
-    uint8_t initialized;
 } adcs_kalman_filter_t;
 
 /* Creates an identity-attitude filter with configured initial covariance. */
