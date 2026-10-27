@@ -22,6 +22,7 @@ typedef struct {
     adcs_attitude_estimator_config_t config;
     adcs_kalman_filter_t filter;
     uint64_t previous_timestamp_us;
+    uint64_t last_absolute_fix_us;
     uint32_t accepted_corrections;
     uint32_t consecutive_rejected_updates;
     uint8_t has_absolute_solution;

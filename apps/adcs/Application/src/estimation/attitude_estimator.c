@@ -157,10 +157,11 @@ adcs_result_t adcs_attitude_estimator_update(
     adcs_attitude_state_t *attitude) {
     uint8_t magnetic_available;
     uint8_t sun_available;
-    uint8_t correction_accepted = 0U;
+    uint8_t got_triad_fix = 0U;
     float magnetic_norm;
     float dt_s;
     adcs_result_t result;
+
 
     if (attitude != NULL) {
         memset(attitude, 0, sizeof(*attitude));
@@ -190,96 +191,91 @@ adcs_result_t adcs_attitude_estimator_update(
         sensors->sun_irradiance_w_m2 >=
             estimator->config.minimum_sun_irradiance_w_m2;
 
-    if (estimator->has_absolute_solution == 0U &&
-        magnetic_available != 0U && sun_available != 0U) {
-        versor initial_attitude;
-        const float zero_bias[ADCS_VECTOR_LENGTH] = {0.0F, 0.0F, 0.0F};
-
-        if (triad_attitude(
-                sensors->sun_vector_body,
-                sensors->magnetic_field_t,
-                references->sun_eci_unit,
-                references->magnetic_field_eci_t,
-                initial_attitude) == ADCS_RESULT_OK &&
-            adcs_kalman_filter_reset(
-                &estimator->filter,
-                initial_attitude,
-                zero_bias) == ADCS_RESULT_OK) {
-            estimator->has_absolute_solution = 1U;
-        }
-    }
-
     if (estimator->previous_timestamp_us != 0U) {
         dt_s = (float)(sensors->timestamp_us - estimator->previous_timestamp_us) /
                1000000.0F;
         if (dt_s > estimator->config.maximum_sample_gap_s) {
-            estimator->previous_timestamp_us = sensors->timestamp_us;
-            return ADCS_RESULT_INVALID_DATA;
-        }
-        result = adcs_kalman_filter_predict(
-            &estimator->filter,
-            sensors->angular_rate_rad_s,
-            dt_s);
-        if (result != ADCS_RESULT_OK) {
-            /* Consume the sample even when propagation rejects it. Otherwise
-               the same bad interval is retried forever with an ever-growing
-               dt and subsequent good samples are discarded too. */
-            estimator->previous_timestamp_us = sensors->timestamp_us;
-            return filter_state_is_corrupt(&estimator->filter) != 0U
-                ? ADCS_RESULT_OUT_OF_RANGE
-                : result;
+            estimator->filter.seeded = 0U;
+            estimator->has_absolute_fix_us = 0U;
+            estimator->last_absolute_fix_us = 0U;
+        } else if (estimator->filter.seeded != 0U) {
+            result = adcs_kalman_filter_predict(
+                &estimator->filter,
+                sensor->angular_rate_rad_s,
+                dt_s
+            );
+            if (result != ADCS_RESULT_OK) {
+                estimator->previous_timestamp_us = sensor->timestamp_us;
+                return filter_state_is_corrupt(&estimator->filter) != 0U ? ADCS_RESULT_OUT_OF_RANGE : result;
+            }
         }
     }
+
     estimator->previous_timestamp_us = sensors->timestamp_us;
 
-    if (magnetic_available != 0U) {
-        result = adcs_kalman_filter_correct_vector(
-            &estimator->filter,
-            sensors->magnetic_field_t,
-            references->magnetic_field_eci_t,
-            estimator->config.magnetometer_measurement_variance);
-        if (result == ADCS_RESULT_OK) {
-            correction_accepted = 1U;
-            ++estimator->accepted_corrections;
-        }
-    }
-    if (sun_available != 0U) {
-        result = adcs_kalman_filter_correct_vector(
-            &estimator->filter,
-            sensors->sun_vector_body,
-            references->sun_eci_unit,
-            estimator->config.sun_sensor_measurement_variance);
-        if (result == ADCS_RESULT_OK) {
-            correction_accepted = 1U;
+    if (magnetic_available != 0U && sun_available != 0U) {
+        versor triad_quaternion;
+        const float zero_bias[ADCS_VECTOR_LENGTH] = {
+            0.0F, 0.0F, 0.0F
+        };
+
+        if (
+            triad_attitude(
+                sensor->sun_vector_body,
+                sensor->magnetic_field_t,
+                references->sun_eci_unit,
+                references->magnetic_field_eci_t,
+                triad_quaternion) == ADCS_RESULT_OK &&
+            adcs_kalman_filter_reset(
+                &estimator->filtr,
+                triad_quaternion,
+                zero_bias) == ADCS_RESULT_OK
+            ) {
+
+            got_triad_fix = 1U;
+            estimator->has_absolute_solution = 1U;
+            estimator->last_absolute_fix_us = sensor->timestamp_us;
             ++estimator->accepted_corrections;
         }
     }
 
-    if (correction_accepted != 0U) {
+    if (got_triad_fix != 0U) {
         estimator->consecutive_rejected_updates = 0U;
-    } else if (estimator->consecutive_rejected_updates < UINT32_MAX) {
+    } else if (estimator->consectuive_rejected_updates < UINT32_MAX) {
         ++estimator->consecutive_rejected_updates;
     }
 
     result = adcs_kalman_filter_get_state(
         &estimator->filter,
-        sensors->timestamp_us,
+        sensor->timestamp_us,
         sensors->angular_rate_rad_s,
-        attitude);
+        attitude
+    );
+
+    if (result == ADCS_RESULT_UNAVAILABLE) {
+        attitude->timestamp_us = sensor->timestamp_us;
+        attitude->quaternion[3] = 1.0F;
+        attitude->valid = 0U;
+        return ADCS_RESULT_INVALID_DATA;
+    }
+
     if (result != ADCS_RESULT_OK) {
         return filter_state_is_corrupt(&estimator->filter) != 0U
             ? ADCS_RESULT_OUT_OF_RANGE
             : result;
     }
 
-    if (estimator->has_absolute_solution == 0U) {
-        attitude->confidence *= 0.25F;
-    }
-    if (estimator->consecutive_rejected_updates >
-        estimator->config.maximum_consecutive_rejections) {
-        attitude->confidence *= 0.25F;
-        attitude->valid = 0U;
-        return ADCS_RESULT_INVALID_DATA;
-    }
+    /* a gyro can carry a triad attitude forward breifly, 
+     but it cannot make that attiude trustworthy forever
+    */
+    if (estimator->last_absolute_fix_us == 0U ||
+        sensor->timestamp_us - estimator->last_absolute_fix_us >
+            SIMPLE_ESTIMATOR_MAX_FIX_AGE_US ||
+        estimator->consecutive_rejected_updates >
+            estimator->config.maximum_consecutive_rejections) {
+                attitude->valid = 0U;
+                attitude->confidence = 0.0F;
+                return ADCS_RESULT_INVALID_DATA;
+            }
     return ADCS_RESULT_OK;
 }
