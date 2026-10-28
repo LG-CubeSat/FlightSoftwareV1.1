@@ -12,6 +12,20 @@ if (NOT HW_MODE)
     add_test(NAME adcs_estimator_test COMMAND adcs_estimator_test)
     set_tests_properties(adcs_estimator_test PROPERTIES TIMEOUT 5)
 
+    add_executable(adcs_manager_faults_test
+        test_adcs_manager_faults.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/manager/adcs_manager.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/control/control_math.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/guidance/target_generator.c
+    )
+    target_include_directories(adcs_manager_faults_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/include
+        ${CMAKE_SOURCE_DIR}/shared/csp
+    )
+    target_link_libraries(adcs_manager_faults_test PRIVATE m pthread)
+    add_test(NAME adcs_manager_faults_test COMMAND adcs_manager_faults_test)
+    set_tests_properties(adcs_manager_faults_test PROPERTIES TIMEOUT 5)
+
     add_executable(comms_bus_test test_comms_bus.c)
     target_link_libraries(comms_bus_test PRIVATE platform)
 
