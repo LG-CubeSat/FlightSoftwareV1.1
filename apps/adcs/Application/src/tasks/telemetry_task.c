@@ -93,11 +93,24 @@ void telemetry_task(void *parameters) {
         if (++diagnostic_divider >= 5U) {
             diagnostic_divider = 0U;
 #ifdef ADCS_STM32
-            printf("[ADCS] mode=%s sensors=0x%lx faults=0x%lx stack_min=%lu words\n",
-                   adcs_manager_mode_name(snapshot.mode),
-                   (unsigned long)snapshot.latest_sensors.valid_mask,
-                   (unsigned long)snapshot.health.active_faults,
-                   (unsigned long)snapshot.health.minimum_stack_margin_words);
+            printf("[ADCS] mode=%s rate=%.4f q=[%.3f %.3f %.3f %.3f] target=[%.3f %.3f %.3f %.3f] error=%.3f torque=[%.2e %.2e %.2e] dipole=[%.3f %.3f %.3f]\n",
+                adcs_manager_mode_name(snapshot.mode),
+                adcs_vector_norm(snapshot.latest_attitude.angular_rate_rad_s),
+                snapshot.latest_attitude.quaternion[0],
+                snapshot.latest_attitude.quaternion[1],
+                snapshot.latest_attitude.quaternion[2],
+                snapshot.latest_attitude.quaternion[3],
+                snapshot.guidance_target.target_quaternion[0],
+                snapshot.guidance_target.target_quaternion[1],
+                snapshot.guidance_target.target_quaternion[2],
+                snapshot.guidance_target.target_quaternion[3],
+                snapshot.latest_control.pointing_error_rad,
+                snapshot.latest_control.requested_torque_nm[0],
+                snapshot.latest_control.requested_torque_nm[1],
+                snapshot.latest_control.requested_torque_nm[2],
+                snapshot.latest_control.requested_dipole_a_m2[0],
+                snapshot.latest_control.requested_dipole_a_m2[1],
+                snapshot.latest_control.requested_dipole_a_m2[2]);
 #else
             printf("[ADCS] mode=%s rate=%.4f q=[%.3f %.3f %.3f %.3f] "
                    "target=[%.3f %.3f %.3f %.3f] error=%.3f "
