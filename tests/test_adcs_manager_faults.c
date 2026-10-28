@@ -36,6 +36,16 @@ static void set_sensors(uint64_t timestamp_us, float measured_rate_rad_s) {
     adcs_manager_set_sensors(&sensors);
 }
 
+static void set_control(uint64_t timestamp_us, float pointing_error_rad) {
+    adcs_control_output_t control;
+    memset(&control, 0, sizeof(control));
+    control.timestamp_us = timestamp_us;
+    control.source_mode = ADCS_MODE_SUN_ACQUISITION;
+    control.pointing_error_valid = 1U;
+    control.pointing_error_rad = pointing_error_rad;
+    adcs_manager_set_control_output(&control);
+}
+
 static void set_attitude(uint64_t timestamp_us, uint8_t valid) {
     adcs_attitude_state_t attitude;
 
@@ -198,11 +208,66 @@ static void test_sun_acquisition_progresses_to_sun_pointing(void) {
 
     /* The default control output has zero pointing error. */
     for (unsigned int cycle = 0U; cycle < 19U; ++cycle) {
-        adcs_manager_update(TEST_NOW_US);
+        uint64_t t = TEST_NOW_US + cycle * 50000U;
+        set_sensors(t, 0.0F);
+        set_attitude(t, 1U);
+        set_control(t, 0.05F);
+        adcs_manager_update(t);
     }
     adcs_manager_get_state(&snapshot);
     CHECK(snapshot.mode == ADCS_MODE_SUN_POINTING);
     CHECK(snapshot.requested_mode == ADCS_MODE_SUN_POINTING);
+}
+
+/* 1. High rate without Sun -> DETUMBLE */
+static void test_high_rate_without_sun_enters_detumble(void) {
+    adcs_manager_init();
+    /* Set sensor with high rate but NO Sun */
+    adcs_sensor_packet_t sensors = {
+        .timestamp_us = TEST_NOW_US,
+        .valid_mask = ADCS_SENSOR_VALID_GYROSCOPE | ADCS_SENSOR_VALID_MAGNETOMETER,
+        .angular_rate_rad_s = {0.05F, 0.0F, 0.0F},
+        .magnetic_field_t = {0.0F, 0.0F, 30.0e-6F}
+    };
+    adcs_manager_set_sensors(&sensors);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
+}
+/* 2. Low rate without attitude -> SAFE */
+static void test_low_rate_without_attitude_exits_to_safe(void) {
+    start_with_sun_reference(0.05F, 0U); /* attitude invalid */
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
+    set_sensors(TEST_NOW_US, 0.0F); /* low rate */
+    for (unsigned int cycle = 0U; cycle < 20U; ++cycle) {
+        adcs_manager_update(TEST_NOW_US);
+    }
+    /* Attitude is missing, so it must fall back to SAFE */
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_SAFE);
+}
+/* 3. Lost gyro or magnetometer -> SAFE */
+static void test_lost_sensors_forces_safe(void) {
+    start_with_sun_reference(0.05F, 1U);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
+    /* Lose magnetometer */
+    adcs_sensor_packet_t sensors;
+    memset(&sensors, 0, sizeof(sensors));
+    sensors.timestamp_us = TEST_NOW_US;
+    sensors.valid_mask = ADCS_SENSOR_VALID_GYROSCOPE; /* magnetometer missing */
+    adcs_manager_set_sensors(&sensors);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_SAFE);
+}
+/* 4. Restored attitude -> Pointing */
+static void test_restored_attitude_enters_pointing(void) {
+    start_with_sun_reference(0.0F, 0U);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_SAFE);
+    /* Restore attitude */
+    set_attitude(TEST_NOW_US, 1U);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_SUN_ACQUISITION);
 }
 
 int main(void) {
@@ -213,6 +278,10 @@ int main(void) {
     test_detumble_exit_requires_consecutive_low_rates();
     test_detumble_exit_respects_requested_mode();
     test_sun_acquisition_progresses_to_sun_pointing();
+    test_high_rate_without_sun_enters_detumble();
+    test_low_rate_without_attitude_exits_to_safe();
+    test_lost_sensors_forces_safe();
+    test_restored_attitude_enters_pointing();
     puts("ADCS manager mode-dependent fault tests passed");
     return 0;
 }

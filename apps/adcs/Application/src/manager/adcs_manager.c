@@ -129,6 +129,7 @@ static void enter_mode_locked(adcs_mode_t mode) {
     state.mode = mode;
     state.mode_entered_us = state.latest_sensors.timestamp_us;
     state.stable_cycles = 0U;
+    state.last_counted_control_timestamp_us = 0U;
     ++state.health.mode_transitions;
 }
 
@@ -276,19 +277,41 @@ void adcs_manager_update(uint64_t now_us) {
             if (body_rate <= manager_config.detumble_exit_rate_rad_s) {
                 ++state.stable_cycles;
                 if (state.stable_cycles >= manager_config.detumble_settle_cycles &&
-                    state.requested_mode != ADCS_MODE_DETUMBLE &&
-                    transition_is_allowed_locked(state.requested_mode, now_us))
+                    state.requested_mode != ADCS_MODE_DETUMBLE
+                )
                 {
-                    enter_mode_locked(state.requested_mode);
+                    if (transition_is_allowed_locked(state.requested_mode, now_us)) {
+                        enter_mode_locked(state.requested_mode);
+                    } else {
+                        enter_mode_locked(ADCS_MODE_SAFE);
+                    }
                 }
             } else {
                 state.stable_cycles = 0U;
             }
             break;
         case ADCS_MODE_SUN_ACQUISITION:
-            if (state.latest_control.pointing_error_rad <=
-                    MANAGER_SUN_SETTLED_ERROR_RAD &&
-                body_rate <= manager_config.detumble_entry_rate_rad_s) {
+            const adcs_control_output_t *control = &state.latest_control;
+
+            if (control->source_mode != ADCS_MODE_SUN_ACQUISITION ||
+                control->timestamp_us <= state.mode_entered_us ||
+                control->timestamp_us > now_us ||
+                now_us - control->timestamp_us > manager_config.sensor_stale_after_us
+            ) {
+                state.stable_cycles = 0U;
+                break;
+            }
+
+            if (control->timestamp_us <= state.last_counted_control_timestamp_us) {
+                break; /* same controller result. dont use twice */
+            }
+            state.last_counted_control_timestamp_us = control->timestamp_us;
+
+            if (control->pointing_error_valid != 0U &&
+                isfinite(control->pointing_error_rad) &&
+                control->pointing_error_rad <= MANAGER_SUN_SETTLED_ERROR_RAD &&
+                body_rate <= manager_config.detumble_entry_rate_rad_s
+            ) {
                 ++state.stable_cycles;
                 if (state.stable_cycles >= manager_config.sun_acquisition_settle_cycles)
                 {

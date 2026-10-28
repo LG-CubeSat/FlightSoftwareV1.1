@@ -45,6 +45,7 @@ typedef struct {
     adcs_guidance_target_t guidance_target;
     adcs_health_t health;
     uint64_t mode_entered_us;
+    uint64_t last_counted_control_timestamp_us;
     uint32_t stable_cycles;
     uint8_t actuators_inhibited;
     uint8_t initialized;

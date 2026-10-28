@@ -127,6 +127,8 @@ typedef struct {
     float requested_dipole_a_m2[ADCS_VECTOR_LENGTH];
     float achievable_torque_nm[ADCS_VECTOR_LENGTH];
     float pointing_error_rad;
+    adcs_mode_t source_mode;
+    uint8_t pointing_error_valid;
     uint8_t actuators_enabled;
     uint8_t saturated;
     uint8_t target_settled;

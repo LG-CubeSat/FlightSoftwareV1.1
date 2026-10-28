@@ -99,6 +99,13 @@ void control_task(void *parameters) {
             &snapshot.latest_attitude,
             (float)CONTROL_TASK_PERIOD_MS / 1000.0F,
             &output);
+        
+        output.source_mode = snapshot.mode;
+        output.pointing_error_valid = 
+            result == ADCS_RESULT_OK &&
+            (snapshot.mode == ADCS_MODE_SUN_ACQUISITION ||
+             snapshot.mode == ADCS_MODE_SUN_POINTING) &&
+             snapshot.actuators_inhibited == 0U;
 
         memset(&command, 0, sizeof(command));
         if (result == ADCS_RESULT_OK &&
