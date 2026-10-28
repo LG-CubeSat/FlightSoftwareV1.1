@@ -205,7 +205,13 @@ void adcs_manager_update(uint64_t now_us) {
         }
     }
 
-    body_rate = adcs_vector_norm(state.latest_attitude.angular_rate_rad_s);
+    if (!sensors_ready_locked() || !sensors_fresh_locked(now_us)) {
+        enter_mode_locked(ADCS_MODE_SAFE);
+        adcs_mutex_unlock(&manager_lock);
+        return;
+    }
+
+    body_rate = adcs_vector_norm(state.latest_sensors.angular_rate_rad_s);
     if (!isfinite(body_rate) || body_rate > manager_config.excessive_rate_rad_s) {
         enter_mode_locked(ADCS_MODE_SAFE);
         adcs_mutex_unlock(&manager_lock);
