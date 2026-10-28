@@ -78,13 +78,19 @@ static void test_attitude_fault_allows_detumble_but_blocks_pointing(void) {
     CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
 
     /* A settled measured rate and valid estimate are insufficient while the
-       attitude fault bit is still active. */
+       attitude fault bit is still active: it remains in DETUMBLE before settle
+       and exits to SAFE once settle cycles elapse. */
     set_sensors(TEST_NOW_US, 0.0F);
     set_attitude(TEST_NOW_US, 1U);
-    for (unsigned int cycle = 0U; cycle < 20U; ++cycle) {
+    for (unsigned int cycle = 0U; cycle < 10U; ++cycle) {
         adcs_manager_update(TEST_NOW_US);
     }
     CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
+
+    for (unsigned int cycle = 10U; cycle < 20U; ++cycle) {
+        adcs_manager_update(TEST_NOW_US);
+    }
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_SAFE);
 
     injected_faults = ADCS_FAULT_NONE;
     adcs_manager_update(TEST_NOW_US);
@@ -207,7 +213,7 @@ static void test_sun_acquisition_progresses_to_sun_pointing(void) {
     CHECK(adcs_manager_get_mode() == ADCS_MODE_SUN_ACQUISITION);
 
     /* The default control output has zero pointing error. */
-    for (unsigned int cycle = 0U; cycle < 19U; ++cycle) {
+    for (unsigned int cycle = 1U; cycle <= 20U; ++cycle) {
         uint64_t t = TEST_NOW_US + cycle * 50000U;
         set_sensors(t, 0.0F);
         set_attitude(t, 1U);

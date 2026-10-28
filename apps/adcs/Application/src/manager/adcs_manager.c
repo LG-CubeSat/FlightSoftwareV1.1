@@ -277,8 +277,7 @@ void adcs_manager_update(uint64_t now_us) {
             if (body_rate <= manager_config.detumble_exit_rate_rad_s) {
                 ++state.stable_cycles;
                 if (state.stable_cycles >= manager_config.detumble_settle_cycles &&
-                    state.requested_mode != ADCS_MODE_DETUMBLE
-                )
+                    state.requested_mode != ADCS_MODE_DETUMBLE)
                 {
                     if (transition_is_allowed_locked(state.requested_mode, now_us)) {
                         enter_mode_locked(state.requested_mode);
@@ -290,7 +289,7 @@ void adcs_manager_update(uint64_t now_us) {
                 state.stable_cycles = 0U;
             }
             break;
-        case ADCS_MODE_SUN_ACQUISITION:
+        case ADCS_MODE_SUN_ACQUISITION: {
             const adcs_control_output_t *control = &state.latest_control;
 
             if (control->source_mode != ADCS_MODE_SUN_ACQUISITION ||
@@ -322,6 +321,7 @@ void adcs_manager_update(uint64_t now_us) {
                 state.stable_cycles = 0U;
             }
             break;
+        }
         case ADCS_MODE_SLEWING:
             if (state.latest_control.target_settled != 0U) {
                 state.requested_mode = ADCS_MODE_TARGET_POINTING;

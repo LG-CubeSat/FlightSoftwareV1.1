@@ -111,6 +111,7 @@ void telemetry_task(void *parameters) {
                 snapshot.latest_control.requested_dipole_a_m2[0],
                 snapshot.latest_control.requested_dipole_a_m2[1],
                 snapshot.latest_control.requested_dipole_a_m2[2]);
+            fflush(stdout);
 #else
             printf("[ADCS] mode=%s rate=%.4f q=[%.3f %.3f %.3f %.3f] "
                    "target=[%.3f %.3f %.3f %.3f] error=%.3f "
