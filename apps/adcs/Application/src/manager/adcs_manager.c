@@ -275,11 +275,11 @@ void adcs_manager_update(uint64_t now_us) {
         case ADCS_MODE_DETUMBLE:
             if (body_rate <= manager_config.detumble_exit_rate_rad_s) {
                 ++state.stable_cycles;
-                if (state.stable_cycles >= manager_config.detumble_settle_cycles) {
-                    state.requested_mode = ADCS_MODE_SUN_ACQUISITION;
-                    if (transition_is_allowed_locked(ADCS_MODE_SUN_ACQUISITION, now_us)) {
-                        enter_mode_locked(ADCS_MODE_SUN_ACQUISITION);
-                    }
+                if (state.stable_cycles >= manager_config.detumble_settle_cycles &&
+                    state.requested_mode != ADCS_MODE_DETUMBLE &&
+                    transition_is_allowed_locked(state.requested_mode, now_us))
+                {
+                    enter_mode_locked(state.requested_mode);
                 }
             } else {
                 state.stable_cycles = 0U;
@@ -290,8 +290,8 @@ void adcs_manager_update(uint64_t now_us) {
                     MANAGER_SUN_SETTLED_ERROR_RAD &&
                 body_rate <= manager_config.detumble_entry_rate_rad_s) {
                 ++state.stable_cycles;
-                if (state.stable_cycles >=
-                    manager_config.sun_acquisition_settle_cycles) {
+                if (state.stable_cycles >= manager_config.sun_acquisition_settle_cycles)
+                {
                     state.requested_mode = ADCS_MODE_SUN_POINTING;
                     enter_mode_locked(ADCS_MODE_SUN_POINTING);
                 }

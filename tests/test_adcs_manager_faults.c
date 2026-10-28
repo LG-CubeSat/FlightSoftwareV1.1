@@ -136,11 +136,83 @@ static void test_explicit_safe_request_takes_priority(void) {
     CHECK(adcs_manager_get_mode() == ADCS_MODE_SAFE);
 }
 
+static void test_detumble_exit_requires_consecutive_low_rates(void) {
+    start_with_sun_reference(0.05F, 1U);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
+
+    set_sensors(TEST_NOW_US, 0.0F);
+    for (unsigned int cycle = 0U; cycle < 10U; ++cycle) {
+        adcs_manager_update(TEST_NOW_US);
+    }
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
+
+    /* This rate is below the entry threshold but above the exit threshold. */
+    set_sensors(TEST_NOW_US, 0.02F);
+    adcs_manager_update(TEST_NOW_US);
+    set_sensors(TEST_NOW_US, 0.0F);
+    for (unsigned int cycle = 0U; cycle < 19U; ++cycle) {
+        adcs_manager_update(TEST_NOW_US);
+    }
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_SUN_ACQUISITION);
+}
+
+static void test_detumble_exit_respects_requested_mode(void) {
+    adcs_manager_state_t snapshot;
+    adcs_reference_vectors_t references;
+
+    start_with_sun_reference(0.05F, 1U);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_DETUMBLE);
+
+    /* An explicit DETUMBLE request must remain in effect at a low rate. */
+    adcs_manager_request_mode(ADCS_MODE_DETUMBLE);
+    set_sensors(TEST_NOW_US, 0.0F);
+    for (unsigned int cycle = 0U; cycle < 25U; ++cycle) {
+        adcs_manager_update(TEST_NOW_US);
+    }
+    adcs_manager_get_state(&snapshot);
+    CHECK(snapshot.mode == ADCS_MODE_DETUMBLE);
+    CHECK(snapshot.requested_mode == ADCS_MODE_DETUMBLE);
+
+    /* A valid Earth-pointing request should be honored after settling. */
+    memset(&references, 0, sizeof(references));
+    references.valid_mask = ADCS_REFERENCE_VALID_NADIR;
+    references.nadir_eci_unit[2] = 1.0F;
+    adcs_manager_set_references(NULL, &references);
+    adcs_manager_request_mode(ADCS_MODE_EARTH_POINTING);
+    adcs_manager_update(TEST_NOW_US);
+    adcs_manager_get_state(&snapshot);
+    CHECK(snapshot.mode == ADCS_MODE_EARTH_POINTING);
+    CHECK(snapshot.requested_mode == ADCS_MODE_EARTH_POINTING);
+}
+
+static void test_sun_acquisition_progresses_to_sun_pointing(void) {
+    adcs_manager_state_t snapshot;
+
+    start_with_sun_reference(0.0F, 1U);
+    adcs_manager_update(TEST_NOW_US);
+    CHECK(adcs_manager_get_mode() == ADCS_MODE_SUN_ACQUISITION);
+
+    /* The default control output has zero pointing error. */
+    for (unsigned int cycle = 0U; cycle < 19U; ++cycle) {
+        adcs_manager_update(TEST_NOW_US);
+    }
+    adcs_manager_get_state(&snapshot);
+    CHECK(snapshot.mode == ADCS_MODE_SUN_POINTING);
+    CHECK(snapshot.requested_mode == ADCS_MODE_SUN_POINTING);
+}
+
 int main(void) {
     test_attitude_fault_allows_detumble_but_blocks_pointing();
     test_other_faults_force_safe();
     test_attitude_checks_work_before_fault_is_reported();
     test_explicit_safe_request_takes_priority();
+    test_detumble_exit_requires_consecutive_low_rates();
+    test_detumble_exit_respects_requested_mode();
+    test_sun_acquisition_progresses_to_sun_pointing();
     puts("ADCS manager mode-dependent fault tests passed");
     return 0;
 }

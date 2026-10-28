@@ -244,7 +244,12 @@ uint32_t fault_management_evaluate_adcs(
                 magnetic_norm > config.maximum_magnetic_field_t) {
                 faults |= ADCS_FAULT_SENSOR_RANGE;
             }
+            rate_norm = adcs_vector_norm(sensors->angular_rate_rad_s);
+            if (!isfinite(rate_norm) || rate_norm > config.maximum_rate_rad_s) {
+                faults |= ADCS_FAULT_EXCESSIVE_RATE;
+            }
         }
+
     }
 
     if (attitude == NULL || attitude->valid == 0U ||
@@ -265,11 +270,6 @@ uint32_t fault_management_evaluate_adcs(
             !isfinite(attitude->confidence) || attitude->confidence < 0.0F ||
             attitude->confidence > 1.0F) {
             faults |= ADCS_FAULT_ATTITUDE_INVALID;
-        }
-
-        rate_norm = adcs_vector_norm(attitude->angular_rate_rad_s);
-        if (!isfinite(rate_norm) || rate_norm > config.maximum_rate_rad_s) {
-            faults |= ADCS_FAULT_EXCESSIVE_RATE;
         }
     }
 
