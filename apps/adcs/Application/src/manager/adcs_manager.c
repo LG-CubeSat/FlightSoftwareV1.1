@@ -67,7 +67,31 @@ static uint8_t sensors_fresh_locked(uint64_t now_us) {
             manager_config.sensor_stale_after_us;
 }
 
-static uint8_t transition_is_allowed_locked(adcs_mode_t requested) {
+static uint8_t mode_needs_attitude(adcs_mode_t mode) {
+    switch (mode) {
+        case ADCS_MODE_SUN_ACQUISITION:
+        case ADCS_MODE_SUN_POINTING:
+        case ADCS_MODE_EARTH_POINTING:
+        case ADCS_MODE_SLEWING:
+        case ADCS_MODE_TARGET_POINTING:
+        case ADCS_MODE_SCIENCE:
+            return 1U;
+        default:
+            return 0U;
+    }
+}
+
+static uint8_t attitude_usable_locked(uint64_t now_us) {
+    uint64_t timestamp_us = state.latest_attitude.timestamp_us;
+
+    return attitude_ready_locked() &&
+        (state.health.active_faults & ADCS_FAULT_ATTITUDE_INVALID) == 0U &&
+        now_us != 0U &&
+        timestamp_us <= now_us &&
+        now_us - timestamp_us <= manager_config.estimate_stale_after_us;
+}
+
+static uint8_t transition_is_allowed_locked(adcs_mode_t requested, uint64_t now_us) {
     switch (requested) {
         case ADCS_MODE_SAFE:
             return 1U;
@@ -75,16 +99,16 @@ static uint8_t transition_is_allowed_locked(adcs_mode_t requested) {
             return sensors_ready_locked();
         case ADCS_MODE_SUN_ACQUISITION:
         case ADCS_MODE_SUN_POINTING:
-            return attitude_ready_locked() &&
+            return attitude_usable_locked(now_us) &&
                    (state.latest_sensors.valid_mask & ADCS_SENSOR_VALID_SUN) != 0U &&
                    (state.latest_references.valid_mask & ADCS_REFERENCE_VALID_SUN) != 0U;
         case ADCS_MODE_EARTH_POINTING:
-            return attitude_ready_locked() &&
+            return attitude_usable_locked(now_us) &&
                    (state.latest_references.valid_mask & ADCS_REFERENCE_VALID_NADIR) != 0U;
         case ADCS_MODE_SLEWING:
         case ADCS_MODE_TARGET_POINTING:
         case ADCS_MODE_SCIENCE:
-            return attitude_ready_locked() &&
+            return attitude_usable_locked(now_us) &&
                    quaternion_is_valid(state.guidance_target.target_quaternion);
         case ADCS_MODE_BOOT:
         case ADCS_MODE_COUNT:
@@ -188,7 +212,7 @@ void adcs_manager_update(uint64_t now_us) {
     }
 
     state.health.active_faults = fault_management_get_active();
-    critical_faults = state.health.active_faults & ADCS_FAULT_ALL;
+    critical_faults = state.health.active_faults & (ADCS_FAULT_ALL & ~ADCS_FAULT_ATTITUDE_INVALID);
     if (critical_faults != 0U) {
         enter_mode_locked(ADCS_MODE_SAFE);
         refresh_builtin_target_locked();
@@ -218,13 +242,22 @@ void adcs_manager_update(uint64_t now_us) {
         return;
     }
 
+    if (state.requested_mode != ADCS_MODE_SAFE &&
+        mode_needs_attitude(state.mode) &&
+        !attitude_usable_locked(now_us)) {
+        enter_mode_locked(ADCS_MODE_DETUMBLE);
+        adcs_mutex_unlock(&manager_lock);
+        return;
+    }
+    
+
     if (state.requested_mode == ADCS_MODE_SAFE) {
         enter_mode_locked(ADCS_MODE_SAFE);
     } else if (body_rate > manager_config.detumble_entry_rate_rad_s) {
         enter_mode_locked(ADCS_MODE_DETUMBLE);
     } else if (state.mode != ADCS_MODE_DETUMBLE &&
                state.requested_mode != state.mode &&
-               transition_is_allowed_locked(state.requested_mode)) {
+               transition_is_allowed_locked(state.requested_mode, now_us)) {
         enter_mode_locked(state.requested_mode);
     }
 
@@ -234,7 +267,7 @@ void adcs_manager_update(uint64_t now_us) {
                 if (body_rate > manager_config.detumble_entry_rate_rad_s &&
                     sensors_ready_locked()) {
                     enter_mode_locked(ADCS_MODE_DETUMBLE);
-                } else if (transition_is_allowed_locked(state.requested_mode)) {
+                } else if (transition_is_allowed_locked(state.requested_mode, now_us)) {
                     enter_mode_locked(state.requested_mode);
                 }
             }
@@ -244,7 +277,7 @@ void adcs_manager_update(uint64_t now_us) {
                 ++state.stable_cycles;
                 if (state.stable_cycles >= manager_config.detumble_settle_cycles) {
                     state.requested_mode = ADCS_MODE_SUN_ACQUISITION;
-                    if (transition_is_allowed_locked(ADCS_MODE_SUN_ACQUISITION)) {
+                    if (transition_is_allowed_locked(ADCS_MODE_SUN_ACQUISITION, now_us)) {
                         enter_mode_locked(ADCS_MODE_SUN_ACQUISITION);
                     }
                 }
