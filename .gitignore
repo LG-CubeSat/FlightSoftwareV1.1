@@ -16,11 +16,34 @@ build_hw/
 build-sim/
 
 # STM CubeIDE generate
+apps/adcs/Debug/
+apps/adcs/Release/
+apps/adcs/.settings/
+apps/adcs/.metadata/
 firmware/adcs_stm32/Debug
 firmware/adcs_stm32/Release
 firmware/adcs_stm32/.settings/
 firmware/adcs_stm32/.metadata/
 firmware/adcs_stm32/.osx.project
 firmware/adcs_stm32/.mxproject
+
 # Standalone STM32 CMake output
 build-stm32/
+
+# Debug and Release Builds
+Debug/
+**/Debug/
+Release/
+**/Release/
+
+# Object, binary, and compiler output files
+*.o
+*.obj
+*.su
+*.cyclo
+*.d
+*.elf
+*.bin
+*.map
+*.hex
+*.list
