@@ -1,7 +1,7 @@
 /*
 Required application-provided memory hooks for FreeRTOS's Idle and Timer
 tasks, needed because configSUPPORT_STATIC_ALLOCATION is enabled (every
-task in apps/adcs/src/tasks/ is created with xTaskCreateStatic).
+task in firmware/adcs_stm32/Application/src/tasks/ is created with xTaskCreateStatic).
 */
 #include "FreeRTOS.h"
 #include "task.h"

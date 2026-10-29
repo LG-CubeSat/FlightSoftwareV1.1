@@ -171,9 +171,13 @@ restart a perfectly healthy process. All 6 non-supervisor roles do this today.
 ## Repository layout
 
 ```
+firmware/adcs_stm32/
+├── Core/                  # STM32 HAL startup and I2C transport
+├── Drivers/               # STM32 HAL and CMSIS
+└── Application/           # ADCS tasks, control, estimation, telemetry, simulation
+    └── src/sim_main.c     # Desktop entry point; Core/Src/main.c starts MCU tasks
+
 apps/
-├── adcs/                  # FreeRTOS MCU app -- reference implementation, now with local fault handling
-│   └── src/manager/fault_manager.c   # Watchdog thread, bounds checking, reset/shutdown triggers
 └── obc/                   # 7 separate Linux processes, not one binary -- see apps/obc/roles.md
     ├── supervisor/         # Process lifecycle: spawns, reaps, restarts the other 6
     ├── fdir/               # Fault policy: health_monitor tracks board resets, fallback acts on them
@@ -340,7 +344,7 @@ run them at the same time as each other or as a manually-launched binary using t
   to shut a repeatedly-resetting board down, but nothing can un-shut-down it — that
   needs EPS to be able to power-cycle a board, which doesn't exist yet.
 - **ADCS's watchdog is POSIX-only.** The independent watchdog thread in
-  `apps/adcs/src/manager/fault_manager.c` uses `pthread`, which doesn't exist on bare-metal
+  `firmware/adcs_stm32/Application/src/manager/fault_manager.c` uses `pthread`, which doesn't exist on bare-metal
   hardware. Real hardware needs an actual watchdog peripheral (e.g. an IWDG-style timer) kicked
   directly — unlike `board_reset`/`board_shutdown`, this isn't abstracted yet, since the
   register layout is part-specific rather than ARM-architectural.

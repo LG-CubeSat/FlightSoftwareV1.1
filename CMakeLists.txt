@@ -40,7 +40,8 @@ add_subdirectory(apps/thermals)
 # link the Linux-only real I2C driver and the POSIX FreeRTOS port -- neither
 # of which is correct for real silicon -- so they're SIM-only until the ARM
 if (NOT HW_MODE)
-    add_subdirectory(apps/adcs)
+    # Keep the simulator executable path stable after relocating its sources.
+    add_subdirectory(apps/adcs/Application apps/adcs)
     add_subdirectory(apps/eps)
 endif()
 

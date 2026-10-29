@@ -203,7 +203,7 @@ lc_status_t lc_evaluate(const float vbatt, const float temperature);
 
 ## 6. MCU — IPC Router
 
-**Location:** `apps/adcs/src/ipc_router.c` (to be created)
+**Location:** `firmware/adcs_stm32/Application/src/ipc_router.c` (to be created)
 
 ### Public API
 
@@ -320,7 +320,7 @@ int comms_bus_receive(uint8_t *buffer, uint16_t max_length) {
 
 ## 7. MCU — ADCS Task
 
-**Location:** `apps/adcs/src/tasks/adcs_task.c` (to be created)
+**Location:** `firmware/adcs_stm32/Application/src/tasks/adcs_task.c` (to be created)
 
 ### Public API
 
@@ -401,7 +401,7 @@ void adcs_task_entry(void *pvParameters) {
 
 ## 8. MCU — EPS Task
 
-**Location:** `apps/adcs/src/tasks/eps_task.c` (to be created)
+**Location:** `firmware/adcs_stm32/Application/src/tasks/eps_task.c` (to be created)
 
 ### Public API
 
@@ -476,7 +476,7 @@ void eps_task_entry(void *pvParameters) {
 
 ## 9. MCU — Hardware Watchdog
 
-**Location:** `apps/adcs/src/tasks/watchdog.c` (to be created)
+**Location:** `firmware/adcs_stm32/Application/src/tasks/watchdog.c` (to be created)
 
 ### Public API
 
