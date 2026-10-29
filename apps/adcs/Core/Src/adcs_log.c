@@ -142,26 +142,62 @@ int _write(int file, char *data, int length)
     adcs_stdio_lock();
     while (transmitted < length)
     {
-        int remaining = length - transmitted;
-        uint16_t chunk_length =
-            (remaining > (int)ADCS_LOG_UART_CHUNK_SIZE)
-                ? (uint16_t)ADCS_LOG_UART_CHUNK_SIZE
-                : (uint16_t)remaining;
-
-        HAL_StatusTypeDef status = HAL_UART_Transmit(
-            s_log_uart,
-            (uint8_t *)&data[transmitted],
-            chunk_length,
-            ADCS_LOG_UART_TIMEOUT_MS
-        );
-
-        if (status != HAL_OK)
+        int next_nl = -1;
+        for (int i = transmitted; i < length; i++)
         {
-            adcs_stdio_unlock();
-            return (transmitted > 0) ? transmitted : -1;
+            if (data[i] == '\n')
+            {
+                next_nl = i;
+                break;
+            }
         }
 
-        transmitted += (int)chunk_length;
+        if (next_nl >= 0)
+        {
+            int prefix_len = next_nl - transmitted;
+            if (prefix_len > 0)
+            {
+                HAL_UART_Transmit(
+                    s_log_uart,
+                    (uint8_t *)&data[transmitted],
+                    (uint16_t)prefix_len,
+                    ADCS_LOG_UART_TIMEOUT_MS
+                );
+            }
+            static const uint8_t crlf[2] = {'\r', '\n'};
+            if (next_nl > 0 && data[next_nl - 1] == '\r')
+            {
+                HAL_UART_Transmit(s_log_uart, (uint8_t *)"\n", 1, ADCS_LOG_UART_TIMEOUT_MS);
+            }
+            else
+            {
+                HAL_UART_Transmit(s_log_uart, (uint8_t *)crlf, 2, ADCS_LOG_UART_TIMEOUT_MS);
+            }
+            transmitted = next_nl + 1;
+        }
+        else
+        {
+            int remaining = length - transmitted;
+            uint16_t chunk_length =
+                (remaining > (int)ADCS_LOG_UART_CHUNK_SIZE)
+                    ? (uint16_t)ADCS_LOG_UART_CHUNK_SIZE
+                    : (uint16_t)remaining;
+
+            HAL_StatusTypeDef status = HAL_UART_Transmit(
+                s_log_uart,
+                (uint8_t *)&data[transmitted],
+                chunk_length,
+                ADCS_LOG_UART_TIMEOUT_MS
+            );
+
+            if (status != HAL_OK)
+            {
+                adcs_stdio_unlock();
+                return (transmitted > 0) ? transmitted : -1;
+            }
+
+            transmitted += (int)chunk_length;
+        }
     }
 
     adcs_stdio_unlock();
