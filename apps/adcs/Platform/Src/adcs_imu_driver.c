@@ -5,16 +5,39 @@
 
 extern I2C_HandleTypeDef hi2c2;
 
-#define IMU_I2C_ADDR (0x68 << 1) /* Replace with the real IMU 7 bit address << 1 */
+#define MPU6050_I2C_ADDR (0x68 << 1) /* Replace with the real IMU 7 bit address << 1 */
+#define MPU6050_REG_PWR_MGMT_1 0x6B
+#define MPU6050_REG_GYRO_CFG 0x1B
+#define MPU6050_REG_ACCEL_CFG 0x1C
+#define MPU6050_REG_DATA_START 0x3B
+#define MPU6050_REG_WHO_AM_I 0x75
 
 imu_status_t imu_initialize(void) {
     // check device id and wake sensor from sleep
     uint8_t who_am_i = 0;
     if (HAL_I2C_Mem_Read(
-        &hi2c2, IMU_I2C_ADDR, 0x75, 1, &who_am_i, 1, 1000
+        &hi2c2, MPU6050_I2C_ADDR, MPU6050_REG_WHO_AM_I, 1, &who_am_i, 1, 100
     ) != HAL_OK) {
         return IMU_NOT_READY;
     }
+    if (who_am_i != 0x68) {
+        return IMU_NOT_READY;
+    }
+
+    // wake up MPU6050 by writing 0x00 to PWR_MGMT_1. This takes it out of sleep
+    uint8_t pwr = 0x00;
+    if (HAL_I2C_Mem_Write(&hi2c2, MPU6050_I2C_ADDR, MPU6050_REG_PWR_MGMT_1, 1, &pwr, 1, 100) != HAL_OK) {
+        return IMU_ERROR;
+    }
+
+    // configure gyro full scale: +/- 2000 deg/s (FS_SEL = 3 -> 0x18)
+    uint8_t gyro_cfg = 0x18;
+    HAL_I2C_Mem_Write(&hi2c2, MPU6050_I2C_ADDR, MPU6050_REG_GYRO_CFG, 1, &gyro_cfg, 1, 100);
+
+    // configure accell full scale: +/- 2g (AFS_SEL = 0 -> 0x00)
+    uint8_t accel_cfg = 0x00;
+    HAL_I2C_Mem_Write(&hi2c2, MPU6050_I2C_ADDR, MPU6050_REG_ACCEL_CFG, 1, &accel_cfg, 1, 100);
+
     // configure ODR and power registrations here
     return IMU_OK;
 }
