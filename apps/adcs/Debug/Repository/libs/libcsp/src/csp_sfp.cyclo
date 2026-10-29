@@ -1,4 +1,0 @@
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_sfp.c:53:10:csp_sfp_opts_max_mtu	3
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_sfp.c:77:10:csp_sfp_conn_max_mtu	2
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_sfp.c:87:5:csp_sfp_send	10
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/csp_sfp.c:148:5:csp_sfp_recv_fp	21

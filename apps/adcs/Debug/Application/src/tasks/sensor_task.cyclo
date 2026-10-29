@@ -1,3 +1,0 @@
-../Application/src/tasks/sensor_task.c:63:6:sensor_task	7
-../Application/src/tasks/sensor_task.c:31:5:sensor_task_receive	3
-../Application/src/tasks/sensor_task.c:38:6:sensor_task_init	3

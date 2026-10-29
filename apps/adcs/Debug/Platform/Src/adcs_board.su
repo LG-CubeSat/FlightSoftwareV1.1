@@ -1,8 +1,0 @@
-../Platform/Src/adcs_board.c:13:6:adcs_watchdog_start	0	static
-../Platform/Src/adcs_board.c:21:6:adcs_watchdog_pet	0	static
-../Platform/Src/adcs_board.c:22:6:board_reset	8	static,ignoring_inline_asm
-../Platform/Src/adcs_board.c:28:6:board_shutdown	8	static,ignoring_inline_asm
-../Platform/Src/adcs_board.c:35:6:adcs_assert_failed	0	static,ignoring_inline_asm
-../Platform/Src/adcs_board.c:42:6:vApplicationStackOverflowHook	0	static,ignoring_inline_asm
-../Platform/Src/adcs_board.c:48:6:__malloc_lock	8	static
-../Platform/Src/adcs_board.c:52:6:__malloc_unlock	8	static

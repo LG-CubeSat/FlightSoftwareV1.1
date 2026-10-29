@@ -1,5 +1,0 @@
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_eth.c:24:6:csp_eth_pack_header	0	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_eth.c:96:6:csp_eth_arp_set_addr	20	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_eth.c:124:6:csp_eth_arp_get_addr	0	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_eth.c:136:5:csp_eth_rx	64	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_eth.c:241:5:csp_eth_tx	48	static,ignoring_inline_asm

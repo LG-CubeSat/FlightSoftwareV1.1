@@ -1,3 +1,0 @@
-../Application/src/tasks/command_task.c:189:6:command_task	112	static
-../Application/src/tasks/command_task.c:32:5:command_task_send	8	static
-../Application/src/tasks/command_task.c:49:6:command_task_init	24	static

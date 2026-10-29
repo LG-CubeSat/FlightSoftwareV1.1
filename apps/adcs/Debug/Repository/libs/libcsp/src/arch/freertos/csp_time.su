@@ -1,4 +1,0 @@
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/arch/freertos/csp_time.c:8:10:csp_get_ms	0	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/arch/freertos/csp_time.c:12:10:csp_get_ms_isr	0	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/arch/freertos/csp_time.c:16:10:csp_get_s	8	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/arch/freertos/csp_time.c:20:10:csp_get_s_isr	8	static

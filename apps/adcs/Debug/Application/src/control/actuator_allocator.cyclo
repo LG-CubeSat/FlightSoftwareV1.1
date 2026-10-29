@@ -1,2 +1,0 @@
-../Application/src/control/actuator_allocator.c:66:6:adcs_actuator_disable	2
-../Application/src/control/actuator_allocator.c:8:15:adcs_actuator_allocate	20

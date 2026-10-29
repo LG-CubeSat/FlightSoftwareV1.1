@@ -1,7 +1,0 @@
-../Application/src/communication/telemetry.c:40:16:put_u32	2
-../Application/src/communication/telemetry.c:64:16:put_float_array	3
-../Application/src/communication/telemetry.c:76:6:adcs_telemetry_init	1
-../Application/src/communication/telemetry.c:80:6:adcs_telemetry_set_transport_enabled	1
-../Application/src/communication/telemetry.c:84:9:adcs_telemetry_transport_is_enabled	1
-../Application/src/communication/telemetry.c:88:25:adcs_telemetry_encode	46
-../Application/src/communication/telemetry.c:192:25:adcs_telemetry_send	7

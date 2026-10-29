@@ -1,4 +1,0 @@
-../Application/src/estimation/attitude_estimator.c:39:16:filter_state_is_corrupt	16	static
-../Application/src/estimation/attitude_estimator.c:105:6:adcs_attitude_estimator_init	24	static
-../Application/src/estimation/attitude_estimator.c:133:15:adcs_attitude_estimator_reset	24	static
-../Application/src/estimation/attitude_estimator.c:153:15:adcs_attitude_estimator_update	224	static

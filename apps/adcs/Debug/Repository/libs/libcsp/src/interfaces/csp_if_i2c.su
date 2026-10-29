@@ -1,3 +1,0 @@
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_i2c.c:7:5:csp_i2c_tx	16	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_i2c.c:35:6:csp_i2c_rx	16	static
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_i2c.c:57:5:csp_i2c_add_interface	8	static

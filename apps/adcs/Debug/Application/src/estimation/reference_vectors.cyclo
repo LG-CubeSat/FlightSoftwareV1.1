@@ -1,4 +1,0 @@
-../Application/src/estimation/reference_vectors.c:25:15:adcs_reference_sun_vector	3
-../Application/src/estimation/reference_vectors.c:61:15:adcs_reference_magnetic_field	12
-../Application/src/estimation/reference_vectors.c:116:15:adcs_reference_nadir_vector	3
-../Application/src/estimation/reference_vectors.c:130:15:adcs_reference_vectors_compute	10

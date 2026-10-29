@@ -1,3 +1,0 @@
-../Application/src/tasks/estimation_task.c:69:6:estimation_task	616	static
-../Application/src/tasks/estimation_task.c:47:6:estimation_task_request_reset	0	static,ignoring_inline_asm
-../Application/src/tasks/estimation_task.c:51:6:estimation_task_init	88	static,ignoring_inline_asm

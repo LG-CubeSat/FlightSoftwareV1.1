@@ -1,5 +1,0 @@
-../Application/src/estimation/kalman_filter.c:5:6:adcs_kalman_filter_init	2
-../Application/src/estimation/kalman_filter.c:18:15:adcs_kalman_filter_reset	1
-../Application/src/estimation/kalman_filter.c:32:15:adcs_kalman_filter_predict	1
-../Application/src/estimation/kalman_filter.c:46:15:adcs_kalman_filter_correct_vector	1
-../Application/src/estimation/kalman_filter.c:62:15:adcs_kalman_filter_get_state	2

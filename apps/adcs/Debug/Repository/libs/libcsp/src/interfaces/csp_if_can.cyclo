@@ -1,5 +1,0 @@
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_can.c:377:12:csp_can2_tx	9
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_can.c:167:12:csp_can1_tx	8
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_can.c:476:5:csp_can_add_interface	5
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_can.c:500:5:csp_can_remove_interface	2
-/Users/wesleywong/Documents/GitHub/FlightSoftwareV1.1/libs/libcsp/src/interfaces/csp_if_can.c:511:5:csp_can_rx	21

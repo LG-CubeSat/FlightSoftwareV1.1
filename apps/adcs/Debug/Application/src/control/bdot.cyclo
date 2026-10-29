@@ -1,3 +1,0 @@
-../Application/src/control/bdot.c:8:6:adcs_bdot_init	14
-../Application/src/control/bdot.c:30:6:adcs_bdot_reset	2
-../Application/src/control/bdot.c:40:15:adcs_bdot_update	14

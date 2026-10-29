@@ -1,3 +1,0 @@
-../Application/src/communication/command_handler.c:18:29:enqueue_command	8	static
-../Application/src/communication/command_handler.c:221:13:receiver_task	216	static
-../Application/src/communication/command_handler.c:226:6:command_handler_init	24	static
