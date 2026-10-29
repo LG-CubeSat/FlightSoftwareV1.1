@@ -257,22 +257,22 @@ static void MX_I2C2_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_I2C2_CLK_ENABLE();
 
-  GPIO_InitTypeDef GPIO_InitScrut = {0};
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   // PC4 -> I2C2_SCL
   GPIO_InitStruct.Pin = GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitScrut.Alternate = GPIO_AF4_I2C2;
+  GPIO_InitStruct.Alternate = GPIO_AF4_I2C2;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   // PA8 -> I2C_SDA
-  GPIO_InitScrut.Pin = GPIO_PIN_8;
-  GPIO_InitScrut.Mode = GPIO_MODE_AF_OD;
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternative = GPIO_AF4_I2C2;
+  GPIO_InitStruct.Alternate = GPIO_AF4_I2C2;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE END I2C2_Init 0 */

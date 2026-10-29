@@ -197,9 +197,14 @@ adcs_result_t adcs_attitude_estimator_update(
         dt_s = (float)(sensors->timestamp_us - estimator->previous_timestamp_us) /
                1000000.0F;
         if (dt_s > estimator->config.maximum_sample_gap_s) {
+#ifndef ADCS_STM32
             estimator->filter.seeded = 0U;
             estimator->last_absolute_fix_us = 0U;
-        } else if (estimator->filter.seeded != 0U) {
+#else
+            dt_s = estimator->config.maximum_sample_gap_s;
+#endif
+        }
+        if (estimator->filter.seeded != 0U) {
             result = adcs_kalman_filter_predict(
                 &estimator->filter,
                 sensors->angular_rate_rad_s,

@@ -53,6 +53,10 @@ void estimation_task_init(void) {
 
     atomic_store(&reset_requested, 0U);
     adcs_attitude_estimator_init(&estimator, &config);
+#ifdef ADCS_STM32
+    versor initial_seed = {0.0F, 0.0F, 0.0F, 1.0F};
+    (void)adcs_attitude_estimator_reset(&estimator, initial_seed);
+#endif
     xEstimationHandle = xTaskCreateStatic(
         estimation_task,
         "Estimation",
