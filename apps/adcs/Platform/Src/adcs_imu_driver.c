@@ -48,21 +48,32 @@ imu_status_t imu_read(imu_sample_t *sample) {
     uint8_t raw[14];
 
     /* Burst read accel (6b) + temp (2B) + gyro (6B) */
-    if (HAL_I2C_Mem_Read(&hi2c2, IMU_I2C_ADDR, 0x3B, 1, raw, 14, 50) != HAL_OK) {
+    if (HAL_I2C_Mem_Read(&hi2c2, MPU6050_I2C_ADDR, MPU6050_REG_DATA_START, 1, raw, 14, 50) != HAL_OK) {
         return IMU_ERROR;
     }
 
     sample->timestamp_us = adcs_monotonic_time_us();
 
     // convert raw 16 bit counts to rad/s
+    int16_t ax = (int16_t)((raw[0] << 8) | raw[1]);
+    int16_t ay = (int16_t)((raw[2] << 8) | raw[3]);
+    int16_t az = (int16_t)((raw[4] << 8) | raw[5]);
+
     int16_t gx = (int16_t)(raw[8] << 8 | raw[9]);
     int16_t gy = (int16_t)(raw[10] << 8 | raw[11]);
     int16_t gz = (int16_t)((raw[12] << 8) | raw[13]);
 
-    const float rad_per_lsb = (2000.0f / 32768.0f) * (3.14159265f / 180.0f);
-    sample->angular_rate_rad_s[0] = (float)gx * rad_per_lsb;
-    sample->angular_rate_rad_s[1] = (float)gy * rad_per_lsb;
-    sample->angular_rate_rad_s[2] = (float)gz * rad_per_lsb;
+    // convert accel count to m/s^2 (+/- 2g range: 16384 LSB/g)
+    const float accel_scale = 9.80665f / 16384.0f;
+    sample->acceleration_m_s2[0] = (float)ax * accel_scale;
+    sample->acceleration_m_s2[1] = (float)ay * accel_scale;
+    sample->acceleration_m_s2[2] = (float)az * accel_scale;
+
+    // convert Gyro counts to rad/s +/- 2000 dps range: 16.4 LSB/(deg/s)
+    const float gyro_scale = (2000.0f / 32768.0f) * (3.1415926535 / 180.0f);
+    sample->angular_rate_rad_s[0] = (float)gx * gyro_scale;
+    sample->angular_rate_rad_s[1] = (float)gy * gyro_scale;
+    sample->angular_rate_rad_s[2] = (float)gz * gyro_scale;
 
     return IMU_OK;
 }
