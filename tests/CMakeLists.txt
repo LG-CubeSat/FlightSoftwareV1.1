@@ -35,6 +35,18 @@ if (NOT HW_MODE)
         RESOURCE_LOCK comms_bus_socket
     )
 
+    add_executable(radio_sim_test test_radio_sim.c)
+    target_link_libraries(radio_sim_test PRIVATE platform)
+
+    add_test(NAME radio_sim_test COMMAND radio_sim_test)
+    set_tests_properties(radio_sim_test PROPERTIES TIMEOUT 10)
+
+    add_executable(radio_framing_test test_radio_framing.c)
+    target_link_libraries(radio_framing_test PRIVATE platform)
+
+    add_test(NAME radio_framing_test COMMAND radio_framing_test)
+    set_tests_properties(radio_framing_test PROPERTIES TIMEOUT 10)
+
     add_executable(comms_bus_addressing_test test_comms_bus_addressing.c)
     target_link_libraries(comms_bus_addressing_test PRIVATE platform)
 
