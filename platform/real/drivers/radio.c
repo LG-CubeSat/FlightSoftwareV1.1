@@ -41,7 +41,7 @@ radio_receive pulls whole ccsds packets out of the uart stream with radio_defram
 #define INIT_RETRY_MS 1000       // don't hammer a missing module with reinit attempts
 
 /* e22 registers written at every startup so the module always comes up the same */
-#define RADIO_CHANNEL 24         // e22-400t30d: 410.125 + channel mhz, 24 = 434.125 mhz
+#define RADIO_CHANNEL 23         // e22-400t30d: 410.125 + channel mhz, 23 = 433.125 mhz
 #define RADIO_REG0 0x62          // uart 9600 8n1, air rate 2.4k (factory default)
 #define RADIO_REG1 0x00          // 240 byte sub-packet, 30 dbm
 #define RADIO_REG3 0x03          // transparent mode, no rssi byte, lbt off
