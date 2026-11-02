@@ -1,0 +1,4 @@
+#ifndef SENSOR_STM32_C
+#define SENSOR_STM32_C
+
+#endif // SENSOR_STM32_C

@@ -17,8 +17,8 @@
 
 static thermal_sensor_t sensors[MAX_SENSORS];
 
-#define MIN_VALID_TEMPERATURE_C (-40.0f)
-#define MAX_VALID_TEMPERATURE_C (125.0f)
+#define MIN_VALID_TEMPERATURE_C (-100.0f)
+#define MAX_VALID_TEMPERATURE_C (300.0f)
 
 #define SENSOR_READ_TASK_PRIORITY (2)
 #define SENSOR_READ_TASK_STACK_SIZE (1024)

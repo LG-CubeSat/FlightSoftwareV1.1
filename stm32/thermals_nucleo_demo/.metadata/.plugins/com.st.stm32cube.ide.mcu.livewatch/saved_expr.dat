@@ -1,0 +1,6 @@
+sensor_48_status
+sensor_49_status
+heater_pwm_status
+sensor_48_temperature_c
+sensor_49_temperature_c
+battery_heater.power_percent
