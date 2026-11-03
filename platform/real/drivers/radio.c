@@ -2,6 +2,7 @@
 #include "radio_deframer.h"
 #include "radio_queue.h"
 
+#include <pigpiod_if2.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/gpio.h>
@@ -15,6 +16,7 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 /*
 real e22-400t30d (433 mhz) over uart in normal (transparent) mode.
@@ -62,6 +64,21 @@ static int init_attempted = 0;
 static long last_init_ms = 0;
 static radio_deframer_t rx_deframer; // holds a partial packet between radio_receive calls
 
+/* 
+so the UART on the first OBC is swapped where TX->TX and RX->RX. 
+Meaning pins 14/15 need to be switched in SW
+Below it makes it so if its zero, keep /dev/serial0 which is normal.
+When it is 1, treat them as reversed.
+One should note that GPIO14 is normally TX and GPIO15 is normally RX.
+*/
+#define RADIO_SOFT_RX 14 // Pi receives E22 TXD
+#define RADIO_SOFT_TX 15 // Pi sends to E22 RXD
+#define RADIO_BAUD_RATE 9600
+
+static int swapped_uart = 0;
+static int pigpio_pi = -1;
+static int soft_rx_open = 0;
+
 static long now_ms(void)
 {
     struct timespec ts;
@@ -77,6 +94,22 @@ static void sleep_ms(int ms)
 
 static int open_uart(void)
 {
+    if (swapped_uart) {
+        pigpio_pi = pigpio_start(NULL, NULL);
+        if (pigpio_pi < 0) return -1;
+
+        if (set_mode(pigpio_pi, RADIO_SOFT_RX, PI_INPUT) < 0 ||
+            set_pull_up_down(pigpio_pi, RADIO_SOFT_RX, PI_PUD_UP) < 0 ||
+            set_mode(pigpio_pi, RADIO_SOFT_TX, PI_OUTPUT) < 0 ||
+            gpio_write(pigpio_pi, RADIO_SOFT_TX, 1) < 0 ||
+            bb_serial_read_open(pigpio_pi, RADIO_SOFT_RX, RADIO_SOFT_BAUD, 8) < 0) {
+            return -1; // radio_init() already calls close all on failures.
+        }
+
+        soft_rx_open = 1;
+        return 0;
+    }
+
     uart_fd = open(RADIO_UART_DEVICE, O_RDWR | O_NOCTTY);
     if (uart_fd < 0) {
         perror("[RADIO] open uart");
@@ -160,7 +193,7 @@ static int open_gpio(void)
 }
 
 /* m0 = bit 0, m1 = bit 1, same order the lines were requested in */
-static int set_mode(int m0, int m1)
+static int set_radio_mode(int m0, int m1)
 {
     struct gpio_v2_line_values values = {
         .bits = (uint64_t)(m0 ? 1 : 0) | (uint64_t)(m1 ? 2 : 0),
@@ -175,34 +208,68 @@ static int set_mode(int m0, int m1)
     return 0;
 }
 
-static int read_exact(uint8_t *buf, size_t length, int timeout_ms)
+// returns 1 for a byte, 0 for a timeout, -1 for an error
+static int uart_read_byte(uint8_t *byte, int timeout_ms)
 {
     long deadline = now_ms() + timeout_ms;
-    size_t got = 0;
-    while (got < length) {
-        int left = (int)(deadline - now_ms());
-        if (left <= 0) return -1;
 
-        struct pollfd pfd = { .fd = uart_fd, .events = POLLIN };
-        int ready_fds = poll(&pfd, 1, left);
-        if (ready_fds < 0) {
+    for (;;) {
+        if (swapped_uart) {
+            int n = bb_serial_read(pigpio_pi, RADIO_SOFT_RX, byte, 1);
+            if (n < 0) return -1;
+            if (n == 0) return 1;
+            if (now_ms() >= deadline) return 0;
+            sleep_ms(1);
+            continue;
+        }
+
+        int remaining = (int)(deadline - now_ms());
+        if (remaining <= 0) return 0;
+
+        struct pollfd pfd = { .fd = uart_fd, .events = POLLIN};
+        int ready = poll(&pfd, 1, remaining);
+        if (ready < 0) {
             if (errno == EINTR) continue;
             return -1;
         }
-        if (ready_fds == 0 || (pfd.revents & (POLLERR | POLLHUP | POLLNVAL))) return -1;
 
-        ssize_t n = read(uart_fd, buf + got, length - got);
-        if (n < 0) {
-            if (errno == EINTR || errno == EAGAIN) continue;
-            return -1;
-        }
+        if (ready == 0) return 0;
+        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) return -1;
+
+        ssize_t n = read(uart_fd, byte, 1);
+        if (n == 1) return 1;
         if (n == 0) return -1;
-        got += (size_t)n;
+        if (errno !+ EINTR && errno != EAGAIN) return -1;
+    }
+}
+
+static int read_exact(uint8_t *buf, size_t length, int timeout_ms)
+{
+    long deadline = now_ms() + timeout_ms;
+
+    for (size_t got=0; got < length; ++got) {
+        int remaining = (int)(deadline - now_ms());
+        if (remaining <= 0) return -1;
+
+        if (uart_read_byte(&buf[got], remaining) != 1) return -1;
     }
     return 0;
 }
 
 static int write_all(const uint8_t *data, size_t length);
+
+static int uart_flush_input(void)
+{
+    if (!swapped_uart) return tcflush(uart_fd, TCIFLUSH);
+
+    uint8_t discard[256];
+    for (;;) {
+        int n == bb_serial_read(pigpio_pi, RADIO_SOFT_RX, discard, sizeof(discard));
+
+        if (n < 0) return -1;
+        if (n == 0) return 0;
+    }
+}
 
 /* config mode is m0 = 0, m1 = 1. the e22 echoes the registers back to confirm */
 static int configure_radio(void)
@@ -216,19 +283,20 @@ static int configure_radio(void)
     };
     uint8_t reply[sizeof(command)];
 
-    if (set_mode(0, 1) != 0) {
+    if (set_radio_mode(0, 1) != 0) {
         fprintf(stderr, "[RADIO] couldn't enter config mode\n");
         return -1;
     }
-    tcflush(uart_fd, TCIFLUSH);
 
-    int ok = write_all(command, sizeof(command)) == 0 &&
-             read_exact(reply, sizeof(reply), CONFIG_REPLY_TIMEOUT_MS) == 0 &&
-             reply[0] == CONFIG_REPLY &&
-             memcmp(reply + 1, command + 1, 9) == 0; // address, length, settings. key reads back as 0 anyway
+    int ok = uart_flush_input() == 0 &&
+            write_all(command, sizeof(command)) == 0 &&
+            read_exact(reply, sizeof(reply), CONFIG_REPLY_TIMEOUT_MS) == 0 &&
+            reply[0] == CONFIG_REPLY &&
+            memcmp(reply + 1, command + 1, 9) == 0; // address, length, settings. key reads back as 0 anyway
+            
     if (!ok) fprintf(stderr, "[RADIO] e22 didn't confirm config\n");
 
-    if (set_mode(0, 0) != 0) {
+    if (set_radio_mode(0, 0) != 0) {
         fprintf(stderr, "[RADIO] couldn't return to normal mode\n");
         return -1;
     }
@@ -241,10 +309,23 @@ static void close_all(void)
     if (mode_fd >= 0) close(mode_fd);
     if (aux_fd >= 0) close(aux_fd);
     uart_fd = mode_fd = aux_fd = -1;
+
+    if (soft_rx_open) {
+        bb_serial_read_close(pigpio_pi, RADIO_SOFT_RX);
+        soft_rx_open = 0;
+    }
+    if (pigpio_pi >= 0) {
+        pigpio_stop(pigpio_pi);
+        pigpio_pi = -1;
+    }
 }
 
 static int radio_init(void)
 {
+    // check if we need to swap the UART. OBC V1 needs this.
+    const char *value = getenv("E22_SWAPPED_UART");
+    swapped_uart = value && strcmp(value, "1") == 0;
+
     // configure_radio leaves the module in normal mode on success
     if (open_gpio() != 0 || open_uart() != 0 || configure_radio() != 0) {
         close_all(); // don't leak half-opened fds into the next attempt
@@ -280,6 +361,35 @@ static int ensure_ready(void)
 
 static int write_all(const uint8_t *data, size_t length)
 {
+    if (swapped_uart) {
+        if (length == 0) return 0;
+
+        if (wave_add_new(pigpio_pi) < 0 ||
+            wave_add_serial(pigpio_pi, RADIO_SOFT_TX, RADIO_SOFT_BAUD,
+                            8, 2, 0, (unsigned)length, (char *)data) < 0) {
+                return -1;
+            }
+
+        int wave = wave_create(pigpio_pi);
+        if (wave < 0) return -1;
+
+        int result = wave_send_once(pigpio_pi, wave);
+        long deadline = now_ms() + 5000;
+
+        int busy = 0;
+        while (result >= 0 && (busy = wave_tx_busy(pigpio_pi)) > 0) {
+            if (now_ms() >= deadline) {
+                wave_tx_stop(pigpio_pi);
+                result = -1;
+                break;
+            }
+            sleep_ms(1);
+        }
+
+        if (busy < 0) result = -1;
+        return result < 0 ? -1 : 0;
+    }
+
     size_t written = 0;
     while (written < length) {
         ssize_t n = write(uart_fd, data + written, length - written);
@@ -367,36 +477,18 @@ int radio_receive(uint8_t *buffer, uint16_t max_length)
             if (wait_ms <= 0) break; // timed out, nothing heard
         }
 
-        struct pollfd pfd = { .fd = uart_fd, .events = POLLIN };
-        int ready_fds = poll(&pfd, 1, wait_ms);
-        if (ready_fds < 0) {
-            if (errno == EINTR) continue;
+        uint8_t byte;
+        int n = uart_read_byte(&byte, wait_ms);
+        if (n < 0) {
             failed = 1;
             break;
         }
-        if (ready_fds == 0) {
-            // line went quiet in the middle of a packet, that packet is broken
+        if (n == 0) {
+            // line went quiet in the middle of a packet.
             radio_stats_rx_skipped(radio_deframer_buffered(&rx_deframer));
             radio_deframer_reset(&rx_deframer);
             continue;
         }
-        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) { // uart disconnected or broken
-            failed = 1;
-            break;
-        }
-
-        uint8_t byte;
-        ssize_t n = read(uart_fd, &byte, 1);
-        if (n < 0) {
-            if (errno == EINTR || errno == EAGAIN) continue;
-            failed = 1;
-            break;
-        }
-        if (n == 0) { // poll said readable but nothing came = hangup
-            failed = 1;
-            break;
-        }
-
         radio_deframer_push(&rx_deframer, byte);
         packet_length = radio_deframer_next(&rx_deframer, packet);
     }
