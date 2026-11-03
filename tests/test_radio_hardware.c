@@ -8,6 +8,7 @@
  */
 
 #include "radio.h"
+#include <pigpiod_if2.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,17 @@
 
 #define SEND_TIMEOUT_MS 12000
 #define ECHO_TIMEOUT_MS 15000
+
+/* pigpiod keeps the bit-banged RX open after a client exits. Release it so
+ * repeated runs (and a later flight-process start) can open GPIO14 again. */
+static void release_soft_uart(void)
+{
+    int pi = pigpio_start(NULL, NULL);
+    if (pi >= 0) {
+        bb_serial_read_close(pi, 14);
+        pigpio_stop(pi);
+    }
+}
 
 static long now_ms(void)
 {
@@ -39,6 +51,11 @@ int main(void)
     const char *mode = getenv("E22_SWAPPED_UART");
     if (mode == NULL || (strcmp(mode, "0") != 0 && strcmp(mode, "1") != 0)) {
         fprintf(stderr, "Set E22_SWAPPED_UART=1 for the swapped PCB, or 0 after repair.\n");
+        return 2;
+    }
+
+    if (strcmp(mode, "1") == 0 && atexit(release_soft_uart) != 0) {
+        fprintf(stderr, "Could not register swapped-UART cleanup.\n");
         return 2;
     }
 
