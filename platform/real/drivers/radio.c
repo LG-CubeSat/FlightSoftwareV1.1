@@ -365,7 +365,7 @@ static int write_all(const uint8_t *data, size_t length)
         if (length == 0) return 0;
 
         if (wave_add_new(pigpio_pi) < 0 ||
-            wave_add_serial(pigpio_pi, RADIO_SOFT_TX, RADIO_SOFT_BAUD,
+            wave_add_serial(pigpio_pi, RADIO_SOFT_TX, RADIO_BAUD_RATE,
                             8, 2, 0, (unsigned)length, (char *)data) < 0) {
                 return -1;
             }
@@ -386,7 +386,7 @@ static int write_all(const uint8_t *data, size_t length)
             sleep_ms(1);
         }
         if (busy < 0) result = -1;
-        if (wave_delete(pigpio_pi, wave) < 0) result = -1
+        if (wave_delete(pigpio_pi, wave) < 0) result = -1;
         return result < 0 ? -1 : 0;
     }
 
