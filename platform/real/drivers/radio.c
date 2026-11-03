@@ -102,7 +102,7 @@ static int open_uart(void)
             set_pull_up_down(pigpio_pi, RADIO_SOFT_RX, PI_PUD_UP) < 0 ||
             set_mode(pigpio_pi, RADIO_SOFT_TX, PI_OUTPUT) < 0 ||
             gpio_write(pigpio_pi, RADIO_SOFT_TX, 1) < 0 ||
-            bb_serial_read_open(pigpio_pi, RADIO_SOFT_RX, RADIO_SOFT_BAUD, 8) < 0) {
+            bb_serial_read_open(pigpio_pi, RADIO_SOFT_RX, RADIO_BAUD_RATE, 8) < 0) {
             return -1; // radio_init() already calls close all on failures.
         }
 
@@ -217,7 +217,7 @@ static int uart_read_byte(uint8_t *byte, int timeout_ms)
         if (swapped_uart) {
             int n = bb_serial_read(pigpio_pi, RADIO_SOFT_RX, byte, 1);
             if (n < 0) return -1;
-            if (n == 0) return 1;
+            if (n == 1) return 1;
             if (now_ms() >= deadline) return 0;
             sleep_ms(1);
             continue;
@@ -239,7 +239,7 @@ static int uart_read_byte(uint8_t *byte, int timeout_ms)
         ssize_t n = read(uart_fd, byte, 1);
         if (n == 1) return 1;
         if (n == 0) return -1;
-        if (errno !+ EINTR && errno != EAGAIN) return -1;
+        if (errno != EINTR && errno != EAGAIN) return -1;
     }
 }
 
@@ -264,7 +264,7 @@ static int uart_flush_input(void)
 
     uint8_t discard[256];
     for (;;) {
-        int n == bb_serial_read(pigpio_pi, RADIO_SOFT_RX, discard, sizeof(discard));
+        int n = bb_serial_read(pigpio_pi, RADIO_SOFT_RX, discard, sizeof(discard));
 
         if (n < 0) return -1;
         if (n == 0) return 0;
@@ -385,8 +385,8 @@ static int write_all(const uint8_t *data, size_t length)
             }
             sleep_ms(1);
         }
-
         if (busy < 0) result = -1;
+        if (wave_delete(pigpio_pi, wave) < 0) result = -1
         return result < 0 ? -1 : 0;
     }
 
