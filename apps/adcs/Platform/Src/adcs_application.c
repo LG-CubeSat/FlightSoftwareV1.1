@@ -26,7 +26,7 @@ void adcs_application_start(void) {
     int sun_ready = sun_sensor_initialize() == SUN_SENSOR_OK;
     int rods_ready = magnetorquer_initialize() == MAGNETORQUER_OK;
 
-    #if defined(ADCS_TEST_MAGNETORQUER_AT_BOOT) && (ADCS_TEST_MAGNETOQUER_AT_BOOT != 0)
+    #if defined(ADCS_TEST_MAGNETORQUER_AT_BOOT) && (ADCS_TEST_MAGNETORQUER_AT_BOOT != 0)
         if (rods_ready) {
             magnetorquer_test_sequence();
         }

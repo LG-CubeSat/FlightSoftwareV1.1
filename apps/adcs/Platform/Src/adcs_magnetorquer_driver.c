@@ -146,56 +146,49 @@ magnetorquer_status_t magnetorquer_get_last_command(magnetorquer_command_t *comm
 void magnetorquer_test_sequence(void) {
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "=== Embedded Z-magnetorquer Bench Test Starting ===");
     if (magnetorquer_is_fault_active()) {
-        adcs_log_write(ADCS_LOG_LEVEL_WARN, "MAGTORQ", "WARNING: DRV_nFAULT pin is LOW price to power enable!");
+        adcs_log_write(ADCS_LOG_LEVEL_WARN, "MAGTORQ", "WARNING: DRV_nFAULT pin is LOW prior to power enable!");
     }
 
-    // step 1: Energize 5V coil rail and wake DRV1
-    adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "Enabling 5V coil raili (COIL_PWR_EN=1, LED_COIL=1)...");
+    // Energize 5V coil rail and wake DRV1
+    adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "Enabling 5V coil rail (COIL_PWR_EN=1, LED_COIL=1)...");
     HAL_GPIO_WritePin(COIL_PWR_EN_PORT, COIL_PWR_EN_PIN, GPIO_PIN_SET);
     HAL_GPIO_WritePin(LED_COIL_PORT, LED_COIL_PIN, GPIO_PIN_SET);
-    
     magnetorquer_delay_ms(50);
 
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "Waking DRV8833 U2 (DRV1_nSLEEP=1)...");
     HAL_GPIO_WritePin(DRV1_nSLEEP_PORT, DRV1_nSLEEP_PIN, GPIO_PIN_SET);
-    
     magnetorquer_delay_ms(10);
 
-    // step 2: Pulse forward (+Z)
-    adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", ">> Step 1/3: Forward (+Z) ON for 2.0S (COILZ_1=1, COILZ_2=0)");
-    adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "  [Observe bench supply current draw and compass deflection]");
+    for (int cycle = 1; cycle <= 3; ++cycle) {
+        adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", ">> [Cycle %d/3] FORWARD (+Z) ON for 3.0s (COILZ_1=1, COILZ_2=0)", cycle);
+        HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_RESET);
+        magnetorquer_delay_ms(3000);
 
-    HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_RESET);
-    magnetorquer_delay_ms(2000);
+        if (magnetorquer_is_fault_active()) {
+            adcs_log_write(ADCS_LOG_LEVEL_ERROR, "MAGTORQ", "FAULT: DRV8833 tripped during forward pulse!");
+        }
 
-    if (magnetorquer_is_fault_active()) {
-        adcs_log_write(ADCS_LOG_LEVEL_ERROR, "MAGTORQ", "FAULT: DRV8833 tripped during forward pulse!");
+        adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", ">> [Cycle %d/3] COAST / OFF for 1.0s (COILZ_1=0, COILZ_2=0)", cycle);
+        HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_RESET);
+        magnetorquer_delay_ms(1000);
+
+        adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", ">> [Cycle %d/3] REVERSE (-Z) ON for 3.0s (COILZ_1=0, COILZ_2=1)", cycle);
+        HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_SET);
+        magnetorquer_delay_ms(3000);
+
+        if (magnetorquer_is_fault_active()) {
+            adcs_log_write(ADCS_LOG_LEVEL_ERROR, "MAGTORQ", "FAULT: DRV8833 tripped during reverse pulse!");
+        }
+
+        adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", ">> [Cycle %d/3] COAST / OFF for 1.0s", cycle);
+        HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_RESET);
+        magnetorquer_delay_ms(1000);
     }
 
-    // step 3: Coast/off
-    adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", ">> STEP 2/3: Coil OFF / COAST for 1.0s (COILZ_1=0, COILZ_2=0)");
-    adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "   [Current should drop to 0 mA; compass returns to normal]");
-    
-
-    HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_RESET);
-
-    magnetorquer_delay_ms(1000);
-
-    adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", ">> Step 3/3: Reverse (-Z) ON for 2.0s (COIL_1 = 0, COILZ_2=1)");
-    adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "   [Current draw should return; compass should move away.]");
-    
-    HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_SET);
-
-    magnetorquer_delay_ms(2000);
-
-    if (magnetorquer_is_fault_active()) {
-        adcs_log_write(ADCS_LOG_LEVEL_ERROR, "MAGTORQ", "FAULT: DRV8833 tripped during reverse pulse!");
-    }
-
-    // step 5 disable
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "Test completed. Putting bridges and rail back to safe/sleep");
     (void)magnetorquer_disable();
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "=== Embedded Z-Magnetorquer Bench Test Done ===");
