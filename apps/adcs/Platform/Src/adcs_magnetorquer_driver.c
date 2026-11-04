@@ -60,7 +60,7 @@ magnetorquer_status_t magnetorquer_initialize(void) {
 
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
 
     GPIO_InitStruct.Pin = COIL_PWR_EN_PIN | DRV1_nSLEEP_PIN;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);

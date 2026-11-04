@@ -25,10 +25,9 @@ magnetorquer_status_t magnetorquer_set(const magnetorquer_command_t *command) {
     (void)command;
     return MAGNETORQUER_NOT_READY;
 }
-#endif
-
 magnetorquer_status_t magnetorquer_disable(void) { return MAGNETORQUER_NOT_READY; }
 magnetorquer_status_t magnetorquer_get_last_command(magnetorquer_command_t *command) {
     if (command != NULL) memset(command, 0, sizeof(*command));
     return MAGNETORQUER_NOT_READY;
 }
+#endif
