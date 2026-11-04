@@ -10,7 +10,7 @@
 #define COIL_PWR_EN_PORT GPIOB
 #define COIL_PWR_EN_PIN GPIO_PIN_5
 
-#define DRV_nFAULT_PORT GPIO_B
+#define DRV_nFAULT_PORT GPIOB
 #define DRV_nFAULT_PIN GPIO_PIN_6
 
 #define LED_COIL_PORT GPIOC
@@ -19,6 +19,9 @@
 // drv8833 u2 (Z and X Coils)
 #define DRV1_nSLEEP_PORT GPIOB
 #define DRV1_nSLEEP_PIN GPIO_PIN_10
+
+#define DRV2_nSLEEP_PORT GPIOD
+#define DRV2_nSLEEP_PIN  GPIO_PIN_2
 
 // channel A: Z-axis embedded magnetorquer (J13)
 #define COILZ_1_PORT GPIOC
@@ -57,7 +60,7 @@ magnetorquer_status_t magnetorquer_initialize(void) {
 
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.SPeed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.speed = GPIO_SPEED_FREQ_LOW;
 
     GPIO_InitStruct.Pin = COIL_PWR_EN_PIN | DRV1_nSLEEP_PIN;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -69,7 +72,7 @@ magnetorquer_status_t magnetorquer_initialize(void) {
     GPIO_InitStruct.Pin = DRV_nFAULT_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_INIT(DRV_nFAULT_PORT, &GPIO_InitStruct);
+    HAL_GPIO_Init(DRV_nFAULT_PORT, &GPIO_InitStruct);
 
     memset(&s_last_command, 0, sizeof(s_last_command));
     s_initialized = 1;
@@ -90,7 +93,7 @@ magnetorquer_status_t magnetorquer_disable(void) {
     HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_RESET);
 
     HAL_GPIO_WritePin(DRV1_nSLEEP_PORT, DRV1_nSLEEP_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(DRV2_nSLEEP_PORT, DRV2_nSLEEP_PIN, GPIO_PIN_RESET);
+    // HAL_GPIO_WritePin(DRV2_nSLEEP_PORT, DRV2_nSLEEP_PIN, GPIO_PIN_RESET);
 
     // de energize coil power rail and turn off indication LED
     HAL_GPIO_WritePin(COIL_PWR_EN_PORT, COIL_PWR_EN_PIN, GPIO_PIN_RESET);
@@ -112,7 +115,7 @@ magnetorquer_status_t magnetorquer_set(const magnetorquer_command_t *command) {
         return magnetorquer_disable();
     }
 
-    HAL_GPIO_WritePin(COIL_PWR_EN_PIN, COIL_PWR_EN_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(COIL_PWR_EN_PORT, COIL_PWR_EN_PIN, GPIO_PIN_SET);
     HAL_GPIO_WritePin(LED_COIL_PORT, LED_COIL_PIN, GPIO_PIN_SET);
     HAL_GPIO_WritePin(DRV1_nSLEEP_PORT, DRV1_nSLEEP_PIN, GPIO_PIN_SET);
 
@@ -121,6 +124,9 @@ magnetorquer_status_t magnetorquer_set(const magnetorquer_command_t *command) {
         HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_SET);
         HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_RESET);
     } else if (mz < -0.0001f) {
+        HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_SET);
+    } else {
         HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_RESET);
         HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_RESET);
     }
@@ -180,7 +186,7 @@ void magnetorquer_test_sequence(void) {
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", ">> Step 3/3: Reverse (-Z) ON for 2.0s (COIL_1 = 0, COILZ_2=1)");
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "   [Current draw should return; compass should move away.]");
     
-    HAL_GPIO_WritePin(COILZ_1_PORT, GPIOZ_1_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(COILZ_1_PORT, COILZ_1_PIN, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(COILZ_2_PORT, COILZ_2_PIN, GPIO_PIN_SET);
 
     magnetorquer_delay_ms(2000);
@@ -191,6 +197,6 @@ void magnetorquer_test_sequence(void) {
 
     // step 5 disable
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "Test completed. Putting bridges and rail back to safe/sleep");
-    (void)magnetorquer_distable();
+    (void)magnetorquer_disable();
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "MAGTORQ", "=== Embedded Z-Magnetorquer Bench Test Done ===");
 }
