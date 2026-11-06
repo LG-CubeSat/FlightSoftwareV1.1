@@ -43,7 +43,7 @@ typedef enum {
     CMD_SHUTDOWN = 3,
     CMD_TIME_SYNC = 4,
     // ADCS COMMANDS
-    CMD_POINT_TO_SUN = 5
+    CMD_POINT_TO_SUN = 5,
 } command_id_t;
 
 typedef enum {

@@ -63,6 +63,8 @@ add_executable(adcs_stm32
     Platform/Src/adcs_newlib_locks.c
     Platform/Src/adcs_csp_stm32.c Platform/Src/adcs_environment_stm32.c
     Platform/Src/adcs_sensors_unavailable.c
+    Platform/Src/adcs_imu_driver.c Platform/Src/bmi270_config.c
+    Platform/Src/adcs_magnetorquer_driver.c
     ${REPO_ROOT}/shared/interfaces/frame.c
     Application/src/freertos_hooks.c
     Application/src/manager/adcs_manager.c Application/src/manager/fault_manager.c

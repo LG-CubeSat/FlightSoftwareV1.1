@@ -17,6 +17,7 @@ target_link_libraries(
         obc_ipc 
         csp_interface 
         pthread 
+        platform
         obc_progress
         obc_telemetry
         obc_logging

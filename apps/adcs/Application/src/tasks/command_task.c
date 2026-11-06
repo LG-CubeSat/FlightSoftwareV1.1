@@ -179,6 +179,16 @@ static void execute_command(const adcs_command_t *command) {
         case ADCS_COMMAND_LEGACY_POSITION:
             dispatch_legacy_position(command);
             break;
+        case ADCS_COMMAND_SET_MAGNETORQUER:
+            printf("[COMMAND] Magnetorquer manual override: axis=%u dir=%d\n",
+                (unsigned int)command->parameter.magnetorquer.axis,
+                (int)command->parameter.magnetorquer.direction);
+            fflush(stdout);
+            control_task_set_manual_magnetorquer(
+                command->parameter.magnetorquer.axis,
+                command->parameter.magnetorquer.direction
+            );
+            break;
         case ADCS_COMMAND_NONE:
         default:
             adcs_manager_note_rejected_command();

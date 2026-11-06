@@ -74,7 +74,8 @@ typedef enum {
     ADCS_COMMAND_DISABLE_ACTUATORS,
     ADCS_COMMAND_SET_UNIX_TIME,
     ADCS_COMMAND_SIMULATOR_FAULT,
-    ADCS_COMMAND_LEGACY_POSITION
+    ADCS_COMMAND_LEGACY_POSITION,
+    ADCS_COMMAND_SET_MAGNETORQUER
 } adcs_command_type_t;
 
 typedef struct {
@@ -168,6 +169,10 @@ typedef struct {
         uint8_t actuators_inhibited;
         uint32_t simulator_fault_mask;
         int32_t legacy_position;
+        struct {
+            uint8_t axis; // 0 = X, 1 = Y, 2 = Z
+            int8_t direction; // 1 = Forward, -1 = Reverse, 0 = Off
+        } magnetorquer;
     } parameter;
 } adcs_command_t;
 

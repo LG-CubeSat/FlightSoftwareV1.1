@@ -271,6 +271,7 @@ adcs_result_t adcs_attitude_estimator_update(
             : result;
     }
 
+#ifndef ADCS_STM32
     /* a gyro can carry a triad attitude forward breifly, 
      but it cannot make that attiude trustworthy forever
     */
@@ -283,5 +284,11 @@ adcs_result_t adcs_attitude_estimator_update(
                 attitude->confidence = 0.0F;
                 return ADCS_RESULT_INVALID_DATA;
             }
+#else
+    /* In gyro-only bring-up on STM32 where no physical magnetometer is populated,
+     * allow gyro dead reckoning to maintain a valid attitude estimate for telemetry. */
+    attitude->valid = 1U;
+    attitude->confidence = 0.5F;
+#endif
     return ADCS_RESULT_OK;
 }

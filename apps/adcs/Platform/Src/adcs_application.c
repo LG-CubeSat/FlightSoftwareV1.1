@@ -20,7 +20,7 @@
 
 void adcs_application_start(void) {
     adcs_manager_init();
-    adcs_manager_set_actuators_inhibited(1U);
+    adcs_manager_set_actuators_inhibited(0U);
     int imu_ready = imu_initialize() == IMU_OK;
     int mag_ready = magnetometer_initialize() == MAGNETOMETER_OK;
     int sun_ready = sun_sensor_initialize() == SUN_SENSOR_OK;

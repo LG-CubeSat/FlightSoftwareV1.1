@@ -40,6 +40,13 @@ static uint8_t quaternion_is_valid(const versor quaternion) {
 
 static uint8_t sensors_ready_locked(void) {
     const adcs_sensor_packet_t *sensor = &state.latest_sensors;
+#ifdef ADCS_STM32
+    uint32_t required = ADCS_SENSOR_VALID_GYROSCOPE;
+    return state.latest_sensors.timestamp_us != 0U &&
+           (state.latest_sensors.valid_mask & required) == required &&
+           adcs_values_are_finite(
+            sensor->angular_rate_rad_s, ADCS_VECTOR_LENGTH);
+#else
     uint32_t required = ADCS_SENSOR_VALID_GYROSCOPE |
                         ADCS_SENSOR_VALID_MAGNETOMETER;
     return state.latest_sensors.timestamp_us != 0U &&
@@ -47,6 +54,7 @@ static uint8_t sensors_ready_locked(void) {
            adcs_values_are_finite(
             sensor->angular_rate_rad_s, ADCS_VECTOR_LENGTH) &&
             adcs_values_are_finite(sensor->magnetic_field_t, ADCS_VECTOR_LENGTH);
+#endif
 }
 
 static uint8_t attitude_ready_locked(void) {
@@ -369,10 +377,15 @@ void adcs_manager_set_sensors(const adcs_sensor_packet_t *sensors) {
     adcs_mutex_lock(&manager_lock);
     if (sensors->timestamp_us >= state.latest_sensors.timestamp_us) {
         state.latest_sensors = *sensors;
+#ifdef ADCS_STM32
+        state.health.sensors_healthy =
+            (sensors->valid_mask & ADCS_SENSOR_VALID_GYROSCOPE) != 0U;
+#else
         state.health.sensors_healthy =
             (sensors->valid_mask &
              (ADCS_SENSOR_VALID_GYROSCOPE | ADCS_SENSOR_VALID_MAGNETOMETER)) ==
             (ADCS_SENSOR_VALID_GYROSCOPE | ADCS_SENSOR_VALID_MAGNETOMETER);
+#endif
     }
     adcs_mutex_unlock(&manager_lock);
 }

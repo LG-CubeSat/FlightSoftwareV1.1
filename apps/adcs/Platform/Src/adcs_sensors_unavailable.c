@@ -2,6 +2,7 @@
  * Explicit unavailable responses keep validity bits clear and actuators inhibited.
  * Replace this file with measured/calibrated board drivers when hardware is known.
  */
+#include "imu.h"
 #include "magnetometer.h"
 #include "sun_sensor.h"
 #include "magnetorquer.h"
@@ -20,6 +21,11 @@ sun_sensor_status_t sun_sensor_read(sun_sensor_sample_t *sample) {
 
 // avoid duplicate conflicts with real driver
 #if !defined(STM32G431xx) && !defined(USE_HAL_DRIVER)
+imu_status_t imu_initialize(void) { return IMU_NOT_READY; }
+imu_status_t imu_read(imu_sample_t *sample) {
+    if (sample != NULL) memset(sample, 0, sizeof(*sample));
+    return IMU_NOT_READY;
+}
 magnetorquer_status_t magnetorquer_initialize(void) { return MAGNETORQUER_NOT_READY; }
 magnetorquer_status_t magnetorquer_set(const magnetorquer_command_t *command) {
     (void)command;

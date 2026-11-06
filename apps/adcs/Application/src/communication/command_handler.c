@@ -117,6 +117,21 @@ static command_ack_status_t decode_command(
                 return enqueue_command(&command);
             }
             return NACK;
+        
+        case ADCS_WIRE_COMMAND_SET_MAGNETORQUER:
+            if (packet->length >= sizeof(adcs_magnetorquer_command_payload_t)) {
+                adcs_magnetorquer_command_payload_t payload;
+                memcpy(&payload, packet->data, sizeof(payload));
+                if (payload.axis > 2 || payload.direction < -1 || payload.direction > 1) {
+                    return NACK;
+                }
+                command.type = ADCS_COMMAND_SET_MAGNETORQUER;
+                command.parameter.magnetorquer.axis = payload.axis;
+                command.parameter.magnetorquer.direction = payload.direction;
+                return enqueue_command(&command);
+            }
+            return NACK;
+
         case ADCS_WIRE_COMMAND_SIMULATOR_FAULT:
 #ifdef ADCS_STM32
             return NACK;
