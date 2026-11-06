@@ -364,3 +364,9 @@ if(NOT HW_MODE)
     add_test(NAME stm32_platform_test COMMAND stm32_platform_test)
     set_tests_properties(stm32_platform_test PROPERTIES TIMEOUT 5)
 endif()
+
+# Manual E22 link test. Keep it out of ctest: it needs the Mac USB peer.
+if (HW_MODE)
+    add_executable(radio_hardware_test test_radio_hardware.c)
+    target_link_libraries(radio_hardware_test PRIVATE platform)
+endif()

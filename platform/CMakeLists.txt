@@ -10,6 +10,7 @@ if (HW_MODE)
         common/radio_deframer.c
     )
     target_compile_definitions(platform PRIVATE HW_MODE)
+    target_link_libraries(platform PUBLIC pigpiod_if2)
 else()
     add_library(platform STATIC
         sim/drivers/comms_i2c.c

@@ -16,6 +16,7 @@
 #include "magnetometer.h"
 #include "sun_sensor.h"
 #include "magnetorquer.h"
+#include "adcs_magnetorquer_driver.h"
 
 void adcs_application_start(void) {
     adcs_manager_init();
@@ -24,6 +25,13 @@ void adcs_application_start(void) {
     int mag_ready = magnetometer_initialize() == MAGNETOMETER_OK;
     int sun_ready = sun_sensor_initialize() == SUN_SENSOR_OK;
     int rods_ready = magnetorquer_initialize() == MAGNETORQUER_OK;
+
+    #if defined(ADCS_TEST_MAGNETORQUER_AT_BOOT) && (ADCS_TEST_MAGNETORQUER_AT_BOOT != 0)
+        if (rods_ready) {
+            magnetorquer_test_sequence();
+        }
+    #endif
+
     adcs_log_write(ADCS_LOG_LEVEL_INFO, "ADCS", "Drivers ready: imu=%d mag=%d sun=%d rods=%d",
                    imu_ready, mag_ready, sun_ready, rods_ready);
     fault_management_init();

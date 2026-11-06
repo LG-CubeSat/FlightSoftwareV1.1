@@ -17,6 +17,9 @@ sun_sensor_status_t sun_sensor_read(sun_sensor_sample_t *sample) {
     if (sample != NULL) memset(sample, 0, sizeof(*sample));
     return SUN_SENSOR_NOT_READY;
 }
+
+// avoid duplicate conflicts with real driver
+#if !defined(STM32G431xx) && !defined(USE_HAL_DRIVER)
 magnetorquer_status_t magnetorquer_initialize(void) { return MAGNETORQUER_NOT_READY; }
 magnetorquer_status_t magnetorquer_set(const magnetorquer_command_t *command) {
     (void)command;
@@ -27,3 +30,4 @@ magnetorquer_status_t magnetorquer_get_last_command(magnetorquer_command_t *comm
     if (command != NULL) memset(command, 0, sizeof(*command));
     return MAGNETORQUER_NOT_READY;
 }
+#endif
