@@ -74,13 +74,17 @@ static void *radio_rx_thread(void *arg) {
     return NULL;
 }
 
+static int start_radio_rx_thread(void) {
+    pthread_t thread;
+    return pthread_create(&thread, NULL, radio_rx_thread, NULL);
+}
+
 int main(void) {
     if (obc_log_init("command") != 0) {
         fprintf(stderr, "[OBC COMMAND] Failed to initialize logging.\n");
     }
 
     LOG_INFO("Initializing");
-
     printf("[OBC COMMAND] Program started.\n");
 
     /*
@@ -99,6 +103,11 @@ int main(void) {
 
     if (ingest_thread_init() != 0 || relay_thread_init() != 0) {
         fprintf(stderr, "[OBC COMMANDS] Failed to start a worker thread.\n");
+        return 1;
+    }
+
+    if (start_radio_rx_thread() != 0) {
+        fprintf(stderr, "[OBC COMMANDS] Failed to start radio received thread.\n");
         return 1;
     }
 
