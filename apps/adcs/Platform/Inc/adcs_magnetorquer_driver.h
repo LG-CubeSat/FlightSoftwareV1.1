@@ -14,9 +14,9 @@ extern "C" {
 #endif
 
 typedef enum {
-    MAGNATORQUER_AXIS_X = 0,
-    MAGNATORQUER_AXIS_Y = 1,
-    MAGNATORQUER_AXIS_Z = 2
+    MAGNETORQUER_AXIS_X = 0,
+    MAGNETORQUER_AXIS_Y = 1,
+    MAGNETORQUER_AXIS_Z = 2
 } magnetorquer_axis_t;
 
 typedef enum {

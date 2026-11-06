@@ -22,7 +22,7 @@
 
 // drv8833 u3 (Y and aux coils)
 #define DRV2_nSLEEP_PORT GPIOD
-#define DRV2_nSLEEP_PIN GPIO_PIN2
+#define DRV2_nSLEEP_PIN GPIO_PIN_2
 
 // channel A: Z-axis embedded magnetorquer (J13)
 #define COILZ_1_PORT GPIOC
@@ -126,7 +126,7 @@ magnetorquer_status_t magnetorquer_disable(void) {
     HAL_GPIO_WritePin(COILY_2_PORT, COILY_2_PIN, GPIO_PIN_RESET);
     
     // put both driver ICs to sleep
-    HAL_GPIO_WritePin(DRV1_nSLEEP_PIN, DRV1_nSLEEP_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(DRV1_nSLEEP_PORT, DRV1_nSLEEP_PIN, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(DRV2_nSLEEP_PORT, DRV2_nSLEEP_PIN, GPIO_PIN_RESET);
 
     // de-energize 5V rail and indicator LED
