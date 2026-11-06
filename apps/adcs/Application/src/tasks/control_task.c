@@ -23,6 +23,20 @@ static adcs_controller_t controller;
 
 TaskHandle_t xControlHandle;
 
+static uint8_t s_manual_override = 0;
+static magnetorquer_command_t s_manual_command = {0};
+
+void control_task_set_manual_magnetorquer(uint8_t axis, int8_t direction) {
+    if (axis > 2) return;
+    float val = (direction > 0) ? 0.20f : ((direction < 0) ? -0.20f : 0.0f);
+    s_manual_command.dipole_a_m2[axis] = val;
+    s_manual_command.enabled = (s_manual_command.dipole_a_m2[0] != 0.0f ||
+                                s_manual_command.dipole_a_m2[1] != 0.0f ||
+                                s_manual_command.dipole_a_m2[2] != 0.0f) ? 1U: 0U;                            
+    
+    s_manual_override = s_manual_command.enabled;
+}
+
 static adcs_controller_config_t controller_config(void) {
     return (adcs_controller_config_t) {
         .bdot = {
@@ -123,6 +137,12 @@ void control_task(void *parameters) {
                 snapshot.mode != ADCS_MODE_BOOT && snapshot.mode != ADCS_MODE_SAFE) {
                 adcs_manager_note_controller_error();
             }
+        }
+
+        if (s_manual_override) {
+            command = s_manual_command;
+            output.actuators_enabled = command.enabled;
+            memcpy(output.requested_dipole_a_m2, command.dipole_a_m2, sizeof(output.requested_dipole_a_m2));
         }
 
         if (magnetorquer_set(&command) != MAGNETORQUER_OK) {

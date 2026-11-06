@@ -13,4 +13,7 @@ void control_task_init(void);
 /* Consumes the manager snapshot, selects a controller, and commands SIM actuators. */
 void control_task(void *pvParameters);
 
+/* Manual override for telecommands to toggle magnetorquer channels directly. */
+void control_task_set_manual_magnetorquer(uint8_t axis, int8_t direction);
+
 #endif
