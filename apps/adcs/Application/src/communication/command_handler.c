@@ -126,7 +126,7 @@ static command_ack_status_t decode_command(
                     return NACK;
                 }
                 command.type = ADCS_COMMAND_SET_MAGNETORQUER;
-                command.parameter.magnetorquer.direction = payload.direction;
+                command.parameter.magnetorquer.axis = payload.axis;
                 command.parameter.magnetorquer.direction = payload.direction;
                 return enqueue_command(&command);
             }

@@ -50,7 +50,7 @@ static void *radio_rx_thread(void *arg) {
         fflush(stdout);
 
         // forward over CSP bus (I2C to ADCS)
-        csp_conn_t *conn = csp_connector(CSP_PRIO_NORM, dest_addr, dest_port, 100, CSP_O_NONE);
+        csp_conn_t *conn = csp_connect(CSP_PRIO_NORM, dest_addr, dest_port, 1000, CSP_O_NONE);
         if (conn == NULL) {
             fprintf(stderr, "[OBC RADIO RX] Failed to connect to CSP node %u port %u\n", dest_addr, dest_port);
             continue;
