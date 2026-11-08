@@ -5,12 +5,9 @@ if (HW_MODE)
     add_library(platform STATIC
         real/drivers/comms_i2c.c
         real/drivers/camera.c
-        ${CMAKE_SOURCE_DIR}/libs/RadioHandler/src/radio.c
-        common/radio_queue.c
-        common/radio_deframer.c
     )
     target_compile_definitions(platform PRIVATE HW_MODE)
-    target_link_libraries(platform PUBLIC pigpiod_if2)
+    target_link_libraries(platform PUBLIC RadioHandler)
 else()
     add_library(platform STATIC
         sim/drivers/comms_i2c.c
@@ -18,30 +15,25 @@ else()
         sim/drivers/board_shutdown.c
         sim/drivers/camera.c
         sim/drivers/radio.c
-        common/radio_queue.c
-        common/radio_deframer.c
     )
     target_compile_definitions(platform PRIVATE SIM_MODE)
+    target_link_libraries(platform PUBLIC RadioHandler_common)
 endif()
 
 if (HW_MODE)
     target_include_directories(platform PUBLIC
-        ${CMAKE_SOURCE_DIR}/libs/RadioHandler/include
         ${CMAKE_SOURCE_DIR}/shared/interfaces
         ${CMAKE_SOURCE_DIR}/shared/csp
         ${CMAKE_CURRENT_SOURCE_DIR}/real/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/common
     )
 else()
     target_include_directories(platform PUBLIC
-        ${CMAKE_SOURCE_DIR}/libs/RadioHandler/include
         ${CMAKE_SOURCE_DIR}/shared/interfaces
         ${CMAKE_CURRENT_SOURCE_DIR}/sim/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/common
     )
 endif()
 
 # frame_serialize/frame_deserialize are medium-agnostic (shared/interfaces/frame.c)
 # -- both the sim and real backends encode/decode the same wire format.
-# radio_queue.c runs the radio tx thread (pthread) and frames packets with ccsds
+# radio_queue runs the radio tx thread (pthread) and frames packets with ccsds
 target_link_libraries(platform PUBLIC frame_codec i2c_protocol pthread ccsds)
