@@ -17,10 +17,39 @@ echo " Repo: ${REPO_ROOT}"
 echo " Date: $(date)"
 echo "=========================================="
 
-# Check and update git submodules if needed
-if [ -f ".gitmodules" ]; then
-    echo "[BUILD] Syncing and updating git submodules..."
-    git submodule update --init --recursive
+# Check and update git submodules only if files are missing or requested
+SKIP_SUBMODULES=0
+for arg in "$@"; do
+    if [ "$arg" = "--skip-submodules" ]; then
+        SKIP_SUBMODULES=1
+    fi
+done
+
+if [ "${SKIP_SUBMODULES}" -eq 0 ] && [ -f ".gitmodules" ]; then
+    # Check if submodule directories are already populated
+    if [ ! -f "libs/RadioHandler/CMakeLists.txt" ] || [ ! -f "libs/ssdv/ssdv.c" ]; then
+        echo "[BUILD] Initializing missing git submodules..."
+        if ! git submodule update --init --recursive; then
+            echo ""
+            echo "=================================================================="
+            echo "[SUBMODULE ERROR] Failed to clone private submodule over HTTPS."
+            echo "GitHub does not accept account passwords for git clone."
+            echo "Options to fix:"
+            echo " 1) Use a GitHub Personal Access Token (classic) with 'repo' scope"
+            echo "    as your password."
+            echo " 2) Or configure SSH keys on this machine and run:"
+            echo "    git config --global url.\"git@github.com:\".insteadOf \"https://github.com/\""
+            echo " 3) Or pass --skip-submodules if you already copied files manually."
+            echo "=================================================================="
+            echo ""
+            # If the files still aren't there, we cannot continue
+            if [ ! -f "libs/RadioHandler/CMakeLists.txt" ]; then
+                exit 1
+            fi
+        fi
+    else
+        echo "[BUILD] Submodules already present on disk. Skipping remote fetch."
+    fi
 fi
 
 # Detect build mode (default HW_MODE=ON, pass --sim for SIM_MODE)
