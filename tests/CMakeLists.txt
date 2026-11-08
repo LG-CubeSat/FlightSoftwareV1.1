@@ -128,6 +128,7 @@ if (HW_MODE)
     target_include_directories(camera_hardware_test PRIVATE
         ${CMAKE_SOURCE_DIR}/apps/obc/mission/include
         ${CMAKE_SOURCE_DIR}/apps/obc/include
+        ${CMAKE_SOURCE_DIR}/libs/RadioHandler/include
         ${CMAKE_SOURCE_DIR}/shared/interfaces
         ${CMAKE_SOURCE_DIR}/shared/csp
     )
@@ -305,6 +306,7 @@ add_executable(
 target_include_directories(mission_telemetry_test PRIVATE
     ${CMAKE_SOURCE_DIR}/apps/obc/mission/include
     ${CMAKE_SOURCE_DIR}/apps/obc/include
+    ${CMAKE_SOURCE_DIR}/libs/RadioHandler/include
     ${CMAKE_SOURCE_DIR}/shared/interfaces
     ${CMAKE_SOURCE_DIR}/shared/csp
 )

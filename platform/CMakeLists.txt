@@ -5,7 +5,7 @@ if (HW_MODE)
     add_library(platform STATIC
         real/drivers/comms_i2c.c
         real/drivers/camera.c
-        real/drivers/radio.c
+        ${CMAKE_SOURCE_DIR}/libs/RadioHandler/src/radio.c
         common/radio_queue.c
         common/radio_deframer.c
     )
@@ -26,6 +26,7 @@ endif()
 
 if (HW_MODE)
     target_include_directories(platform PUBLIC
+        ${CMAKE_SOURCE_DIR}/libs/RadioHandler/include
         ${CMAKE_SOURCE_DIR}/shared/interfaces
         ${CMAKE_SOURCE_DIR}/shared/csp
         ${CMAKE_CURRENT_SOURCE_DIR}/real/include
@@ -33,6 +34,7 @@ if (HW_MODE)
     )
 else()
     target_include_directories(platform PUBLIC
+        ${CMAKE_SOURCE_DIR}/libs/RadioHandler/include
         ${CMAKE_SOURCE_DIR}/shared/interfaces
         ${CMAKE_CURRENT_SOURCE_DIR}/sim/include
         ${CMAKE_CURRENT_SOURCE_DIR}/common

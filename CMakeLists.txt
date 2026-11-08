@@ -21,6 +21,7 @@ add_subdirectory(rtos)
 set(CSP_PORT_MAX_BIND 31 CACHE STRING "Maximum number of bindable ports")
 
 add_subdirectory(libs/libcsp)
+add_subdirectory(libs/RadioHandler)
 
 # ssdv doesn't ship its own CMake project (just a plain Makefile), so it
 # isn't an add_subdirectory candidate the way libcsp is -- it's declared
