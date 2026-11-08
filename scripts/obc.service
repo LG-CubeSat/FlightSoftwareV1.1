@@ -5,9 +5,9 @@ Wants=pigpiod.service
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/FlightSoftwareV1.1
-ExecStart=/home/pi/FlightSoftwareV1.1/scripts/run_obc.sh
+User=wesley
+WorkingDirectory=/home/wesley/FlightSoftwareV1.1
+ExecStart=/home/wesley/FlightSoftwareV1.1/scripts/run_obc.sh
 Restart=always
 RestartSec=3
 KillMode=mixed
