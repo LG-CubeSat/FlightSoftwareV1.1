@@ -1,0 +1,21 @@
+[Unit]
+Description=Flight Software OBC Supervisor Service
+After=network.target local-fs.target pigpiod.service
+Wants=pigpiod.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/FlightSoftwareV1.1
+ExecStart=/home/pi/FlightSoftwareV1.1/scripts/run_obc.sh
+Restart=always
+RestartSec=3
+KillMode=mixed
+TimeoutStopSec=10
+
+# Standard logging to systemd journal
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
