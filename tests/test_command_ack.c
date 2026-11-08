@@ -207,6 +207,27 @@ int main(void) {
     check_true("Valid command after bad ones gets a reply", got_reply);
     check_true("Valid command after bad ones is ACKed", got_reply && status == ACK);
 
+    /* 4. CMD_RESET_IMU -> ACKed and dispatched to command_task */
+    command_envelope_t reset_imu_cmd = {
+        .command_id = CMD_RESET_IMU,
+        .seq = 4
+    };
+    status = NACK;
+    got_reply = send_raw_and_get_ack(&reset_imu_cmd, sizeof(reset_imu_cmd), 4, &status);
+    check_true("CMD_RESET_IMU gets a reply", got_reply);
+    check_true("CMD_RESET_IMU is ACKed", got_reply && status == ACK);
+
+    /* 5. ADCS_WIRE_COMMAND_RESET_IMU (71) -> also ACKed and dispatched */
+    command_envelope_t wire_reset_imu_cmd = {
+        .command_id = 71, // ADCS_WIRE_COMMAND_RESET_IMU
+        .seq = 5
+    };
+    status = NACK;
+    got_reply = send_raw_and_get_ack(&wire_reset_imu_cmd, sizeof(wire_reset_imu_cmd), 5, &status);
+    check_true("ADCS_WIRE_COMMAND_RESET_IMU gets a reply", got_reply);
+    check_true("ADCS_WIRE_COMMAND_RESET_IMU is ACKed", got_reply && status == ACK);
+    usleep(100000); /* give command_task a moment to execute */
+
     kill(adcs_pid, SIGTERM);
     waitpid(adcs_pid, NULL, 0);
 
@@ -214,6 +235,7 @@ int main(void) {
 
     /* ADCS must be able to get a buffer for every reply it sends. */
     check_not_contains("ADCS never fails to get an ACK reply buffer", adcs_log, "Faiuled to get packet buffer");
+    check_true("ADCS logged IMU reset execution", adcs_log != NULL && strstr(adcs_log, "Resetting IMU") != NULL);
 
     free(adcs_log);
 

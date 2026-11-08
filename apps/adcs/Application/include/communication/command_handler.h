@@ -15,7 +15,8 @@ typedef enum {
     ADCS_WIRE_COMMAND_RESET_ESTIMATOR = 67,
     ADCS_WIRE_COMMAND_SET_ACTUATOR_INHIBIT = 68,
     ADCS_WIRE_COMMAND_SIMULATOR_FAULT = 69,
-    ADCS_WIRE_COMMAND_SET_MAGNETORQUER = 70
+    ADCS_WIRE_COMMAND_SET_MAGNETORQUER = 70,
+    ADCS_WIRE_COMMAND_RESET_IMU = 71,
 } adcs_wire_command_id_t;
 
 typedef struct {
@@ -23,6 +24,10 @@ typedef struct {
     uint8_t axis; // 0 = X, 1 = Y, 2 = Z
     int8_t direction; // 1 = Forward, -1 = Reverse, 0 = Off
 } adcs_magnetorquer_command_payload_t;
+
+typedef struct {
+    command_envelope_t envelope;
+} adcs_imu_command_payload_t;
 
 typedef struct {
     command_envelope_t envelope;

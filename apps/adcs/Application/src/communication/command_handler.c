@@ -131,7 +131,15 @@ static command_ack_status_t decode_command(
                 return enqueue_command(&command);
             }
             return NACK;
-
+        case CMD_RESET_IMU:
+        case ADCS_WIRE_COMMAND_RESET_IMU:
+            if (packet->length >= sizeof(adcs_imu_command_payload_t)) {
+                adcs_imu_command_payload_t payload;
+                memcpy(&payload, packet->data, sizeof(payload));
+                command.type = ADCS_COMMAND_RESET_IMU;
+                return enqueue_command(&command);
+            }
+            return NACK;
         case ADCS_WIRE_COMMAND_SIMULATOR_FAULT:
 #ifdef ADCS_STM32
             return NACK;
@@ -202,6 +210,10 @@ static void *command_handler_rx_loop(void *parameter) {
                         fflush(stdout);
                     } else if (envelope.command_id == CMD_TIME_SYNC) {
                         printf("[COMMAND HANDLER] Time sync command received.\n");
+                        fflush(stdout);
+                    } else if (envelope.command_id == CMD_RESET_IMU ||
+                               envelope.command_id == ADCS_WIRE_COMMAND_RESET_IMU) {
+                        printf("[COMMAND HANDLER] Reset IMU command received.\n");
                         fflush(stdout);
                     }
                 }

@@ -178,6 +178,14 @@ int payload_commander_point_to_sun(void)
     return IPC_send(ROLE_COMMANDS, (const uint8_t *)&req, sizeof(req)) < 0 ? -1 : 0;
 }
 
+int payload_commander_reset_imu(void)
+{
+    command_envelope_t cmd = { .command_id = CMD_RESET_IMU, .seq = 1 };
+    relay_request_t req = { .dest_addr = ADCS_ADDRESS, .dest_port = ADCS_CMD_PORT, .length = sizeof(cmd) };
+    memcpy(req.payload, &cmd, sizeof(cmd));
+    return IPC_send(ROLE_COMMANDS, (const uint8_t *)&req, sizeof(req)) < 0 ? -1 : 0;
+}
+
 int payload_commander_downlink_telemetry_record(
     uint64_t offset,
     uint64_t *next_offset,

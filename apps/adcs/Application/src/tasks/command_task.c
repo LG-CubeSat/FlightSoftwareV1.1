@@ -15,6 +15,7 @@
 #include "tasks/estimation_task.h"
 #include "tasks/sensor_task.h"
 #include "tasks/telemetry_task.h"
+#include "imu.h"
 
 #define COMMAND_TASK_PRIORITY 2
 #include "platform/adcs_task_config.h"
@@ -188,6 +189,12 @@ static void execute_command(const adcs_command_t *command) {
                 command->parameter.magnetorquer.axis,
                 command->parameter.magnetorquer.direction
             );
+            break;
+        case ADCS_COMMAND_RESET_IMU:
+            printf("[COMMAND] Resetting IMU. Zeroing based on current orientation.\n");
+            fflush(stdout);
+            (void)imu_initialize();
+            estimation_task_request_reset();
             break;
         case ADCS_COMMAND_NONE:
         default:
