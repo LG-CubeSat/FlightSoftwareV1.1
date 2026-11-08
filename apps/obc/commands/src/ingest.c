@@ -18,7 +18,6 @@ typedef enum {
     INGEST_FORWARD_TELEMETRY
 } ingest_forward_type_t;
 
-
 typedef struct {
     uint8_t port;
     OBC_Roles_t owner;
