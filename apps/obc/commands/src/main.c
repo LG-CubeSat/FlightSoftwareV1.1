@@ -13,6 +13,7 @@
 #include "obc_relay_protocol.h"
 #include "commands_health.h"
 #include "obc_log.h"
+#include "csp_commands.h"
 
 #define RADIO_RX_BUF_SIZE 256
 
@@ -48,6 +49,23 @@ static void *radio_rx_thread(void *arg) {
 
         printf("[OBC RADIO RX] Routing command to Node %u, Port %u (%u payload bytes)\n", dest_addr, dest_port, payload_len);
         fflush(stdout);
+
+        // check if this command is intended for the OBC itself
+        if (dest_addr == OBC_ADDRESS) {
+            if (payload_len >= sizeof(command_envelope_t)) {
+                const command_envelope_t *env = (const command_envelope_t *)payload;
+                if (env->command_id == CMD_TAKE_PHOTO) {
+                    printf("[OBC RADIO RX] Uplink CMD_TAKE_PHOTO -> Forwarding to ROLE_MISSION\n");
+                    fflush(stdout);
+                    IPC_send(ROLE_MISSION, payload, payload_len);
+                } else {
+                    fprintf(stderr, "[OBC RADIO RX] Unknown OBC command ID: %u\n", env->command_id);
+                }
+            } else {
+                fprintf(stderr, "[OBC RADIO RX] OBC command payload too short (%u bytes)\n", payload_len);
+            }
+            continue;
+        }
 
         // forward over CSP bus (I2C to ADCS)
         csp_conn_t *conn = csp_connect(CSP_PRIO_NORM, dest_addr, dest_port, 1000, CSP_O_NONE);
