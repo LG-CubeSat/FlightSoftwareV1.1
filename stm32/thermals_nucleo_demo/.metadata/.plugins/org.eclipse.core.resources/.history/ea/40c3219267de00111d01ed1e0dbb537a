@@ -1,0 +1,403 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2026 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include "ssd1306.h"
+#include "ssd1306_fonts.h"
+#include <stdio.h>
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
+/* USER CODE BEGIN PV */
+
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_I2C1_Init(void);
+/* USER CODE BEGIN PFP */
+
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+#define OV7670_ADDR (0x21 << 1)
+
+// OV7670 Register settings for QQVGA (160x120) YUV422 + Auto-Exposure
+const uint8_t ov7670_regs[34] = {
+    0x12, 0x80, // Reset all registers
+    0xFF, 0xFF, // 100ms delay marker
+    0x12, 0x00, // YUV output format
+    0x11, 0x03, // Internal clock prescaler (/4 -> slows PCLK for reliable polling)
+    0x0C, 0x04, // Enable DCW (Downsample)
+    0x3E, 0x1A, // PCLK divider /4 for QQVGA
+    0x70, 0x3A, // Scaling X
+    0x71, 0x35, // Scaling Y
+    0x72, 0x22, // Downsample by 4 (640x480 -> 160x120)
+    0x73, 0xF2, // DSP scale clock divider
+    0xA2, 0x02, // PCLK delay
+    0x13, 0xE7, // Enable Auto Gain (AGC), Auto White Balance (AWB), Auto Exposure (AEC)
+    0x14, 0x28, // Max AGC gain ceiling (8x) for clear indoor brightness
+    0x55, 0x10, // Slight brightness boost
+    0x56, 0x48, // Contrast boost for crisp 1-bit monochrome shading
+    0x3A, 0x04, // YUYV byte order (Y brightness first, then U/V color)
+    0x00, 0x00  // End marker
+};
+
+// 4x4 Bayer Matrix for high-detail grayscale dithering on 1-bit OLED
+const uint8_t bayer4x4[16] = {
+     15, 135,  45, 165,
+    195,  75, 225, 105,
+     60, 180,  30, 150,
+    240, 120, 210,  90
+};
+
+uint8_t OV7670_Init(void) {
+    // Check if camera responds on I2C bus (requires 4 MHz XCLK on PA8 to be ticking)
+    if (HAL_I2C_IsDeviceReady(&hi2c1, OV7670_ADDR, 3, 100) != HAL_OK) {
+        return 0;
+    }
+
+    for (int i = 0; ov7670_regs[i] != 0x00 || ov7670_regs[i + 1] != 0x00; i += 2) {
+        if (ov7670_regs[i] == 0xFF) {
+            HAL_Delay(100);
+            continue;
+        }
+        uint8_t cmd[2] = { ov7670_regs[i], ov7670_regs[i + 1] };
+        HAL_I2C_Master_Transmit(&hi2c1, OV7670_ADDR, cmd, 2, 100);
+        HAL_Delay(2);
+    }
+    return 1;
+}
+static uint8_t frame_buf[64][128];
+
+void Capture_And_Display_Frame(void) {
+    ssd1306_Fill(Black);
+
+    __disable_irq();
+
+    // 1. Wait for VSYNC falling edge (start of frame)
+    uint32_t timeout = 3000000;
+    while (((GPIOB->IDR & GPIO_PIN_0) == 0) && --timeout);
+    timeout = 3000000;
+    while (((GPIOB->IDR & GPIO_PIN_0) != 0) && --timeout);
+
+    // 2. Capture 120 rows into RAM buffer
+    for (int y = 0; y < 120; y++) {
+        timeout = 500000;
+        while (((GPIOB->IDR & GPIO_PIN_1) == 0) && --timeout);
+        if (timeout == 0) break;
+
+        for (int x = 0; x < 160; x++) {
+            // Byte 1: Y (Brightness)
+            timeout = 10000;
+            while (((GPIOB->IDR & GPIO_PIN_2) == 0) && --timeout);
+            uint8_t luma = (uint8_t)(GPIOC->IDR & 0xFF);
+            timeout = 10000;
+            while (((GPIOB->IDR & GPIO_PIN_2) != 0) && --timeout);
+
+            // Byte 2: U/V (Skip)
+            timeout = 10000;
+            while (((GPIOB->IDR & GPIO_PIN_2) == 0) && --timeout);
+            timeout = 10000;
+            while (((GPIOB->IDR & GPIO_PIN_2) != 0) && --timeout);
+
+            if (y >= 28 && y < 92 && x >= 16 && x < 144) {
+                frame_buf[y - 28][x - 16] = luma;
+            }
+        }
+    }
+
+    __enable_irq();
+
+    // 3. Calculate average scene brightness for clean auto-thresholding
+    uint32_t sum = 0;
+    for (int y = 0; y < 64; y++) {
+        for (int x = 0; x < 128; x++) {
+            sum += frame_buf[y][x];
+        }
+    }
+    uint8_t avg_luma = (uint8_t)(sum / (128 * 64));
+
+    // 4. Draw clean, sharp silhouette + Bayer shading without random dot noise
+    for (int y = 0; y < 64; y++) {
+        for (int x = 0; x < 128; x++) {
+            uint8_t pixel = frame_buf[y][x];
+            // Combine clean threshold with subtle dithering for sharp edges
+            int16_t adjusted = (int16_t)pixel - (int16_t)avg_luma + 128;
+            if (adjusted < 0) adjusted = 0;
+            if (adjusted > 255) adjusted = 255;
+
+            uint8_t threshold = bayer4x4[((y & 3) << 2) | (x & 3)];
+            if ((uint8_t)adjusted > threshold) {
+                ssd1306_DrawPixel(x, y, White);
+            }
+        }
+    }
+
+    ssd1306_UpdateScreen();
+}
+
+    // Re-enable interrupts before sending frame buffer to OLED over I2C
+
+/* USER CODE END 0 */
+
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  /* USER CODE BEGIN 2 */
+    ssd1306_Init();
+    ssd1306_Fill(Black);
+    ssd1306_SetCursor(5, 20);
+
+    if (OV7670_Init()) {
+        ssd1306_WriteString("OV7670 OK!", Font_7x10, White);
+    } else {
+        ssd1306_WriteString("OV7670 ERR!", Font_7x10, White);
+    }
+    ssd1306_UpdateScreen();
+    HAL_Delay(1000);
+    /* USER CODE END 2 */
+
+  /* Infinite loop */
+    /* USER CODE BEGIN WHILE */
+      while (1)
+      {
+        Capture_And_Display_Frame();
+        /* USER CODE END WHILE */
+
+        /* USER CODE BEGIN 3 */
+      }
+      /* USER CODE END 3 */
+}
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 84;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  HAL_RCC_MCOConfig(RCC_MCO1, RCC_MCO1SOURCE_HSI, RCC_MCODIV_4);
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 400000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+
+  /* USER CODE END MX_GPIO_Init_1 */
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pins : PC0 PC1 PC2 PC3
+                           PC4 PC5 PC6 PC7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
+                          |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB0 PB1 PB2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF0_MCO;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+
+  /* USER CODE END MX_GPIO_Init_2 */
+}
+
+/* USER CODE BEGIN 4 */
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
+#ifdef USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */
