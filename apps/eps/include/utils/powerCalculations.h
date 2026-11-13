@@ -1,3 +1,23 @@
+#ifndef POWERCALCULATIONS_H
+#define POWERCALCULATIONS_H
+
+
+float calculateWatts(float voltage, float amps) {
+    return voltage * amps;
+}
+float calculateVoltage(float amps, float watts) {
+    return watts / amps;
+}
+float calculateAmps(float watts, float voltage) {
+    return watts / voltage;
+}
+
+
+
+
+
+
+#endif //POWERCALCULATIONS_H
 /*
  * Instant Power calculation
  * Energy is the integral of power over time
