@@ -15,9 +15,8 @@
 #include "obc_log.h"
 #include "csp_commands.h"
 #include "ground_ack.h"
-#include "ccsds/profile.h"
 
-#define RADIO_RX_BUF_SIZE RADIO_MAX_PACKET_SIZE
+#define RADIO_RX_BUF_SIZE 256
 
 static void downlink_ack(uint8_t node, uint8_t port, uint8_t command_id,
                          uint32_t sequence, ground_ack_status_t status) {
@@ -35,36 +34,37 @@ static void *radio_rx_thread(void *arg) {
     fflush(stdout);
 
     for (;;) {
-        // Blocks on UART until a valid CCSDS packet arrives and CRC-32 is verified
-        int length = radio_receive_packet(buffer, sizeof(buffer));
+        // The radio verifies CCSDS framing and CRC, then returns the command payload.
+        int length = radio_receive(buffer, sizeof(buffer));
         if (length <= 0) {
             continue; // timeout or quiet line
         }
 
-        lg_ccsds_profile_view_t view;
-        if (lg_ccsds_profile_parse(buffer, (size_t)length, &view) != CCSDS_OK ||
-            view.metadata.content_type != LG_CCSDS_CONTENT_COMMAND) {
-            fprintf(stderr, "[OBC RADIO RX] Dropping non-command RF packet\n");
-            continue;
-        }
-
-        printf("[OBC RADIO RX] Received RF Packet from ground: %d bytes\n", length);
+        printf("[OBC RADIO RX] Received RF command payload: %d bytes\n", length);
         fflush(stdout);
 
         // ground telecommand wire format:
         // byte 0: destination CSP node (e.g., ADCS_ADDRESS = 2)
         // byte 1: destination CSP port (e.g. ADCS_CMD_PORT = 10)
         // bytes 2..N: command payload
-        if (view.payload_length < 2 + sizeof(command_envelope_t)) {
-            fprintf(stderr, "[OBC RADIO RX] Command payload too short (%zu bytes), dropping\n",
-                    view.payload_length);
+        if (length < 2 + (int)sizeof(command_envelope_t)) {
+            fprintf(stderr, "[OBC RADIO RX] Command payload too short (%d bytes), dropping\n",
+                    length);
             continue;
         }
 
-        uint8_t dest_addr = view.payload[0];
-        uint8_t dest_port = view.payload[1];
-        uint16_t payload_len = (uint16_t)(view.payload_length - 2);
-        const uint8_t *payload = &view.payload[2];
+        uint8_t dest_addr = buffer[0];
+        uint8_t dest_port = buffer[1];
+        if (!((dest_addr == OBC_ADDRESS && dest_port == 0) ||
+              (dest_addr == ADCS_ADDRESS && dest_port == ADCS_CMD_PORT) ||
+              (dest_addr == EPS_ADDRESS && dest_port == EPS_CMD_PORT) ||
+              (dest_addr == THERMALS_ADDRESS && dest_port == THERMALS_CMD_PORT))) {
+            fprintf(stderr, "[OBC RADIO RX] Dropping payload with unknown command route %u:%u\n",
+                    dest_addr, dest_port);
+            continue;
+        }
+        uint16_t payload_len = (uint16_t)(length - 2);
+        const uint8_t *payload = &buffer[2];
         command_envelope_t envelope;
         memcpy(&envelope, payload, sizeof(envelope));
 

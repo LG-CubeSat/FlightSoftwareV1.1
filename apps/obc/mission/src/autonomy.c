@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "time.h"
 #include "pthread.h"
 
@@ -58,6 +59,13 @@ void *autonomy_thread(void *arg)
 {
     (void)arg;
 
+    const char *enabled = getenv("MISSION_AUTONOMY_ENABLED");
+    int run_actions = enabled == NULL || strcmp(enabled, "0") != 0;
+    if (!run_actions) {
+        printf("[AUTONOMY] actions disabled for manual ground control\n");
+        fflush(stdout);
+    }
+
     int interval_sec = get_autonomy_interval_sec();
     for (size_t i = 0; i < sizeof(actions) / sizeof(actions[0]); i++) {
         actions[i].interval_sec = interval_sec;
@@ -70,7 +78,7 @@ void *autonomy_thread(void *arg)
         struct timespec now;
         clock_gettime(CLOCK_MONOTONIC, &now);
 
-        for (size_t i = 0; i<sizeof(actions)/sizeof(actions[0]); i++) {
+        for (size_t i = 0; run_actions && i<sizeof(actions)/sizeof(actions[0]); i++) {
             double since_last = (now.tv_sec - actions[i].last_fired.tv_sec)
                 + (now.tv_nsec - actions[i].last_fired.tv_nsec) / 1e9;
         
