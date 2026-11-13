@@ -154,6 +154,11 @@ target_link_libraries(frame_codec_test PRIVATE frame_codec)
 add_test(NAME frame_codec_test COMMAND frame_codec_test)
 set_tests_properties(frame_codec_test PROPERTIES TIMEOUT 5)
 
+add_executable(ground_ack_test test_ground_ack.c)
+target_include_directories(ground_ack_test PRIVATE ${CMAKE_SOURCE_DIR}/shared/interfaces)
+add_test(NAME ground_ack_test COMMAND ground_ack_test)
+set_tests_properties(ground_ack_test PROPERTIES TIMEOUT 5)
+
 add_executable(obc_ipc_test test_obc_ipc.c)
 target_link_libraries(obc_ipc_test PRIVATE obc_ipc)
 add_test(NAME obc_ipc_test COMMAND obc_ipc_test)

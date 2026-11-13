@@ -1,6 +1,6 @@
 # STM32 ADCS application
 
-`Core/Src/main.c` initializes the STM32G431RB HAL, GPIO, USART1, and I2C1,
+`Core/Src/main.c` initializes the STM32G431RB HAL, GPIO, USART1, I2C1, and I2C2,
 then calls `adcs_application_start()`. This starts the six existing ADCS tasks
 (sensor, estimation, control, command, telemetry, housekeeping), the CSP command
 receiver, the CSP router, and the I2C service task under FreeRTOS. The I2C task
@@ -15,7 +15,7 @@ drivers/plant, POSIX FreeRTOS port, and desktop CSP glue are excluded from the M
 From the repository root:
 
 ```sh
-./firmware/adcs_stm32/build.sh
+./apps/adcs/build.sh
 ```
 
 Requires CMake 3.20+, Make, and Arm GNU tools. The script uses a compiler on PATH,
@@ -26,7 +26,7 @@ Alternatively, import this directory into STM32CubeIDE and build Debug or
 Release. Both configurations include Application, Platform, RTOS, and linked
 repository kernel/CSP/frame sources. Debug retains debug information but uses
 `-Os` to match the memory/stack budget. CubeIDE produces
-`firmware/adcs_stm32/Debug/adcs_stm32.elf` (or `Release/`).
+`apps/adcs/Debug/adcs_stm32.elf` (or `Release/`).
 
 The repository root's `HW_MODE=ON` remains the Linux OBC build. It does not build
 this firmware; use the standalone firmware project or script above.
@@ -46,10 +46,11 @@ this firmware; use the standalone firmware project or script above.
 - The STM32 time adapter extends the HAL millisecond tick across rollover and
   accepts OBC Unix-time synchronization. Unix time is unavailable until synced.
   Orbit data is explicitly unavailable until a flight orbit provider is added.
-- `Platform/Src/adcs_sensors_unavailable.c` returns NOT_READY for all sensors
-  and actuator operations. No IMU, magnetometer, Sun sensor, or rod pinout is
-  configured in the current `.ioc`. Replace that file with the actual drivers.
-  No simulator runs on the MCU, and no sensor-valid bits are invented.
+- `Platform/Src/adcs_imu_driver.c` contains a BMI270 I2C2 driver and
+  `Platform/Src/adcs_magnetorquer_driver.c` contains the rod driver. Neither
+  has been verified with the physical board. Magnetometer and Sun sensor calls
+  in `Platform/Src/adcs_sensors_unavailable.c` still return NOT_READY. No
+  simulator runs on the MCU, and no sensor-valid bits are invented.
 - Actuators start inhibited. Missing sensor/attitude data keeps ADCS in SAFE.
   `Application/src/estimation/kalman_filter.c` remains unfinished. Booting this
   application does not yet provide detumbling or pointing.

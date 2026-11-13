@@ -12,10 +12,10 @@ this file is the practical "clone it, build it, run it" reference for the softwa
 |---|---|
 | ADCS | **Done** — reference implementation. FreeRTOS task set, command handling, telemetry, full CSP round-trip with OBC. Also self-monitors now: an independent watchdog thread and an out-of-bounds check can trigger a real local reset, and repeated resets can lead to an OBC-directed shutdown — see "OBC internal architecture" below. |
 | OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. CCSDS 121.0 (ground-station packetization/link) is a separate, in-progress effort tracked outside this repo's `compute` process. |
-| Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. **OBC's real backend now exists** (`platform/real/drivers/comms_i2c.c` — Linux `i2c-dev`/`ioctl`, round-robin polls known boards since real I2C can't do broadcast-and-listen like the SIM transport does), verified to compile against real Linux/i2c-dev headers, but only exercised via Docker so far — no physical bus yet. MCU-side (ADCS/Thermals real I2C slave) is still a stub, and the OBC/MCU split into separate real backends hasn't happened yet (see Known gaps). |
+| Comms bus (I2C) | Shared-bus simulation with address-based framing (see below). The OBC has a Linux `i2c-dev` master backend and the ADCS STM32 target has an I2C1 slave transport; their complete CSP command/telemetry path has not been measured on physical boards. Thermals hardware integration remains. |
 | Thermals | CSP/FreeRTOS simulation scaffold builds successfully. Command handling, sensor collection, and on-demand telemetry are present; hardware drivers, closed-loop heater control, FDIR, and hardware testing remain. |
 | EPS | Not a CSP board at all — real hardware is a passive buck converter with no MCU. Address reserved in code in case future battery-monitoring hardware needs it. See `docs/satellite_architecture.md`. |
-| Camera / Comms (radio) | Not CSP boards — both are OBC-local peripherals (Arducam OV5647 over CSI ribbon, E22 LoRa module over UART). Their *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; real backends aren't written yet. |
+| Camera / Comms (radio) | Both are OBC-local peripherals. The E22 UART driver is implemented in `libs/RadioHandler`; the simulator radio uses UDP. The real camera path and the Pi E22 link still need hardware validation. |
 
 ## Architecture at a glance
 
@@ -318,20 +318,12 @@ run them at the same time as each other or as a manually-launched binary using t
 
 ## Known gaps
 
-- **`platform/real/drivers/comms_i2c.c` is now a real OBC-side driver, not a stub — but it's
-  the only real backend, and it's OBC-shaped.** It implements `comms_bus_initialize`/`send`/
-  `receive` against Linux `i2c-dev` (`/dev/i2c-1`, `ioctl(I2C_RDWR)`), mapping CSP addresses
-  (`shared/csp/csp_commands.h`) to physical I2C addresses (`platform/real/include/i2c_addresses.h`
-  — **placeholder values, `0x42`/`0x43`, not yet confirmed against real wiring**). `receive()`
-  round-robin polls each known board rather than blocking on a broadcast, since real I2C has no
-  equivalent of the SIM transport's "every frame goes to everyone, filter by address" — see the
-  design note in `docs/satellite_architecture.md`'s Path to HW_MODE, item C.4. Verified so far
-  only by syntax/type-checking against real Linux kernel headers via Docker (macOS has no
-  `<linux/i2c-dev.h>` to compile against natively — see `docs/obc_i2c_bringup.md`); no physical
-  I2C bus has run this yet. **This file doesn't yet work for ADCS/Thermals** — `platform/CMakeLists.txt`
-  still compiles one `real/drivers/comms_i2c.c` for every `HW_MODE=ON` target, so an MCU build
-  today would get this Linux-only code instead of a real STM32 I2C slave implementation. Splitting
-  into separate OBC/MCU real backends (tracked in the Path to HW_MODE TODO) hasn't happened yet.
+- **The physical OBC↔ADCS I2C/CSP path is implemented but unverified on boards.**
+  `platform/real/drivers/comms_i2c.c` is the Linux `i2c-dev` master, and the
+  separately built `apps/adcs` STM32 firmware is the I2C1 slave at `0x2A`.
+  Thermals still has a placeholder address (`0x43`). The master polls boards
+  in round robin order; confirm command ACKs and telemetry across the real
+  bus before treating this path as flight ready.
 - **The master's `receive()` reads connections one at a time, blocking per connection.**
   Fine for the current 2-3 node tests; will need `select()`/`poll()`-based multiplexing
   before many subsystems are simultaneously active and one shouldn't be able to stall
@@ -362,9 +354,11 @@ run them at the same time as each other or as a manually-launched binary using t
 - **`autonomy.c`'s action table has exactly one entry** (point ADCS to the sun). The
   table-driven shape is built to scale to other subsystems (e.g. telling a thermal board
   to heat the bio-chamber), but nothing else is wired in yet.
-- **The real radio driver doesn't live in this repo yet.** `radio.h`/`platform/sim/drivers/radio.c`
-  are the shared contract and mock; `platform/real/drivers/radio.c` is being built
-  separately and intentionally isn't referenced from `platform/CMakeLists.txt` yet.
+- **The real E22 radio driver is in `libs/RadioHandler/src/radio.c`.** The OBC hardware
+  platform links it through `platform/CMakeLists.txt`; the simulator uses UDP in
+  `platform/sim/drivers/radio.c`. The ground station can run against the simulator
+  with `GS_SIM_RF=1`, or use a physical serial E22. The complete Pi radio and
+  STM32 I2C path still needs validation on hardware.
 - **`IPC_send` itself never retries** (see its own comment: "fail fast, don't retry
   forever") — that's a deliberate transport-level choice, not a bug. Two different callers
   compensate for it where it actually matters: `autonomy_thread` only marks an action
