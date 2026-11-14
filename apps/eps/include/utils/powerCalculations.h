@@ -11,10 +11,21 @@ float calculateVoltage(float amps, float watts) {
 float calculateAmps(float watts, float voltage) {
     return watts / voltage;
 }
-
-
-
-
+float calculateResistance(float voltage, float current) {
+    return voltage / current;
+}
+float calculateResistanceDrop(float current, float resistance) {
+    return current * resistance;
+}
+float calculatePowerLoss(float current, float resistance) {
+    return current * current * resistance;
+}
+float calculateEnergy(float power, float time) {
+    return power * time;
+}
+float calculateAveragePower(float energy, float time) {
+    return energy / time;
+}
 
 
 #endif //POWERCALCULATIONS_H
