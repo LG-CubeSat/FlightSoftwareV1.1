@@ -7,6 +7,8 @@ Run this first on the Mac:
 Then run build-hw/bin/radio_hardware_test on the Pi. This script receives one
 CCSDS frame, checks its CRC-32 and test marker, and echoes the exact frame.
 Requires pyserial (`python3 -m pip install pyserial`).
+Stop the ground station while this script owns the USB radio serial port.
+The USB E22 must already have settings compatible with the Pi E22.
 """
 
 import argparse

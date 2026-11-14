@@ -3,6 +3,7 @@
  * library and exercises radio_send() and radio_receive(), including CCSDS
  * framing, E22 configuration, GPIO mode pins, and the selected UART backend.
  *
+ * Stop obc.service before running: it also owns the E22 GPIO lines.
  * On the Pi: E22_SWAPPED_UART=1 ./build-hw/bin/radio_hardware_test
  * On the Mac, run tests/radio_hardware_peer.py first to echo the RF frame.
  */
@@ -19,10 +20,14 @@
 #define SEND_TIMEOUT_MS 12000
 #define ECHO_TIMEOUT_MS 15000
 
+static int owns_soft_uart = 0;
+
 /* pigpiod keeps the bit-banged RX open after a client exits. Release it so
- * repeated runs (and a later flight-process start) can open GPIO14 again. */
+ * repeated runs can open GPIO14 again. Never close another process's reader
+ * when this test failed before it acquired the radio. */
 static void release_soft_uart(void)
 {
+    if (!owns_soft_uart) return;
     int pi = pigpio_start(NULL, NULL);
     if (pi >= 0) {
         bb_serial_read_close(pi, 14);
@@ -74,22 +79,23 @@ int main(void)
     radio_get_stats(&before);
 
     if (radio_send((const uint8_t *)payload, (size_t)payload_length) != 0) {
-        fprintf(stderr, "FAIL: radio_send() could not initialize or queue the frame.\n");
+        fprintf(stderr, "LOCAL FAIL: E22 initialization or packet queueing failed; see [RADIO] details above. The Mac peer is not involved yet.\n");
         return 1;
     }
+    if (strcmp(mode, "1") == 0) owns_soft_uart = 1;
 
     long deadline = now_ms() + SEND_TIMEOUT_MS;
     for (;;) {
         radio_get_stats(&after);
         if (after.packets_sent > before.packets_sent) break;
         if (after.packets_dropped > before.packets_dropped || now_ms() >= deadline) {
-            fprintf(stderr, "FAIL: the radio TX worker did not send the frame.\n");
+            fprintf(stderr, "LOCAL FAIL: the radio TX worker did not complete the E22 send path.\n");
             return 1;
         }
         sleep_ms(20);
     }
 
-    printf("TX passed: production driver sent one CCSDS frame. Waiting for USB E22 echo...\n");
+    printf("Local TX completed: driver wrote one CCSDS frame to the E22 UART; RF delivery is not yet verified. Waiting for USB E22 echo...\n");
     fflush(stdout);
 
     deadline = now_ms() + ECHO_TIMEOUT_MS;
@@ -97,7 +103,7 @@ int main(void)
         uint8_t received[RADIO_MAX_PAYLOAD];
         int count = radio_receive(received, sizeof(received));
         if (count < 0) {
-            fprintf(stderr, "FAIL: radio_receive() reported an error.\n");
+            fprintf(stderr, "RECEIVE FAIL: radio_receive() reported an error.\n");
             return 1;
         }
         if (count == payload_length && memcmp(received, payload, (size_t)count) == 0) {
@@ -109,6 +115,6 @@ int main(void)
         }
     }
 
-    fprintf(stderr, "FAIL: no matching echo arrived within %d ms.\n", ECHO_TIMEOUT_MS);
+    fprintf(stderr, "END-TO-END FAIL: no matching echo arrived within %d ms. Check the Mac peer and radio settings.\n", ECHO_TIMEOUT_MS);
     return 1;
 }
