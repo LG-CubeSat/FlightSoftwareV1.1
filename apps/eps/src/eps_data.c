@@ -4,16 +4,8 @@
 #include <math.h>
 
 
-/*
-split up the locks into different sections in order to not block one thing while something else is running as there are a lot
-of different sensors and whatnot. I didn't include a lock for every single data point though because it would be too chaotic;
-chose a nice in between point. 
-*/
-static pthread_mutex_t solar_sensor_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t battery_sensor_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t battery_estimation_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t solar_estimation_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_mutex_t other_data_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t eps_sensor_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t eps_estimation_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static eps_sensor_data_t eps_sensor_data = {
 
@@ -54,7 +46,39 @@ static eps_estimation_data_t eps_estimation_data = {
 eps_sensor_data_t get_eps_sensor_data(void) {
 
     eps_sensor_data_t snapshot;
-    pthread_mutex_lock(&)
+    pthread_mutex_lock(&eps_sensor_lock);
+    snapshot = eps_sensor_data;
+    pthread_mutex_unlock(&eps_sensor_lock);
 
+    return snapshot;
+
+}
+
+eps_estimation_data_t get_eps_estimation_data(void) {
+
+    eps_estimation_data_t snapshot;
+    pthread_mutex_lock(&eps_estimation_lock);
+    snapshot = eps_estimation_data;
+    pthread_mutex_unlock(&eps_estimation_lock);
+
+    return snapshot;
+
+}
+
+void set_eps_sensor_data(eps_sensor_data_t newdata) {
+
+    pthread_mutex_lock(&eps_sensor_lock);
+    eps_sensor_data = newdata;
+    pthread_mutex_unlock(&eps_sensor_lock);
+    
+
+}
+
+void set_eps_estimation_data(eps_estimation_data_t newdata) {
+
+    pthread_mutex_lock(&eps_estimation_lock);
+    eps_estimation_data = newdata;
+    pthread_mutex_unlock(&eps_estimation_lock);
+    
 
 }

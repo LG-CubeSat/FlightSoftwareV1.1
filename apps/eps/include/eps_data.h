@@ -2,6 +2,7 @@
 #define EPS_DATA
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef enum {
 
@@ -61,14 +62,6 @@ eps_sensor_data_t get_eps_sensor_data(void);
 
 eps_estimation_data_t get_eps_estimation_data(void);
 
-/*
-because there are so many data points for both estimation and sensor data,
-changing a data point will look something like this:
-the function calling set_eps_sensor_data or set_eps_estimation_data will use the getter functions coorolated to its
-data, then it will create it's own copy and tweak the data point it wishes to tweak,
-then it will send that copy through the function and the data will be stored with the new copy
-
-*/
 
 void set_eps_sensor_data(eps_sensor_data_t newdata);
 
