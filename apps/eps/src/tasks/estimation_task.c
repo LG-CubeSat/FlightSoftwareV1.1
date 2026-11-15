@@ -8,8 +8,10 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "eps_data.h"
 
 #include <stdio.h>
+#include <stdint.h>
 
 #define ESTIMATION_TASK_PRIORITY (3)
 #define ESTIMATION_TASK_STACK_SIZE (1024)
@@ -19,6 +21,14 @@ static StackType_t xEstimationTaskStack[ESTIMATION_TASK_STACK_SIZE];
 static StaticTask_t xEstimationTaskBuffer;
 
 TaskHandle_t xEstimationHandle = NULL;
+
+eps_sensor_data_t local_sensor_data;
+eps_estimation_data_t local_estimation_data;
+
+uint8_t index = 0;
+uint8_t index_update_value = 50;
+//only update every [index_update_value] interations as mutexes are constantly going to be 
+//locked and unlocked
 
 void estimation_task_init(void)
 {
@@ -36,6 +46,7 @@ void estimation_task_init(void)
     {
         printf("[ESTIMATION] Failed to initialize.\n");
     }
+
 }
 
 void estimation_task(void *pvParameters)
@@ -46,7 +57,19 @@ void estimation_task(void *pvParameters)
 
     for (;;)
     {
-        // do stuff
+
+        index++;
+
+        if (index >= index_update_value) {
+
+        index = 0;
+        local_sensor_data = get_eps_sensor_data();
+        local_estimation_data = get_eps_estimation_data();
+
+        }
+
+        
+
 
         uint32_t notified_value;
         if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
