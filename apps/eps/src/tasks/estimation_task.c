@@ -8,7 +8,9 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 
 #include "FreeRTOS.h"
 #include "task.h"
+
 #include "eps_data.h"
+#include "powerCalculations.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -25,10 +27,6 @@ TaskHandle_t xEstimationHandle = NULL;
 eps_sensor_data_t local_sensor_data;
 eps_estimation_data_t local_estimation_data;
 
-uint8_t index = 0;
-uint8_t index_update_value = 50;
-//only update every [index_update_value] interations as mutexes are constantly going to be 
-//locked and unlocked
 
 void estimation_task_init(void)
 {
@@ -58,17 +56,10 @@ void estimation_task(void *pvParameters)
     for (;;)
     {
 
-        index++;
-
-        if (index >= index_update_value) {
-
-        index = 0;
         local_sensor_data = get_eps_sensor_data();
         local_estimation_data = get_eps_estimation_data();
 
-        }
-
-        
+        local_estimation_data.solar_power_w = 
 
 
         uint32_t notified_value;

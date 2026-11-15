@@ -38,11 +38,6 @@ typedef struct {
 
 typedef struct {
 
-    uint32_t source_sequence;
-    uint32_t timestamp_ms;
-    uint32_t valid_mask;
-    uint32_t fault_mask;
-
     float solar_power_w;
     float battery_power_w;
     float estimated_power_balance_w;
