@@ -8,7 +8,6 @@
 
 #include "mission_health.h"
 #include "obc_ipc.h"
-#include "radio.h"
 #include "payload_commander.h"
 
 #define DEFAULT_OUTPUT_PATH "/tmp/obc_camera_hardware_test.jpg"
@@ -50,20 +49,7 @@ int IPC_receive_timeout(
     (void)buffer;
     (void)capacity;
     (void)timeout_ms;
-}
-
-int radio_send(const uint8_t *data, size_t length)
-{
-    (void)data;
-    (void)length;
-    return -1;
-}
-
-int radio_receive(uint8_t *buffer, uint16_t max_length)
-{
-    (void)buffer;
-    (void)max_length;
-    return -1;
+    return IPC_ERROR;
 }
 
 void mission_health_payload_progress(void)
