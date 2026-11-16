@@ -27,6 +27,7 @@ static const char *path_for_role(OBC_Roles_t role)
         case ROLE_MISSION: return "/tmp/obc_ipc_mission.sock";
         case ROLE_SUPERVISOR: return "/tmp/obc_ipc_supervisor.sock";
         case ROLE_TIME: return "/tmp/obc_ipc_time.sock";
+        case ROLE_RADIO: return "/tmp/obc_ipc_radio.sock";
         default: return NULL;
     }
 }

@@ -9,6 +9,7 @@ add_executable(obc_commands
 target_include_directories(obc_commands PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../radio/include
 )
 
 target_link_libraries(

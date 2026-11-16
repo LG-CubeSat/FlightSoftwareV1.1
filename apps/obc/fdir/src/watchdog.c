@@ -24,6 +24,7 @@ static const OBC_Roles_t monitored_roles[] = {
     ROLE_DATA,
     ROLE_MISSION,
     ROLE_TIME,
+    ROLE_RADIO,
 };
 
 /*
@@ -39,6 +40,7 @@ static const char *role_name(OBC_Roles_t role) {
         case ROLE_DATA: return "data";
         case ROLE_MISSION: return "mission";
         case ROLE_TIME: return "time";
+        case ROLE_RADIO: return "radio";
         default: return "unknown";
     }
 }

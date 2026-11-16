@@ -34,6 +34,7 @@ int supervisor_is_frozen(OBC_Roles_t role);
 static obc_process_t processes[] = {
     { .name="fdir", .exe_name="obc_fdir", .resolved_path={0}, .pid=-1, .role=ROLE_FDIR, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
     { .name="commands", .exe_name="obc_commands", .resolved_path={0}, .pid=-1, .role=ROLE_COMMANDS, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
+    { .name="radio", .exe_name="obc_radio", .resolved_path={0}, .pid=-1, .role=ROLE_RADIO, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
     { .name="compute", .exe_name="obc_compute", .resolved_path={0}, .pid=-1, .role=ROLE_COMPUTE, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER},
     { .name="data", .exe_name="obc_data", .resolved_path={0}, .pid=-1, .role=ROLE_DATA, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },
     { .name="mission", .exe_name="obc_mission", .resolved_path={0}, .pid=-1, .role=ROLE_MISSION, .restart_count=0, .lifecycle_lock=PTHREAD_MUTEX_INITIALIZER },

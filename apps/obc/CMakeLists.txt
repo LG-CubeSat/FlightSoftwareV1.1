@@ -4,6 +4,7 @@ add_subdirectory(telemetry)
 
 add_subdirectory(supervisor)
 add_subdirectory(commands)
+add_subdirectory(radio)
 add_subdirectory(compute)
 add_subdirectory(data)
 add_subdirectory(fdir)

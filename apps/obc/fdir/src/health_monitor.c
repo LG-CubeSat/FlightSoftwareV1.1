@@ -43,6 +43,7 @@ static int is_monitored_role(OBC_Roles_t role)
         case ROLE_DATA:
         case ROLE_MISSION:
         case ROLE_TIME:
+        case ROLE_RADIO:
             return 1;
         
         default:

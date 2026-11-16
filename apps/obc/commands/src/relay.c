@@ -9,6 +9,8 @@
 #include "obc_ipc.h"
 #include "obc_relay_protocol.h"
 #include "commands_health.h"
+#include "obc_radio_protocol.h"
+#include "radio_uplink.h"
 
 #define RELAY_POLL_TIMEOUT_MS 1000
 
@@ -33,7 +35,7 @@ void *relay_thread(void *arg)
     
     for (;;) {
         OBC_Roles_t src;
-        uint8_t buf[sizeof(relay_request_t)];
+        _Alignas(obc_radio_message_t) uint8_t buf[OBC_IPC_MAX_PAYLOAD];
         int len = IPC_receive_timeout(
             &src,
             buf,
@@ -45,6 +47,15 @@ void *relay_thread(void *arg)
             continue;
         }
         if (len < 0) {
+            continue;
+        }
+        if (src == ROLE_RADIO && len >= (int)OBC_RADIO_HEADER_SIZE) {
+            const obc_radio_message_t *message = (const obc_radio_message_t *)buf;
+            if (message->kind == OBC_RADIO_UPLINK &&
+                message->length <= OBC_RADIO_MAX_DATA &&
+                len == (int)(OBC_RADIO_HEADER_SIZE + message->length))
+                commands_handle_radio_uplink(message->payload, message->length);
+            commands_health_relay_progress();
             continue;
         }
         if (len != sizeof(relay_request_t)) {

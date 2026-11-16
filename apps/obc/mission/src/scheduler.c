@@ -239,16 +239,18 @@ void *scheduler_thread(void *arg) {
         double elapsed = difftime(time(NULL), mission_start_unix); // wall clock: survives restarts
 
         if (current_state == MISSION_WAITING_FOR_ASCENT || current_state == MISSION_COOLDOWN) {
+            int photo_requested = payload_commander_take_pending_photo_command();
             OBC_Roles_t src;
             uint8_t cmd_buf[OBC_IPC_MAX_PAYLOAD];
             int cmd_len = IPC_receive_timeout(&src, cmd_buf, sizeof(cmd_buf), 0);
-            if (cmd_len >= (int)sizeof(command_envelope_t)) {
+            if (cmd_len >= (int)sizeof(command_envelope_t) && src == ROLE_COMMANDS) {
                 const command_envelope_t *env = (const command_envelope_t *)cmd_buf;
-                if (env->command_id == CMD_TAKE_PHOTO) {
-                    printf("[SCHEDULER] Ground telecommand received: CMD_TAKE_PHOTO! Starting Capture.\n");
-                    fflush(stdout);
-                    set_state(MISSION_TAKING_PHOTO);
-                }
+                photo_requested |= env->command_id == CMD_TAKE_PHOTO;
+            }
+            if (photo_requested) {
+                printf("[SCHEDULER] Ground telecommand received: CMD_TAKE_PHOTO! Starting Capture.\n");
+                fflush(stdout);
+                set_state(MISSION_TAKING_PHOTO);
             }
         }
 

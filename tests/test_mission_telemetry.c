@@ -6,6 +6,7 @@
 #include "obc_ipc.h"
 #include "obc_telemetry_protocol.h"
 #include "payload_commander.h"
+#include "obc_radio_protocol.h"
 
 #define MAX_REPLIES 8
 #define MAX_RADIO_CALLS 8
@@ -27,6 +28,8 @@ static size_t radio_length;
 static uint8_t radio_history[MAX_RADIO_CALLS][OBC_IPC_MAX_PAYLOAD];
 static size_t radio_history_lengths[MAX_RADIO_CALLS];
 static int progress_calls;
+static uint32_t pending_radio_id;
+static int pending_radio_status;
 
 static void check_true(const char *name, int condition)
 {
@@ -55,6 +58,8 @@ static void reset_fakes(void)
     memset(radio_history, 0, sizeof(radio_history));
     memset(radio_history_lengths, 0, sizeof(radio_history_lengths));
     progress_calls = 0;
+    pending_radio_id = 0;
+    pending_radio_status = 0;
 }
 
 static size_t make_record(
@@ -123,6 +128,23 @@ static void queue_record_replies(
 
 int IPC_send(OBC_Roles_t destination, const uint8_t *data, uint16_t length)
 {
+    if (destination == ROLE_RADIO && data != NULL && length >= OBC_RADIO_HEADER_SIZE) {
+        const obc_radio_message_t *message = (const obc_radio_message_t *)data;
+        if (message->kind != OBC_RADIO_SEND_RAW ||
+            length != OBC_RADIO_HEADER_SIZE + message->length) return IPC_ERROR;
+        radio_calls++;
+        if (message->length > sizeof(radio_bytes)) return IPC_ERROR;
+        memcpy(radio_bytes, message->payload, message->length);
+        radio_length = message->length;
+        if (radio_calls <= MAX_RADIO_CALLS) {
+            memcpy(radio_history[radio_calls - 1], message->payload, message->length);
+            radio_history_lengths[radio_calls - 1] = message->length;
+        }
+        pending_radio_id = message->request_id;
+        pending_radio_status = radio_result != 0 ||
+            (radio_fail_on_call > 0 && radio_calls == radio_fail_on_call);
+        return length;
+    }
     if (
         destination != ROLE_DATA ||
         data == NULL ||
@@ -148,6 +170,19 @@ int IPC_receive_timeout(
 {
     (void)timeout_ms;
 
+    if (pending_radio_id != 0 && capacity >= OBC_RADIO_HEADER_SIZE) {
+        obc_radio_message_t reply = {
+            .kind = OBC_RADIO_RESULT,
+            .status = (uint8_t)pending_radio_status,
+            .length = 0,
+            .request_id = pending_radio_id
+        };
+        pending_radio_id = 0;
+        *source = ROLE_RADIO;
+        memcpy(buffer, &reply, OBC_RADIO_HEADER_SIZE);
+        return OBC_RADIO_HEADER_SIZE;
+    }
+
     if (
         source == NULL ||
         buffer == NULL ||
@@ -162,32 +197,6 @@ int IPC_receive_timeout(
     return (int)sizeof(replies[0]);
 }
 
-int radio_send(const uint8_t *data, size_t length)
-{
-    radio_calls++;
-    if (radio_result != 0) {
-        return radio_result;
-    }
-    if (radio_fail_on_call > 0 && radio_calls == radio_fail_on_call) {
-        return -1;
-    }
-    if (data == NULL || length > sizeof(radio_bytes)) {
-        return -1;
-    }
-
-    memcpy(radio_bytes, data, length);
-    radio_length = length;
-    if (radio_calls <= MAX_RADIO_CALLS) {
-        memcpy(radio_history[radio_calls - 1], data, length);
-        radio_history_lengths[radio_calls - 1] = length;
-    }
-    return 0;
-}
-
-int radio_send_ssdv(const uint8_t *data, size_t length)
-{
-    return radio_send(data, length);
-}
 
 int radio_receive(uint8_t *buffer, uint16_t max_length)
 {
@@ -274,10 +283,13 @@ static void test_two_chunk_final_record(void)
     check_true("maximum record was split into two replies", reply_count == 2);
     check_true("two-chunk retrieval succeeds", result == 0);
     check_true(
-        "two chunks are reassembled exactly once",
-        radio_calls == 1 &&
-        radio_length == encoded_size &&
-        memcmp(radio_bytes, encoded, encoded_size) == 0
+        "two data replies are sent as ordered radio frames",
+        radio_calls == 2 &&
+        radio_history_lengths[0] == RADIO_MAX_PAYLOAD &&
+        radio_history_lengths[1] == encoded_size - RADIO_MAX_PAYLOAD &&
+        memcmp(radio_history[0], encoded, RADIO_MAX_PAYLOAD) == 0 &&
+        memcmp(radio_history[1], encoded + RADIO_MAX_PAYLOAD,
+               encoded_size - RADIO_MAX_PAYLOAD) == 0
     );
     check_true(
         "final chunk carries end-of-log to caller",

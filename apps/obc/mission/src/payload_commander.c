@@ -3,10 +3,13 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdatomic.h>
+#include <stdbool.h>
 
 #include "csp_commands.h"
 #include "camera.h"
 #include "radio.h"
+#include "obc_radio_protocol.h"
 #include "obc_ipc.h"
 #include "obc_relay_protocol.h"
 #include "obc_data_protocol.h"
@@ -27,6 +30,70 @@ so give it headroom before we conclude the whole process is gone.
 #define TELEMETRY_READ_TIMEOUT_MS 10000
 
 static uint8_t photo_buf[MAX_PHOTO_SIZE];
+static uint32_t next_radio_request_id = 1;
+static atomic_bool pending_photo_command = false;
+static void deadline_in_ms(struct timespec *out, int ms);
+static int remaining_ms(const struct timespec *deadline);
+
+int payload_commander_take_pending_photo_command(void)
+{
+    return atomic_exchange(&pending_photo_command, false);
+}
+
+static void remember_photo_command(OBC_Roles_t source, const uint8_t *data, int length)
+{
+    if (source != ROLE_COMMANDS || length < (int)sizeof(command_envelope_t)) return;
+    command_envelope_t command;
+    memcpy(&command, data, sizeof(command));
+    if (command.command_id == CMD_TAKE_PHOTO)
+        atomic_store(&pending_photo_command, true);
+}
+
+static int radio_send_via_ipc(obc_radio_kind_t kind, const uint8_t *data, size_t length)
+{
+    if (data == NULL || length == 0 ||
+        (kind == OBC_RADIO_SEND_SSDV && length % RADIO_MAX_PAYLOAD != 0)) return -1;
+
+    for (size_t offset = 0; offset < length;) {
+        size_t chunk = length - offset;
+        if (chunk > RADIO_MAX_PAYLOAD) chunk = RADIO_MAX_PAYLOAD;
+        _Alignas(obc_radio_message_t) uint8_t wire[OBC_RADIO_HEADER_SIZE + RADIO_MAX_PAYLOAD];
+        obc_radio_message_t *request = (obc_radio_message_t *)wire;
+        request->kind = kind;
+        request->status = 0;
+        request->length = (uint16_t)chunk;
+        request->request_id = next_radio_request_id++;
+        if (next_radio_request_id == 0) next_radio_request_id = 1;
+        memcpy(request->payload, data + offset, chunk);
+        if (IPC_send(ROLE_RADIO, wire, OBC_RADIO_HEADER_SIZE + (uint16_t)chunk) < 0)
+            return -1;
+
+        struct timespec deadline;
+        deadline_in_ms(&deadline, 17000);
+        int acknowledged = 0;
+        for (;;) {
+            int wait_ms = remaining_ms(&deadline);
+            if (wait_ms <= 0) return -1;
+            OBC_Roles_t source;
+            _Alignas(obc_radio_message_t) uint8_t response[OBC_IPC_MAX_PAYLOAD];
+            int received = IPC_receive_timeout(&source, response,
+                                               sizeof(response), wait_ms);
+            if (received == IPC_TIMEOUT) return -1;
+            if (received < 0) continue;
+            remember_photo_command(source, response, received);
+            obc_radio_message_t *reply = (obc_radio_message_t *)response;
+            if (received == (int)OBC_RADIO_HEADER_SIZE && source == ROLE_RADIO &&
+                reply->kind == OBC_RADIO_RESULT && reply->request_id == request->request_id) {
+                if (reply->status != 0) return -1;
+                acknowledged = 1;
+                break;
+            }
+        }
+        if (!acknowledged) return -1;
+        offset += chunk;
+    }
+    return 0;
+}
 
 static void deadline_in_ms(struct timespec *out, int ms)
 {
@@ -79,6 +146,7 @@ int payload_commander_compress_photo(const char *in_path, const char *out_path)
         OBC_Roles_t src;
         uint8_t buf[sizeof(compute_result_t)];
         int len = IPC_receive_timeout(&src, buf, sizeof(buf), remaining_ms(&deadline));
+        if (len > 0) remember_photo_command(src, buf, len);
         
         if (len == IPC_TIMEOUT) {
             fprintf(stderr, "[PAYLOAD COMMANDER] no result for compute for %s in %d ms\n", in_path, COMPRESS_TOTAL_TIMEOUT_MS);
@@ -127,6 +195,7 @@ int payload_commander_downlink_photo(const char *photo_path)
         OBC_Roles_t src;
         uint8_t buf[sizeof(data_read_reply_t)];
         int len = IPC_receive_timeout(&src, buf, sizeof(buf), wait);
+        if (len > 0) remember_photo_command(src, buf, len);
 
         if (len == IPC_TIMEOUT) {
             fprintf(stderr, "[PAYLOAD COMMANDER] data went quit while reading%s\n", photo_path);
@@ -160,7 +229,7 @@ int payload_commander_downlink_photo(const char *photo_path)
     }
 
     // sending it. the compressed photo is whole ssdv packets, the radio frames each one
-    if (radio_send_ssdv(photo_buf, total) != 0) {
+    if (radio_send_via_ipc(OBC_RADIO_SEND_SSDV, photo_buf, total) != 0) {
         fprintf(stderr, "[PAYLOAD COMMANDER] downlink failed.\n");
         return -1;
     }
@@ -245,6 +314,7 @@ int payload_commander_downlink_telemetry_record(
             sizeof(reply),
             wait_ms
         );
+        if (length > 0) remember_photo_command(source, (const uint8_t *)&reply, length);
 
         if (length == IPC_TIMEOUT) {
             fprintf(stderr,
@@ -370,7 +440,7 @@ int payload_commander_downlink_telemetry_record(
             return -1;
         }
 
-        if (radio_send(encoded, encoded_size) != 0) {
+        if (radio_send_via_ipc(OBC_RADIO_SEND_RAW, encoded, encoded_size) != 0) {
             fprintf(stderr,
                 "[PAYLOAD COMMANDER] telemetry downlink failed\n"
             );
