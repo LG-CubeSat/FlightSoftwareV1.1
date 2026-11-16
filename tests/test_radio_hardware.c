@@ -30,8 +30,11 @@ static void release_soft_uart(void)
     if (!owns_soft_uart) return;
     int pi = pigpio_start(NULL, NULL);
     if (pi >= 0) {
-        bb_serial_read_close(pi, 14);
+        int rc = bb_serial_read_close(pi, 14);
+        if (rc < 0) fprintf(stderr, "[RADIO TEST] GPIO14 serial RX cleanup failed: %d\n", rc);
         pigpio_stop(pi);
+    } else {
+        fprintf(stderr, "[RADIO TEST] could not connect to pigpiod for GPIO14 cleanup: %d\n", pi);
     }
 }
 
