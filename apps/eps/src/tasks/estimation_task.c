@@ -62,9 +62,12 @@ void estimation_task(void *pvParameters)
         //calculations
         local_estimation_data.solar_power_w = calculateWatts(local_sensor_data.solar_voltage_reading,local_sensor_data.solar_current_reading);
         local_estimation_data.battery_power_w = calculateWatts(local_sensor_data.battery_voltage_reading,local_sensor_data.battery_current_reading);
+        local_estimation_data.estimated_power_balance_w = local_estimation_data.solar_power_w - local_estimation_data.battery_power_w;
+        local_estimation_data.battery_energy_in_wh = local_estimation_data.battery_
         /*
 
-        estimated_power_balance_w;
+        to-do: implement calculations for:
+
         battery_energy_in_wh;
         battery_energy_out_wh;
         estimated_state_of_charge_pct;

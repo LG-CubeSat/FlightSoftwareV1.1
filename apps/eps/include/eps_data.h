@@ -16,21 +16,36 @@ typedef enum {
 
 typedef struct {
 
+    //other data
+
+    //Time of the sample; used to calculate elapsed time
     uint32_t timestamp_ms;
+    //New-sample counter; used to avoid processing a sample twice
     uint32_t sequence;
+    //Binary mask; used to detemine which data is valid
     uint32_t valid_mask;
 
 
     //solar readings
+
+    //Solar input voltage; used to calculate solar power
     float solar_voltage_reading;
+    //Solar input current; used to calculate solar power
     float solar_current_reading;
+    //Solar shunt voltage drop; used to verify solar current
     float solar_shunt_voltage_reading;
+    //Sensor-reported solar power; used to check calculated solar power
     float solar_power_reading;
 
     //battery readings
+
+    //Battery voltage; used for power and safety checks
     float battery_voltage_reading;
+    //Battery charge/discharge current; used for power and energy calculations
     float battery_current_reading;
+    //Battery shunt voltage drop; used to verify battery current.
     float battery_shunt_voltage_reading;
+    //Sensor-reported battery power; used to check calculated battery power
     float battery_power_reading;
 
 
@@ -38,17 +53,27 @@ typedef struct {
 
 typedef struct {
 
+    //Calculated solar power; used to measure solar generation
     float solar_power_w;
+    //Calculated battery power; used to determine charging or discharging
     float battery_power_w;
+    //Approximate spacecraft power use; used to detect high loads
     float estimated_power_balance_w;
 
+    //Total energy charged into the battery; used for state of charge (SOC) estimation
     float battery_energy_in_wh;
+    //Total energy removed from the battery; used for state of charge (SOC) estimation
     float battery_energy_out_wh;
+    //Estimated battery fullness; used for low-power decisions (measured in %)
     float estimated_state_of_charge_pct;
 
+    //Smoothed solar-power average; used to predict charging availability
     float average_solar_power_w;
+    //Smoothed battery-current average; used to predict battery trend
     float average_battery_current_a;
+    //Predicted time until empty; used to trigger power-saving mode
     float estimated_time_to_empty_h;
+    //Predicted time until full; used to track charging progress
     float estimated_time_to_full_h;
 
 } eps_estimation_data_t;

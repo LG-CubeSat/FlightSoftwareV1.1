@@ -7,6 +7,8 @@
 static pthread_mutex_t eps_sensor_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t eps_estimation_lock = PTHREAD_MUTEX_INITIALIZER;
 
+
+//sensor_data definitions in eps_data.h
 static eps_sensor_data_t eps_sensor_data = {
 
     .timestamp_ms = 0u, //to be implemeneted
@@ -26,6 +28,7 @@ static eps_sensor_data_t eps_sensor_data = {
     .battery_power_reading = 0.00f
 };
 
+//estimation_data definitions in eps_data.h
 static eps_estimation_data_t eps_estimation_data = {
 
     .solar_power_w = 0.00f,
