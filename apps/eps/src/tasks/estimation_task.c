@@ -62,6 +62,16 @@ void estimation_task(void *pvParameters)
         //calculations
         local_estimation_data.solar_power_w = calculateWatts(local_sensor_data.solar_voltage_reading,local_sensor_data.solar_current_reading);
         local_estimation_data.battery_power_w = calculateWatts(local_sensor_data.battery_voltage_reading,local_sensor_data.battery_current_reading);
+        /*
+
+        solar_shunt_voltage_reading;
+        solar_power_reading;
+        battery_voltage_reading;
+        battery_current_reading;
+        battery_shunt_voltage_reading;
+        battery_power_reading;
+    
+        */
 
         //set data
         set_eps_estimation_data(local_estimation_data);
