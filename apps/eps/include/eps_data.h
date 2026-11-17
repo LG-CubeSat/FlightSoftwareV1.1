@@ -13,6 +13,8 @@ typedef enum {
     EPS_BATTERY_VOLTAGE             =1u << 2,
     EPS_BATTERY_CURRENT             =1u << 3,
     EPS_BATTERY_TEMPERATURE         =1u << 4,
+    SOLAR_SHUNT_VOLTAGE             =1u << 5,
+    BATTERY_SHUNT_VOLTAGE           =1u << 6,
 
     //Estimation masks
     SOLAR_POWER_W                   =1u << 5,
@@ -20,17 +22,12 @@ typedef enum {
     ESTIMATED_POWER_BALANCE         =1u << 7,
     BATTERY_ENERGY_IN_WH            =1u << 8,
     BATTERY_ENERGY_OUT_WH           =1u << 9,
-    ESTIMATED_STATE_OF_CHARGE_PCT   =1U << 10,
-    
+    ESTIMATED_STATE_OF_CHARGE_PCT   =1u << 10,
+    AVERAGE_SOLAR_POWER_W           =1u << 11,
+    AVERAGE_BATTERY_CURRENT_A       =1u << 12,
+    ESTIMATED_TIME_TO_FULL_H        =1u << 13,
+    ESTIAMTED_TIME_TO_EMPTY_H       =1u << 14
 
-    //Smoothed solar-power average; used to predict charging availability
-    float average_solar_power_w;
-    //Smoothed battery-current average; used to predict battery trend
-    float average_battery_current_a;
-    //Predicted time until empty; used to trigger power-saving mode
-    float estimated_time_to_empty_h;
-    //Predicted time until full; used to track charging progress
-    float estimated_time_to_full_h;
     
 
 } eps_valid_mask_t;
@@ -55,8 +52,7 @@ typedef struct {
     float solar_current_reading;
     //Solar shunt voltage drop; used to verify solar current
     float solar_shunt_voltage_reading;
-    //Sensor-reported solar power; used to check calculated solar power
-    float solar_power_reading;
+
 
     //battery readings
 
@@ -66,8 +62,6 @@ typedef struct {
     float battery_current_reading;
     //Battery shunt voltage drop; used to verify battery current.
     float battery_shunt_voltage_reading;
-    //Sensor-reported battery power; used to check calculated battery power
-    float battery_power_reading;
     //temperature reading from battery; used to check for overheating
     float battery_temperature_reading;
 
