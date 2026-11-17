@@ -6,11 +6,32 @@
 
 typedef enum {
 
-    EPS_SOLAR_VOLATGE       =1u << 0,
-    EPS_SOLAR_CURRENT       =1u << 1,
-    EPS_BATTERY_VOLTAGE     =1u << 2,
-    EPS_BATTERY_CURRENT     =1u << 3,
-    EPS_BATTERY_TEMPERATURE =1u << 4
+
+    //Sensor masks
+    EPS_SOLAR_VOLATGE               =1u << 0,
+    EPS_SOLAR_CURRENT               =1u << 1,
+    EPS_BATTERY_VOLTAGE             =1u << 2,
+    EPS_BATTERY_CURRENT             =1u << 3,
+    EPS_BATTERY_TEMPERATURE         =1u << 4,
+
+    //Estimation masks
+    SOLAR_POWER_W                   =1u << 5,
+    BATTERY_POWER_W                 =1u << 6,
+    ESTIMATED_POWER_BALANCE         =1u << 7,
+    BATTERY_ENERGY_IN_WH            =1u << 8,
+    BATTERY_ENERGY_OUT_WH           =1u << 9,
+    ESTIMATED_STATE_OF_CHARGE_PCT   =1U << 10,
+    
+
+    //Smoothed solar-power average; used to predict charging availability
+    float average_solar_power_w;
+    //Smoothed battery-current average; used to predict battery trend
+    float average_battery_current_a;
+    //Predicted time until empty; used to trigger power-saving mode
+    float estimated_time_to_empty_h;
+    //Predicted time until full; used to track charging progress
+    float estimated_time_to_full_h;
+    
 
 } eps_valid_mask_t;
 
@@ -23,7 +44,7 @@ typedef struct {
     //New-sample counter; used to avoid processing a sample twice
     uint32_t sequence;
     //Binary mask; used to detemine which data is valid
-    uint32_t valid_mask;
+    uint32_t valid_sensor_mask;
 
 
     //solar readings
@@ -47,12 +68,16 @@ typedef struct {
     float battery_shunt_voltage_reading;
     //Sensor-reported battery power; used to check calculated battery power
     float battery_power_reading;
+    //temperature reading from battery; used to check for overheating
+    float battery_temperature_reading;
 
 
 } eps_sensor_data_t;
 
 typedef struct {
 
+    //Binary mask; used to detemine which data is valid
+    uint32_t valid_estimation_mask;
     //Calculated solar power; used to measure solar generation
     float solar_power_w;
     //Calculated battery power; used to determine charging or discharging

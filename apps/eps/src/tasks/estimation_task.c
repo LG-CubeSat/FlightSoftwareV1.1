@@ -59,11 +59,13 @@ void estimation_task(void *pvParameters)
         local_sensor_data = get_eps_sensor_data();
         local_estimation_data = get_eps_estimation_data();
 
-        //calculations
+        /*
+        calculations (each has to check if data is valid using valid mask in sensor data), if data it's trying to access
+        is n/a (a.k.a. invalid) it will return NAN along with printing the error
+        */
         local_estimation_data.solar_power_w = calculateWatts(local_sensor_data.solar_voltage_reading,local_sensor_data.solar_current_reading);
         local_estimation_data.battery_power_w = calculateWatts(local_sensor_data.battery_voltage_reading,local_sensor_data.battery_current_reading);
         local_estimation_data.estimated_power_balance_w = local_estimation_data.solar_power_w - local_estimation_data.battery_power_w;
-        local_estimation_data.battery_energy_in_wh = local_estimation_data.battery_
         /*
 
         to-do: implement calculations for:
