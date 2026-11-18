@@ -8,7 +8,7 @@ typedef enum {
 
 
     //Sensor masks
-    EPS_SOLAR_VOLATGE               =1u << 0,
+    EPS_SOLAR_VOLTAGE               =1u << 0,
     EPS_SOLAR_CURRENT               =1u << 1,
     EPS_BATTERY_VOLTAGE             =1u << 2,
     EPS_BATTERY_CURRENT             =1u << 3,

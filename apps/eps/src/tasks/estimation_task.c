@@ -60,26 +60,27 @@ void estimation_task(void *pvParameters)
     for (;;)
     {
 
-        //time calculations
-        if (!has_previous_sensor_sample) {
-
-            previous_sensor_timestamp_ms = sensor.timestamp_ms;
-            previous_sensor_sequence = sensor.sequence;
-            has_previous_sensor_sample = true;
-}
-        else if (sensor.sequence != previous_sensor_sequence) {
-
-            uint32_t elapsed_ms = sensor.timestamp_ms - previous_sensor_timestamp_ms;
-            float elapsed_hours = (float)elapsed_ms / 3600000.0f;
-
-            previous_sensor_timestamp_ms = sensor.timestamp_ms;
-            previous_sensor_sequence = sensor.sequence;
-
-}
-
         //read data
         local_sensor_data = get_eps_sensor_data();
         local_estimation_data = get_eps_estimation_data();
+
+        //time calculations
+        if (!has_previous_sensor_sample) {
+
+            previous_sensor_timestamp_ms = local_sensor_data.timestamp_ms;
+            previous_sensor_sequence = local_sensor_data.sequence;
+            has_previous_sensor_sample = true;
+        }
+        else if (local_sensor_data.sequence != previous_sensor_sequence) {
+
+            uint32_t elapsed_ms = local_sensor_data.timestamp_ms - previous_sensor_timestamp_ms;
+            float elapsed_hours = (float)elapsed_ms / 3600000.0f;
+
+            previous_sensor_timestamp_ms = local_sensor_data.timestamp_ms;
+            previous_sensor_sequence = local_sensor_data.sequence;
+
+            (void)elapsed_hours;
+        }
 
         /*
         calculations (each has to check if data is valid using valid mask in sensor data), if data it's trying to access
@@ -95,7 +96,7 @@ void estimation_task(void *pvParameters)
 
             local_estimation_data.battery_power_w = calculateWatts(local_sensor_data.battery_voltage_reading,local_sensor_data.battery_current_reading);
         }
-        if ((local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) && (local_estimation_data.valid_estimation_mask & BATTERY_POWER_W) && ()) {
+        if ((local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) && (local_estimation_data.valid_estimation_mask & BATTERY_POWER_W)) {
 
             local_estimation_data.estimated_power_balance_w = local_estimation_data.solar_power_w - local_estimation_data.battery_power_w;
         }
