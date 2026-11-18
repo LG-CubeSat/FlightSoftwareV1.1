@@ -3,6 +3,15 @@
         {
             "name": "Mac",
             "includePath": [
+                "${workspaceFolder}/apps/eps/include",
+                "${workspaceFolder}/apps/eps/include/utils",
+                "${workspaceFolder}/rtos/kernels/include",
+                "${workspaceFolder}/rtos/ports/posix",
+                "${workspaceFolder}/rtos/config",
+                "${workspaceFolder}/shared/csp",
+                "${workspaceFolder}/shared/interfaces",
+                "${workspaceFolder}/libs/libcsp/include",
+                "${workspaceFolder}/build/libs/libcsp/include",
                 "${workspaceFolder}/**",
                 "/usr/include"
             ],
@@ -10,17 +19,6 @@
             "compilerPath": "/usr/bin/clang",
             "cStandard": "c17",
             "cppStandard": "c++14",
-            "intelliSenseMode": "macos-clang-arm64"
-        },
-        {
-            "name": "Mac",
-            "includePath": [
-                "${workspaceFolder}/**"
-            ],
-            "defines": [],
-            "compilerPath": "/usr/bin/clang",
-            "cStandard": "gnu17",
-            "cppStandard": "gnu++14",
             "intelliSenseMode": "macos-clang-arm64"
         }
     ],

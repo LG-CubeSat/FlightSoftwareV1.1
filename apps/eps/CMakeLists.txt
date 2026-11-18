@@ -21,6 +21,7 @@ target_include_directories(eps_sim PRIVATE
     ${CMAKE_SOURCE_DIR}/rtos/ports/posix
     ${CMAKE_SOURCE_DIR}/rtos/config
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
 )
 
 target_link_libraries(eps_sim PRIVATE freertos_kernel pthread platform csp_interface)
