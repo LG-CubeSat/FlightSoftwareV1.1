@@ -20,6 +20,31 @@ these are never written to disk or transmitted to ground.
 
 #define OBC_TELEMETRY_READ_CHUNK_SIZE 216U
 
+#define OBC_TELEMETRY_LATEST_REQUEST_MAGIC UINT32_C(0x544C4D4C) // TLML
+#define OBC_TELEMETRY_LATEST_REPLY_MAGIC UINT32_C(0x544C4D52) // TLMR
+
+#define OBC_TELEMETRY_LATEST_HEADER_SIZE 8U
+#define OBC_TELEMETRY_LATEST_MAX_ENCODED \
+(OBC_IPC_MAX_PAYLOAD - OBC_TELEMETRY_LATEST_HEADER_SIZE)
+
+// mission -> data
+typedef struct {
+    uint32_t magic;
+} obc_telemetry_latest_request_t;
+
+// data -> mission. length == 0 means no ADCS record has arrived yet
+typedef struct {
+    uint32_t magic;
+    uint16_t length;
+    uint16_t reserved;
+    uint8_t encoded[OBC_TELEMETRY_LATEST_MAX_ENCODED];
+} obc_telemetry_latest_reply_t;
+
+_Static_assert(
+    sizeof(obc_telemetry_latest_reply_t) <= OBC_IPC_MAX_PAYLOAD,
+    "latest telemetry reply must fit in one IPC message"
+);
+
 /*
 So the codec is going to have these bytes
 Offset: 0, Size: 4, Meaning: Magic Bytes "WESW"

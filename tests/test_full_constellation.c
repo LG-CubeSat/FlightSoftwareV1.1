@@ -120,6 +120,7 @@ static pid_t spawn_logged(const char * path, const char * log_path, int set_asce
                 1
             );
             setenv("MISSION_STATE_PATH", MISSION_STATE, 1);
+            setenv("MISSION_TELEMETRY_MODE", "history", 1);
         }
 
         execl(path, path, (char *)NULL);

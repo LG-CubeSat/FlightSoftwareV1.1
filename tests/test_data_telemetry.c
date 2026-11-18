@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -252,6 +253,34 @@ static int request_telemetry_record(
     return -1;
 }
 
+static int request_latest_record(uint8_t *encoded, size_t capacity, size_t *encoded_size)
+{
+    obc_telemetry_latest_request_t request = {
+        .magic = OBC_TELEMETRY_LATEST_REQUEST_MAGIC
+    };
+    obc_telemetry_latest_reply_t reply;
+    OBC_Roles_t source;
+
+    if (encoded == NULL || encoded_size == NULL ||
+        send_with_retry((const uint8_t *)&request, sizeof(request)) != 0) {
+        return -1;
+    }
+
+    int received = IPC_receive_timeout(&source, (uint8_t *)&reply, sizeof(reply), 1000);
+    if (received < (int)offsetof(obc_telemetry_latest_reply_t, encoded) ||
+        source != ROLE_DATA ||
+        reply.magic != OBC_TELEMETRY_LATEST_REPLY_MAGIC ||
+        reply.reserved != 0 || reply.length > capacity ||
+        reply.length > sizeof(reply.encoded) ||
+        received != (int)(offsetof(obc_telemetry_latest_reply_t, encoded) + reply.length)) {
+        return -1;
+    }
+
+    memcpy(encoded, reply.encoded, reply.length);
+    *encoded_size = reply.length;
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     unlink("/tmp/obc_ipc_mission.sock");
@@ -370,6 +399,18 @@ int main(int argc, char **argv)
         "malformed record is not appended",
         wait_for_file_size(first_run_size)
     );
+
+    check_true("test switches to Mission for latest ADCS request",
+               IPC_initialize(ROLE_MISSION) == IPC_OK);
+    uint8_t latest[OBC_IPC_MAX_PAYLOAD];
+    size_t latest_size = 0;
+    check_true("latest ADCS record can be requested",
+               request_latest_record(latest, sizeof(latest), &latest_size) == 0);
+    check_true("latest ADCS record is the second valid sample",
+               latest_size == second_size &&
+               memcmp(latest, second, second_size) == 0);
+    check_true("test switches back to Commands for restart check",
+               IPC_initialize(ROLE_COMMANDS) == IPC_OK);
 
     stop_data(first_data);
 

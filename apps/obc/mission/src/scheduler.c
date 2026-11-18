@@ -22,7 +22,7 @@
 #define STEP_RETRY_LIMIT 3 // attempts per step before giving up on the cycle
 #define COOLDOWN_SEC 600 // 10 min between cycles, need to tune
 #define TELEMETRY_BATCH_LIMIT 8U
-#define TELEMETRY_DOWNLINK_INTERVAL_SEC 30
+#define TELEMETRY_DOWNLINK_INTERVAL_SEC 3
 
 typedef enum {
     MISSION_WAITING_FOR_ASCENT,
@@ -55,6 +55,17 @@ static int get_ascent_wait_sec(void)
 
     int val = atoi(env);
     return (val > 0) ? val : ASCENT_WAIT_SEC;
+}
+
+static void run_latest_telemetry_downlink(void)
+{
+    mission_health_payload_begin();
+    int result = payload_commander_downlink_latest_adcs();
+    mission_health_payload_end();
+
+    if (result < 0) {
+        fprintf(stderr, "[SCHEDULER] latest ADCS downlink failed\n");
+    }
 }
 
 static int get_telemetry_downlink_interval_sec(void)
@@ -318,7 +329,12 @@ void *scheduler_thread(void *arg) {
         if (
             since_telemetry_attempt >= telemetry_downlink_interval_sec
         ) {
-            run_telemetry_downlink_batch();
+            const char *mode = getenv("MISSION_TELEMETRY_MODE");
+            if (mode != NULL && strcmp(mode, "history") == 0) {
+                run_telemetry_downlink_batch();
+            } else {
+                run_latest_telemetry_downlink();
+            }
 
             /*
             Re-read the clock after the operation. A failed Data request may have consumed its complete timeout.

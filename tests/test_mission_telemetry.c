@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <stddef.h>
 
 #include "mission_health.h"
 #include "obc_ipc.h"
@@ -30,6 +31,9 @@ static size_t radio_history_lengths[MAX_RADIO_CALLS];
 static int progress_calls;
 static uint32_t pending_radio_id;
 static int pending_radio_status;
+static obc_telemetry_latest_reply_t latest_reply;
+static int latest_pending;
+static int latest_request_count;
 
 static void check_true(const char *name, int condition)
 {
@@ -60,6 +64,9 @@ static void reset_fakes(void)
     progress_calls = 0;
     pending_radio_id = 0;
     pending_radio_status = 0;
+    memset(&latest_reply, 0, sizeof(latest_reply));
+    latest_pending = 0;
+    latest_request_count = 0;
 }
 
 static size_t make_record(
@@ -145,6 +152,15 @@ int IPC_send(OBC_Roles_t destination, const uint8_t *data, uint16_t length)
             (radio_fail_on_call > 0 && radio_calls == radio_fail_on_call);
         return length;
     }
+    if (destination == ROLE_DATA && data != NULL &&
+        length == sizeof(obc_telemetry_latest_request_t)) {
+        obc_telemetry_latest_request_t request;
+        memcpy(&request, data, sizeof(request));
+        if (request.magic != OBC_TELEMETRY_LATEST_REQUEST_MAGIC) return IPC_ERROR;
+        latest_request_count++;
+        latest_pending = 1;
+        return length;
+    }
     if (
         destination != ROLE_DATA ||
         data == NULL ||
@@ -181,6 +197,15 @@ int IPC_receive_timeout(
         *source = ROLE_RADIO;
         memcpy(buffer, &reply, OBC_RADIO_HEADER_SIZE);
         return OBC_RADIO_HEADER_SIZE;
+    }
+
+    if (latest_pending && capacity >= sizeof(latest_reply)) {
+        size_t wire_length = offsetof(obc_telemetry_latest_reply_t, encoded) +
+                             latest_reply.length;
+        latest_pending = 0;
+        *source = ROLE_DATA;
+        memcpy(buffer, &latest_reply, wire_length);
+        return (int)wire_length;
     }
 
     if (
@@ -516,6 +541,27 @@ static void test_batch_rejects_zero_limit(void)
     check_true("rejected batch sends no IPC or radio data", request_count == 0 && radio_calls == 0);
 }
 
+static void test_latest_snapshot_skips_duplicate(void)
+{
+    reset_fakes();
+
+    uint8_t encoded[OBC_IPC_MAX_PAYLOAD];
+    size_t encoded_size = make_record(0x7a, 184, encoded);
+    latest_reply.magic = OBC_TELEMETRY_LATEST_REPLY_MAGIC;
+    latest_reply.length = (uint16_t)encoded_size;
+    memcpy(latest_reply.encoded, encoded, encoded_size);
+
+    int first = payload_commander_downlink_latest_adcs();
+    check_true("latest request uses its own IPC message", latest_request_count == 1);
+    check_true("latest ADCS snapshot reaches radio unchanged",
+               first == 1 && radio_calls == 1 && radio_length == encoded_size &&
+               memcmp(radio_bytes, encoded, encoded_size) == 0);
+
+    int duplicate = payload_commander_downlink_latest_adcs();
+    check_true("unchanged snapshot is not transmitted twice",
+               duplicate == 0 && latest_request_count == 2 && radio_calls == 1);
+}
+
 int main(void)
 {
     test_single_chunk_record();
@@ -526,6 +572,7 @@ int main(void)
     test_batch_honors_record_limit();
     test_batch_failure_keeps_failed_record_cursor();
     test_batch_rejects_zero_limit();
+    test_latest_snapshot_skips_duplicate();
 
     if (checks_failed == 0) {
         printf("mission_telemetry_test: PASS\n");

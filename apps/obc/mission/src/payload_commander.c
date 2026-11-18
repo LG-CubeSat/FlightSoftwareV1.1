@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdatomic.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <inttypes.h>
 
 #include "csp_commands.h"
 #include "camera.h"
@@ -34,6 +36,85 @@ static uint32_t next_radio_request_id = 1;
 static atomic_bool pending_photo_command = false;
 static void deadline_in_ms(struct timespec *out, int ms);
 static int remaining_ms(const struct timespec *deadline);
+static void remember_photo_command(OBC_Roles_t source, const uint8_t *data, int length);
+static int radio_send_via_ipc(obc_radio_kind_t kind, const uint8_t *data, size_t length);
+
+int payload_commander_downlink_latest_adcs(void)
+{
+    static uint64_t last_sent_received_unix_us = 0;
+
+    obc_telemetry_latest_request_t request = {
+        .magic = OBC_TELEMETRY_LATEST_REQUEST_MAGIC
+    };
+
+    if (IPC_send(ROLE_DATA, (const uint8_t *)&request, sizeof(request)) < 0) {
+        fprintf(stderr, "[MISSION] latest telemetry request failed\n");
+        return -1;
+    }
+
+    struct timespec deadline;
+    deadline_in_ms(&deadline, TELEMETRY_READ_TIMEOUT_MS);
+
+    for (;;) {
+        int wait_ms = remaining_ms(&deadline);
+        if (wait_ms <= 0) {
+            fprintf(stderr, "[MISSION] latest telemetry reply timed out\n");
+            return -1;
+        }
+
+        OBC_Roles_t source;
+        obc_telemetry_latest_reply_t reply;
+        int received = IPC_receive_timeout(
+            &source, (uint8_t *)&reply, sizeof(reply), wait_ms
+        );
+
+        if (received == IPC_TIMEOUT) return -1;
+        if (received < 0) continue;
+
+        remember_photo_command(source, (const uint8_t *)&reply, received);
+
+        if (source != ROLE_DATA ||
+            received < (int)offsetof(obc_telemetry_latest_reply_t, encoded) ||
+            reply.magic != OBC_TELEMETRY_LATEST_REPLY_MAGIC) {
+            continue;
+        }
+
+        if (reply.reserved != 0 ||
+            reply.length > sizeof(reply.encoded) ||
+            received != (int)(offsetof(obc_telemetry_latest_reply_t, encoded) + reply.length)) {
+            fprintf(stderr, "[MISSION] malformed latest telemetry reply\n");
+            return -1;
+        }
+
+        if (reply.length == 0) return 0;
+
+        obc_telemetry_record_t record;
+        if (obc_telemetry_decode(reply.encoded, reply.length, &record) !=
+                OBC_TELEMETRY_OK ||
+            record.source_node != ADCS_ADDRESS ||
+            record.source_port != ADCS_TELEM_PORT) {
+            fprintf(stderr, "[MISSION] invalid latest ADCS record\n");
+            return -1;
+        }
+
+        // No need to transmit the same snapshot repeatedly.
+        if (record.received_unix_us == last_sent_received_unix_us) {
+            return 0;
+        }
+
+        if (radio_send_via_ipc(OBC_RADIO_SEND_RAW, reply.encoded, reply.length) != 0) {
+            fprintf(stderr, "[MISSION] latest ADCS downlink failed\n");
+            return -1;
+        }
+
+        // update only after obc_radio confirms its local UART send.
+        last_sent_received_unix_us = record.received_unix_us;
+        printf("[MISSION] sent latest ADCS snapshot at %" PRIu64 " us\n",
+               last_sent_received_unix_us);
+        fflush(stdout);
+        return 1;
+    }
+}
 
 int payload_commander_take_pending_photo_command(void)
 {

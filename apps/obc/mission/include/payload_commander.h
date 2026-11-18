@@ -24,4 +24,7 @@ int payload_commander_downlink_telemetry_batch(
     int *end_of_log
 );
 
+/* Returns 1 if sent, 0 if no new record, -1 on failure. */
+int payload_commander_downlink_latest_adcs(void);
+
 #endif // OBC_MISSION_PAYLOAD_COMMANDER_H

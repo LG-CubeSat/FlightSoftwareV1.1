@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <pthread.h>
+#include <stddef.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -11,10 +12,37 @@
 #include "obc_data_protocol.h"
 #include "filesystem.h"
 #include "data_health.h"
+#include "csp_commands.h"
+#include "obc_telemetry_protocol.h"
 
 #define STORAGE_POLL_TIMEOUT_MS 1000
 #define TELEMETRY_REPLY_RETRIES 20
 #define TELEMETRY_REPLY_RETRY_DELAY_US 2000
+
+// only storage thread reads or write this cache so it needs no mutex
+static uint8_t latest_adcs_encoded[OBC_TELEMETRY_LATEST_MAX_ENCODED];
+static uint16_t latest_adcs_length = 0;
+static uint64_t latest_adcs_received_unix_us = 0;
+
+static void send_latest_adcs(OBC_Roles_t requester)
+{
+    if (requester != ROLE_MISSION) return;
+
+    obc_telemetry_latest_reply_t reply = {0};
+    reply.magic = OBC_TELEMETRY_LATEST_REPLY_MAGIC;
+    reply.length = latest_adcs_length;
+
+    if (latest_adcs_length != 0) {
+        memcpy(reply.encoded, latest_adcs_encoded, latest_adcs_length);
+    }
+
+    size_t wire_length = offsetof(obc_telemetry_latest_reply_t, encoded) + reply.length;
+
+    if (IPC_send(requester, (const uint8_t *)&reply,
+        (uint16_t)wire_length) < 0) {
+        fprintf(stderr, "[STORAGE] could not send latest ADCS record.\n");
+    }
+}
 
 int storage_thread_init(void) {
     printf("[DATA STORAGE] Attempting to create pthread.\n");
@@ -183,11 +211,30 @@ void *storage_thread(void *arg)
         }
 
         if (src == ROLE_COMMANDS) {
+            obc_telemetry_record_t record;
+            if ((size_t)len <= sizeof(latest_adcs_encoded) &&
+                obc_telemetry_decode(buf, (size_t)len, &record) == OBC_TELEMETRY_OK &&
+                record.source_node == ADCS_ADDRESS &&
+                record.source_port == ADCS_TELEM_PORT &&
+                (latest_adcs_length == 0 ||
+                 record.received_unix_us >= latest_adcs_received_unix_us)) {
+                memcpy(latest_adcs_encoded, buf, (size_t)len);
+                latest_adcs_length = (uint16_t)len;
+                latest_adcs_received_unix_us = record.received_unix_us;
+            }
+
             if (telemetry_store_append(buf, (size_t)len) != 0) {
                 fprintf(
                     stderr,
                     "[STORAGE] failed to persist telemetry record\n"
                 );
+            }
+        } else if (len == (int)sizeof(obc_telemetry_latest_request_t)) {
+            obc_telemetry_latest_request_t request;
+            memcpy(&request, buf, sizeof(request));
+
+            if (request.magic == OBC_TELEMETRY_LATEST_REQUEST_MAGIC) {
+                send_latest_adcs(src);
             }
         } else if (len == (int)sizeof(obc_telemetry_read_request_t)) {
             obc_telemetry_read_request_t request;
@@ -196,10 +243,9 @@ void *storage_thread(void *arg)
             if (request.magic == OBC_TELEMETRY_READ_REQUEST_MAGIC) {
                 handle_telemetry_read(src, &request);
             } else {
-                fprintf(
-                    stderr,
-                    "[STORAGE] ignoring unknown %d-byte request from role %d\n", len, src
-                );
+                fprintf(stderr,
+                        "[STORAGE] ignoring unknown %d-byte request from role %d\n",
+                        len, src);
             }
         } else if (len == sizeof(data_read_request_t)) {
             data_read_request_t req;
@@ -221,6 +267,7 @@ void *storage_thread(void *arg)
 
             filesystem_write_chunk(chunk.path, chunk.offset, chunk.length, chunk.payload, src);
         }
+
         /* anything else: not a message this thread understands, drop it */
         data_health_storage_progress();
     }

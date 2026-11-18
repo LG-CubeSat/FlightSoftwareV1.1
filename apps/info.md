@@ -128,6 +128,12 @@ The BOOT button is not needed for normal SWD flashing.
 If the probe cannot connect, first verify board power, common ground, and the
 SWD wiring. Do not use `port=USB1` for an ST-Link.
 
+Flashing is done through USB-C like so:
+```sh
+/Applications/STMicroelectronics/STM32Cube/STM32CubeProgrammer/STM32CubeProgrammer.app/Contents/Resources/bin/STM32_Programmer_CLI \
+  -c port=USB1 -d apps/adcs/Debug/adcs_stm32.elf -v -s
+```
+
 ## 4. Build and run the Pi OBC
 
 Do these commands **on the Raspberry Pi**, in its FlightSoftwareV1.1 checkout,
@@ -143,10 +149,14 @@ That is the **OBC build**. It neither flashes the ADCS nor starts the OBC.
 Start the built OBC with:
 
 ```sh
+sudo systemctl stop obc.service
+sudo systemctl start pigpiod
+pigs m 25 r
+pigs pud 25 o
 BENCH_DIR="$(mktemp -d)"
-MISSION_STATE_PATH="$BENCH_DIR/mission.state" \
+E22_SWAPPED_UART=1 MISSION_STATE_PATH="$BENCH_DIR/mission.state" \
   OBC_TELEMETRY_LOG_PATH="$BENCH_DIR/telemetry.bin" \
-  MISSION_TELEMETRY_DOWNLINK_INTERVAL_SEC=1 \
+  MISSION_TELEMETRY_DOWNLINK_INTERVAL_SEC=3 \
   MISSION_ASCENT_WAIT_SEC=100000 MISSION_AUTONOMY_ENABLED=0 \
   ./build-hw/bin/obc_supervisor
 ```
@@ -155,6 +165,13 @@ The terminal stays open while the OBC runs. Do not start `adcs_sim` when using
 the real ADCS board. If you already built `./build/bin/obc_supervisor`, check
 `grep '^HW_MODE:BOOL=' build/CMakeCache.txt` on the Pi. You may run that binary
 instead only if it says `HW_MODE:BOOL=ON`.
+
+This PCB uses swapped E22 UART wiring. GPIO25 is the E22 AUX input; `pigs pud
+25 o` disables its internal pull, matching the known-good hardware test. The
+default mission downlink requests the newest ADCS snapshot every 3 seconds.
+The ground station shows both RF arrival age and the Pi receive timestamp age,
+so keep the Pi and Mac clocks synchronized. Use
+`MISSION_TELEMETRY_MODE=history` only to replay stored records.
 
 ## 5. Confirm the firmware and connection run
 
