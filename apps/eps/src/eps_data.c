@@ -13,23 +13,23 @@ static eps_sensor_data_t eps_sensor_data = {
 
     .timestamp_ms = 0u, //to be implemeneted
     .sequence = 0u, //to be implemented
-    .valid_mask = 0u << 0, //initial mask
+    .valid_sensor_mask = 0u << 0, //initial mask
 
     //solar readings
     .solar_voltage_reading = 0.00f,
     .solar_current_reading = 0.00f,
     .solar_shunt_voltage_reading = 0.00f,
-    .solar_power_reading = 0.00f,
 
     //battery readings
     .battery_voltage_reading = 0.00f,
     .battery_current_reading = 0.00f, 
-    .battery_shunt_voltage_reading = 0.00f,
-    .battery_power_reading = 0.00f
+    .battery_shunt_voltage_reading = 0.00f
 };
 
 //estimation_data definitions in eps_data.h
 static eps_estimation_data_t eps_estimation_data = {
+
+    .valid_estimation_mask = 0u << 0,
 
     .solar_power_w = 0.00f,
     .battery_power_w =0.00f,
