@@ -184,6 +184,11 @@ int radio_send(const uint8_t *data, size_t length)
     return 0;
 }
 
+int radio_send_ssdv(const uint8_t *data, size_t length)
+{
+    return radio_send(data, length);
+}
+
 int radio_receive(uint8_t *buffer, uint16_t max_length)
 {
     (void)buffer;

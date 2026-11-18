@@ -12,6 +12,8 @@
 #include "pthread.h"
 #include "mission_health.h"
 #include <inttypes.h>
+#include "obc_ipc.h"
+#include "csp_commands.h"
 
 #define ASCENT_WAIT_SEC 5400 // ~90 min: typical HAB ascent to burst altitude at ~5 m/s; tune once real ascent rate/fill is known
 #define PHOTO_PATH "/tmp/photos" // placeholder
@@ -235,6 +237,20 @@ void *scheduler_thread(void *arg) {
         struct timespec now;
         clock_gettime(CLOCK_MONOTONIC, &now); // monotonic: cooldown pacing
         double elapsed = difftime(time(NULL), mission_start_unix); // wall clock: survives restarts
+
+        if (current_state == MISSION_WAITING_FOR_ASCENT || current_state == MISSION_COOLDOWN) {
+            OBC_Roles_t src;
+            uint8_t cmd_buf[OBC_IPC_MAX_PAYLOAD];
+            int cmd_len = IPC_receive_timeout(&src, cmd_buf, sizeof(cmd_buf), 0);
+            if (cmd_len >= (int)sizeof(command_envelope_t)) {
+                const command_envelope_t *env = (const command_envelope_t *)cmd_buf;
+                if (env->command_id == CMD_TAKE_PHOTO) {
+                    printf("[SCHEDULER] Ground telecommand received: CMD_TAKE_PHOTO! Starting Capture.\n");
+                    fflush(stdout);
+                    set_state(MISSION_TAKING_PHOTO);
+                }
+            }
+        }
 
         switch (current_state) {
             case MISSION_WAITING_FOR_ASCENT:

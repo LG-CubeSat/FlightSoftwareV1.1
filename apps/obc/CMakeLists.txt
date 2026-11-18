@@ -9,3 +9,7 @@ add_subdirectory(data)
 add_subdirectory(fdir)
 add_subdirectory(mission)
 add_subdirectory(time)
+
+if (HW_MODE)
+    add_subdirectory(i2c_test)
+endif()

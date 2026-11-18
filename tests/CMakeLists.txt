@@ -1,4 +1,31 @@
 if (NOT HW_MODE)
+    add_executable(adcs_estimator_test
+        test_adcs_estimator.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/control/control_math.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/estimation/kalman_filter.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/estimation/attitude_estimator.c
+    )
+    target_include_directories(adcs_estimator_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/include
+    )
+    target_link_libraries(adcs_estimator_test PRIVATE m)
+    add_test(NAME adcs_estimator_test COMMAND adcs_estimator_test)
+    set_tests_properties(adcs_estimator_test PROPERTIES TIMEOUT 5)
+
+    add_executable(adcs_manager_faults_test
+        test_adcs_manager_faults.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/manager/adcs_manager.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/control/control_math.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/guidance/target_generator.c
+    )
+    target_include_directories(adcs_manager_faults_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/include
+        ${CMAKE_SOURCE_DIR}/shared/csp
+    )
+    target_link_libraries(adcs_manager_faults_test PRIVATE m pthread)
+    add_test(NAME adcs_manager_faults_test COMMAND adcs_manager_faults_test)
+    set_tests_properties(adcs_manager_faults_test PROPERTIES TIMEOUT 5)
+
     add_executable(comms_bus_test test_comms_bus.c)
     target_link_libraries(comms_bus_test PRIVATE platform)
 
@@ -7,6 +34,18 @@ if (NOT HW_MODE)
         TIMEOUT 10
         RESOURCE_LOCK comms_bus_socket
     )
+
+    add_executable(radio_sim_test test_radio_sim.c)
+    target_link_libraries(radio_sim_test PRIVATE platform)
+
+    add_test(NAME radio_sim_test COMMAND radio_sim_test)
+    set_tests_properties(radio_sim_test PROPERTIES TIMEOUT 10)
+
+    add_executable(radio_framing_test test_radio_framing.c)
+    target_link_libraries(radio_framing_test PRIVATE platform)
+
+    add_test(NAME radio_framing_test COMMAND radio_framing_test)
+    set_tests_properties(radio_framing_test PROPERTIES TIMEOUT 10)
 
     add_executable(comms_bus_addressing_test test_comms_bus_addressing.c)
     target_link_libraries(comms_bus_addressing_test PRIVATE platform)
@@ -89,6 +128,7 @@ if (HW_MODE)
     target_include_directories(camera_hardware_test PRIVATE
         ${CMAKE_SOURCE_DIR}/apps/obc/mission/include
         ${CMAKE_SOURCE_DIR}/apps/obc/include
+        ${CMAKE_SOURCE_DIR}/libs/RadioHandler/include
         ${CMAKE_SOURCE_DIR}/shared/interfaces
         ${CMAKE_SOURCE_DIR}/shared/csp
     )
@@ -266,6 +306,7 @@ add_executable(
 target_include_directories(mission_telemetry_test PRIVATE
     ${CMAKE_SOURCE_DIR}/apps/obc/mission/include
     ${CMAKE_SOURCE_DIR}/apps/obc/include
+    ${CMAKE_SOURCE_DIR}/libs/RadioHandler/include
     ${CMAKE_SOURCE_DIR}/shared/interfaces
     ${CMAKE_SOURCE_DIR}/shared/csp
 )
@@ -312,3 +353,22 @@ add_test(
 set_tests_properties(i2c_protocol_test PROPERTIES
     TIMEOUT 5
 )
+
+if(NOT HW_MODE)
+    add_executable(stm32_platform_test
+        test_stm32_platform.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Platform/Src/adcs_environment_stm32.c
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Platform/Src/adcs_sensors_unavailable.c)
+    target_include_directories(stm32_platform_test PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/stm32_support
+        ${CMAKE_SOURCE_DIR}/apps/adcs/Application/include
+        ${CMAKE_SOURCE_DIR}/shared/interfaces)
+    add_test(NAME stm32_platform_test COMMAND stm32_platform_test)
+    set_tests_properties(stm32_platform_test PROPERTIES TIMEOUT 5)
+endif()
+
+# Manual E22 link test. Keep it out of ctest: it needs the Mac USB peer.
+if (HW_MODE)
+    add_executable(radio_hardware_test test_radio_hardware.c)
+    target_link_libraries(radio_hardware_test PRIVATE platform)
+endif()

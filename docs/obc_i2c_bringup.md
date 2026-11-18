@@ -1,9 +1,8 @@
 # OBC (Raspberry Pi) I2C Bring-Up Guide
 
-**Status:** written ahead of hardware arrival. Walk through this top to bottom once the Pi
-Zero 2 W is physically in hand, before writing or running any of our own driver code against
-it. Every step here uses stock Raspberry Pi OS tools — nothing from this repo — so a failure
-at any step points at OS/wiring configuration, not our code.
+**Status:** updated for the Raspberry Pi Zero 2 W and the STM32G431 ADCS bring-up firmware.
+The ADCS board uses seven-bit I2C address `0x2A`; STM32 HAL displays the same address shifted
+left as `0x54` in `OAR1`.
 
 ---
 
@@ -78,23 +77,57 @@ driver bug if you don't already know to check group membership first.
 
 ---
 
-## 6. Verify the bus electrically — before any of our code runs
+## 6. Wire and verify the bus electrically
+
+Power both boards normally and connect a common ground. The I2C signals are 3.3 V logic; do
+not connect a Pi 5 V pin to SDA or SCL.
+
+| Signal | Raspberry Pi Zero 2 W | ADCS J8 |
+|---|---|---|
+| SDA | physical pin 3, GPIO2/SDA1 | pin 3, STM32 PB7/I2C1_SDA |
+| SCL | physical pin 5, GPIO3/SCL1 | pin 4, STM32 PA15/I2C1_SCL |
+| GND | any ground pin, for example physical pin 6 | board ground |
+
+With both boards powered and idle, SDA and SCL should each measure close to 3.3 V. A line
+stuck near 0 V means the bus is shorted, miswired, or one device is holding it low. The ADCS
+PCB includes 4.7 kOhm pull-ups, so do not add stronger pull-ups during initial bring-up.
+
+First confirm the Pi has selected the correct pins and bus:
+
+```bash
+pinctrl get 2,3
+ls -l /dev/i2c-1
+```
+
+GPIO2 and GPIO3 should show their I2C alternate function and both should read high while idle.
 
 With `i2c-tools` installed (step 3), scan the bus:
 
 ```bash
-i2cdetect -y 1
+sudo i2cdetect -y 1 0x2a 0x2a
 ```
 
-- **With nothing wired up yet:** expect a grid of all `--` — an *empty* result is success here,
-  it means the bus is alive and just has nothing attached.
+- **With the flashed and running ADCS board connected:** expect `2a` in row `20`, column `a`.
+- **With nothing wired up yet:** expect `--` at `0x2A`; that only proves no slave acknowledged.
 - **An actual error** (e.g. `Error: Could not open file "/dev/i2c-1"`) means step 4 or 5 isn't
   done correctly — not a wiring problem. Fix that before assuming anything about hardware.
-- **Once ADCS and/or Thermals are wired in** at their assigned I2C addresses (see
-  `docs/satellite_architecture.md` — real I2C addresses are a separate concept from CSP
-  addresses and still need assigning), their addresses should appear highlighted in the grid.
-  This is the checkpoint that proves the physical bus and address wiring are correct,
-  completely independent of any code in this repository.
+
+`i2cdetect` uses probe transactions that are not the actual ADCS protocol, so the definitive
+test is the repeated-start `GET_STATUS` transaction:
+
+```bash
+sudo i2ctransfer -y 1 w1@0x2a 0x01 r5
+```
+
+With no response frame queued, the exact result is:
+
+```text
+0xa5 0x01 0x00 0x00 0x00
+```
+
+That transaction is one Linux `I2C_RDWR` operation: write command `0x01`, issue a repeated
+START without releasing the bus, and read the five-byte reply. Separate shell commands do not
+test repeated-start behavior.
 
 ---
 
@@ -108,12 +141,22 @@ still enumerates correctly at the new speed.
 
 ---
 
-## 8. What's next
+## 8. Build and run the repository test
 
-Once `i2cdetect` confirms the bus is alive (and, once boards are wired in, that they respond at
-their assigned addresses), the next step is writing the actual master driver
-(`platform/real/drivers/`'s OBC-side I2C implementation) against the Linux `i2c-dev` ioctl API.
-See `docs/satellite_architecture.md` §4 item C.4 for where that fits in the overall bring-up
-plan, and the discussion in-session about how real I2C's master-driven addressing model differs
-from the current SIM transport's broadcast-and-filter design — that's the main design question
-to resolve before writing the driver, not just an implementation detail.
+From the repository root on the Pi:
+
+```bash
+cmake -S . -B build-hw -DHW_MODE=ON -DBUILD_TESTS=OFF
+cmake --build build-hw --target obc_adcs_i2c_test -j4
+./build-hw/bin/obc_adcs_i2c_test status
+./build-hw/bin/obc_adcs_i2c_test roundtrip
+```
+
+The first program command validates the five-byte status response. `roundtrip` sends a framed
+payload with `WRITE_FRAME`, polls `GET_STATUS`, reads it back with `READ_FRAME`, and verifies
+the returned source, destination, length, and payload. During the test, the ADCS UART should
+show address, receive, transmit, completion, malformed-transaction, and error counters.
+
+If `/dev/i2c-1` is still owned by `root:i2c` and the current login has not picked up its new
+group membership, temporarily prefix the two program commands with `sudo`; logging out and
+back in is the lasting fix.

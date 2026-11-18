@@ -72,7 +72,7 @@ int i2c_status_decode(
 
     I2cStatus_t decoded = {
         .flags = wire_buffer[2],
-        .frame_length = (
+        .frame_length = (uint16_t)(
             (uint16_t)wire_buffer[3] << 8 |
             (uint16_t)wire_buffer[4]
         )
@@ -84,4 +84,4 @@ int i2c_status_decode(
 
     *status_out = decoded;
     return 0;
-} 
+}

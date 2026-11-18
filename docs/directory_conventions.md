@@ -43,18 +43,15 @@ FlightSoftwareV1/
 │   └── real/                   # Hardware implementations
 │       └── drivers/
 │           └── comms_i2c.c     # Real backend, satisfies comms_bus.h (today: SPI HAL calls, see note below)
-├── apps/                       # Application code
-│   ├── adcs/                   # MCU flight code (Attitude Determination & Control) -- done, reference implementation
-│   │   ├── CMakeLists.txt
-│   │   ├── include/
-│   │   │   ├── communication/
-│   │   │   ├── control/
-│   │   │   └── tasks/
-│   │   └── src/
-│   │       ├── main.c
-│   │       ├── communication/
-│   │       ├── control/
-│   │       └── tasks/
+├── firmware/adcs_stm32/        # STM32 project and ADCS application sources
+│   ├── Core/                   # HAL startup and I2C transport
+│   ├── Drivers/                # Vendor HAL and CMSIS
+│   └── Application/
+│       ├── CMakeLists.txt      # Desktop simulation build
+│       ├── include/            # ADCS contracts
+│       └── src/                # Tasks, estimation, control, manager, simulation
+│           └── sim_main.c      # Desktop entry point
+├── apps/                       # Other application code
 │   └── obc/                    # Linux mission coordinator
 │       ├── CMakeLists.txt
 │       └── src/
@@ -87,7 +84,7 @@ slave backend behind that same interface.
 | `*.c` | `comms_i2c.c` | Implementation file |
 | `port.c` | `rtos/ports/posix/port.c` | OS/hardware port layer |
 | `portmacro.h` | `rtos/ports/posix/portmacro.h` | Port-specific macros and types |
-| `main.c` | `apps/adcs/src/main.c` | Entry point for an executable |
+| `sim_main.c` | `firmware/adcs_stm32/Application/src/sim_main.c` | Entry point for an executable |
 | `CMakeLists.txt` | Every directory | Build configuration |
 
 ### Directories

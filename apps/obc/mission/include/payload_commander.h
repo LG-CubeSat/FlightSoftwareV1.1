@@ -12,6 +12,8 @@ int payload_commander_downlink_photo(const char *photo_path);
 
 int payload_commander_point_to_sun(void);
 
+int payload_commander_reset_imu(void);
+
 int payload_commander_downlink_telemetry_record(uint64_t offset, uint64_t *next_offset, int *end_of_log);
 
 int payload_commander_downlink_telemetry_batch(

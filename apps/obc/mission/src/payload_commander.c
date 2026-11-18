@@ -159,8 +159,8 @@ int payload_commander_downlink_photo(const char *photo_path)
         return -1;
     }
 
-    // sending it
-    if (radio_send(photo_buf, total) != 0) {
+    // sending it. the compressed photo is whole ssdv packets, the radio frames each one
+    if (radio_send_ssdv(photo_buf, total) != 0) {
         fprintf(stderr, "[PAYLOAD COMMANDER] downlink failed.\n");
         return -1;
     }
@@ -173,6 +173,14 @@ int payload_commander_downlink_photo(const char *photo_path)
 int payload_commander_point_to_sun(void)
 {
     command_envelope_t cmd = { .command_id = CMD_POINT_TO_SUN, .seq = 1 };
+    relay_request_t req = { .dest_addr = ADCS_ADDRESS, .dest_port = ADCS_CMD_PORT, .length = sizeof(cmd) };
+    memcpy(req.payload, &cmd, sizeof(cmd));
+    return IPC_send(ROLE_COMMANDS, (const uint8_t *)&req, sizeof(req)) < 0 ? -1 : 0;
+}
+
+int payload_commander_reset_imu(void)
+{
+    command_envelope_t cmd = { .command_id = CMD_RESET_IMU, .seq = 1 };
     relay_request_t req = { .dest_addr = ADCS_ADDRESS, .dest_port = ADCS_CMD_PORT, .length = sizeof(cmd) };
     memcpy(req.payload, &cmd, sizeof(cmd));
     return IPC_send(ROLE_COMMANDS, (const uint8_t *)&req, sizeof(req)) < 0 ? -1 : 0;

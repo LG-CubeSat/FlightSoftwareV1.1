@@ -43,8 +43,18 @@ int main(void)
 
     CHECK(frame_serialize(&original, wire, 6) == -1,
           "serialize rejects an undersized output buffer");
+    CHECK(frame_serialize(NULL, wire, sizeof(wire)) == -1 &&
+          frame_serialize(&original, NULL, sizeof(wire)) == -1,
+          "serialize rejects null arguments");
     CHECK(frame_deserialize(wire, 3, &decoded) == -1,
           "deserialize rejects a truncated header");
+    CHECK(frame_deserialize(NULL, wire_len, &decoded) == -1 &&
+          frame_deserialize(wire, wire_len, NULL) == -1,
+          "deserialize rejects null arguments");
+
+    uint8_t trailing[] = {0x02, 0x01, 0x00, 0x01, 0xaa, 0xbb};
+    CHECK(frame_deserialize(trailing, sizeof(trailing), &decoded) == -1,
+          "deserialize rejects trailing bytes beyond the declared payload");
 
     const uint8_t truncated[] = {0x02, 0x01, 0x00, 0x04, 0xaa, 0xbb};
     CHECK(frame_deserialize(truncated, sizeof(truncated), &decoded) == -1,

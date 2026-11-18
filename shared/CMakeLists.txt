@@ -1,3 +1,5 @@
+add_subdirectory(ccsds)
+
 add_library(frame_codec STATIC
     interfaces/frame.c
 )

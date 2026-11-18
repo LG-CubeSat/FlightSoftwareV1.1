@@ -1,190 +1,94 @@
-# ADCS simulation
+# STM32 ADCS application
 
-This directory contains a working software-in-the-loop ADCS starting point. It
-models a CubeSat in orbit, exposes hardware-shaped sensor reads, estimates the
-current attitude, stores the current and target attitudes in one manager-owned
-context, selects a mode, calculates control with PID/B-dot controllers, and
-feeds actuator commands back into the simulated rigid body.
+`Core/Src/main.c` initializes the STM32G431RB HAL, GPIO, USART1, and I2C1,
+then calls `adcs_application_start()`. This starts the six existing ADCS tasks
+(sensor, estimation, control, command, telemetry, housekeeping), the CSP command
+receiver, the CSP router, and the I2C service task under FreeRTOS. The I2C task
+replaces the old frame echo loop and also toggles the status LED each second.
 
-It is an engineering simulation, not flight-qualified control software. The
-models and gains are deliberately small and understandable so real drivers and
-better environmental models can replace them later.
+The application sources live in `Application/`; both the desktop simulation and
+the MCU build compile these sources. `Application/src/sim_main.c`, the simulated
+drivers/plant, POSIX FreeRTOS port, and desktop CSP glue are excluded from the MCU.
 
-## Build and run
+## Build
 
 From the repository root:
 
 ```sh
-cmake -S . -B build -DHW_MODE=OFF
-cmake --build build --target adcs_sim
-build/apps/adcs/adcs_sim --standalone
+./firmware/adcs_stm32/build.sh
 ```
 
-`--standalone` runs all FreeRTOS tasks without requiring an OBC/CSP peer.
-Running without an argument enables CSP command and telemetry transport and
-waits for the normal repository network setup.
+Requires CMake 3.20+, Make, and Arm GNU tools. The script uses a compiler on PATH,
+`ARM_TOOLCHAIN_BIN`, or the macOS STM32CubeIDE toolchain. It does not flash.
+Outputs: `build-stm32/adcs_stm32.elf`, `.hex`, `.bin`, and `.map`.
 
-## The whole data flow
+Alternatively, import this directory into STM32CubeIDE and build Debug or
+Release. Both configurations include Application, Platform, RTOS, and linked
+repository kernel/CSP/frame sources. Debug retains debug information but uses
+`-Os` to match the memory/stack budget. CubeIDE produces
+`firmware/adcs_stm32/Debug/adcs_stm32.elf` (or `Release/`).
 
-```text
-simulated orbit + rigid-body truth
-              |
-              v
- IMU / magnetometer / Sun reads                    command queue
-              |                                          |
-              v                                          v
-        sensor packet ---> reference vectors ---> ADCS manager context
-              |                    |                | current attitude
-              +--> TRIAD seed + multiplicative -----+ target attitude
-                   attitude filter                  | active mode
-                                                   v
-                                   B-dot / Sun acquisition / quaternion PID
-                                                   |
-                                           magnetic allocator
-                                                   |
-                                           magnetorquers
-                                                   |
-                                                   v
-                                           simulated rigid body
-```
+The repository root's `HW_MODE=ON` remains the Linux OBC build. It does not build
+this firmware; use the standalone firmware project or script above.
 
-The manager context is the source of truth shared across tasks. Sensor and
-estimation tasks update it; control takes one coherent snapshot from it; mode
-logic updates the built-in target; telemetry takes another coherent snapshot.
-The mutex in `adcs_manager.c` prevents readers from seeing half-updated state.
+## Current behavior and remaining work
 
-Task rates are intentionally conventional for this simulation:
+- USART1 prints initialization and then ADCS mode, sensor/fault masks, and the
+  minimum free stack watermark of the six application tasks once per second.
+- I2C1 remains a seven-bit slave at `0x2A`. Existing GET_STATUS, WRITE_FRAME,
+  and READ_FRAME envelopes now carry CSP commands, ACK/NACK, and ADCS telemetry.
+  The logical CSP address is `ADCS_ADDRESS` from `shared/csp/csp_commands.h`.
+  Use the OBC CSP command path; the earlier echo-only bring-up test no longer
+  applies. Frames for other destinations or inconsistent CSP sources are dropped.
+- The six-packet CSP pool and two-frame transmit queue are bounded. A full
+  transmit queue drops the outgoing packet and increments the interface error
+  count; it cannot block the scheduler while an OBC is disconnected.
+- The STM32 time adapter extends the HAL millisecond tick across rollover and
+  accepts OBC Unix-time synchronization. Unix time is unavailable until synced.
+  Orbit data is explicitly unavailable until a flight orbit provider is added.
+- `Platform/Src/adcs_sensors_unavailable.c` returns NOT_READY for all sensors
+  and actuator operations. No IMU, magnetometer, Sun sensor, or rod pinout is
+  configured in the current `.ioc`. Replace that file with the actual drivers.
+  No simulator runs on the MCU, and no sensor-valid bits are invented.
+- Actuators start inhibited. Missing sensor/attitude data keeps ADCS in SAFE.
+  `Application/src/estimation/kalman_filter.c` remains unfinished. Booting this
+  application does not yet provide detumbling or pointing.
+- The independent watchdog starts before the scheduler and housekeeping feeds
+  it. Nominal timeout is about 32 seconds (LSI tolerance applies). Assert/stack
+  overflow handlers stop feeding it. An intentional shutdown disables interrupts
+  and feeds IWDG in the halt loop so shutdown does not turn into a reboot.
+- FreeRTOS uses static allocation. The linker reserves 1,536 bytes each for
+  the C-library heap and interrupt stack. Task stacks use explicit MCU budgets;
+  stack overflow checks and telemetry watermarks remain enabled. Additions to
+  the filter or drivers require rechecking stack usage on target.
 
-- Sensor and plant step: 100 Hz
-- Estimation: once per sensor packet, up to 100 Hz
-- Control and mode evaluation: 20 Hz
-- Telemetry: 5 Hz
-- Fault/health evaluation: 1 Hz
+## Validation
 
-## Quaternion and frame convention
+Verified with Arm GCC 14.3.1 through CMake and STM32CubeIDE Debug. The CMake
+image uses 28,960 / 32,768 bytes RAM including reserved heap/MSP stack, and
+67,296 / 131,072 bytes flash. These are build-time figures, not measured stack
+high-water marks.
 
-All attitudes use the local quaternion type, whose storage order is
-`[x, y, z, w]`.
-The quaternion rotates an ECI vector into the spacecraft body frame. Current
-attitude lives in `latest_attitude.quaternion`; commanded attitude lives in
-`guidance_target.target_quaternion`.
+Host regressions: position commands, ACK/NACK, full constellation telemetry and
+payload flow, frame codec, I2C protocol, and the new `stm32_platform_test` for
+clock rollover, time sync, and unavailable-device behavior. No physical board
+was flashed or exercised during integration. Validate UART output, stable SAFE,
+I2C command/telemetry round trips, and all task stack margins on the board next.
 
-This convention matters when forming the physical attitude error. The control
-math uses the shortest rotation from current attitude to target attitude and
-converts that error into a body-rate target before the three axis PID loops.
-Quaternions are normalized at subsystem boundaries, and `q` and `-q` are
-treated as the same attitude.
+## Build maintenance
 
-## Modes
+`RTOS/ARM_CM4F` vendors the unmodified FreeRTOS V11.1.0 GCC Cortex-M4F port,
+compatible with the repository's 11.1 kernel API. Its MIT notices are retained.
+Source: https://github.com/FreeRTOS/FreeRTOS-Kernel/tree/V11.1.0/portable/GCC/ARM_CM4F
 
-The implemented mode set is:
+`Platform/Inc/csp/autoconfig.h` is the CubeIDE copy of CMake's generated CSP
+configuration. CMake checks equality to prevent drift. Keep the linked sources
+in `.project` and source exclusions in `.cproject` in sync with the CMake target.
+Both builds compile and link against newlib-nano; the per-task reentrancy and
+retargeted locks must use matching C-library headers.
 
-- `BOOT`: wait for valid, fresh sensors and a valid attitude estimate.
-- `SAFE`: actuators off while faults or prerequisites prevent control.
-- `DETUMBLE`: B-dot magnetic damping until body rate remains below threshold.
-- `SUN_ACQUISITION`: turn the configured body Sun axis toward the Sun with
-  magnetorquers.
-- `SUN_POINTING`: maintain the Sun target with magnetorquer control.
-- `EARTH_POINTING`: continuously regenerate a nadir target and hold it.
-- `SLEWING`: move toward a commanded quaternion attitude or vector target.
-- `TARGET_POINTING`: hold the target after the slew settles.
-- `SCIENCE`: hold the commanded target using the precise controller.
-
-Nominal startup requests Sun pointing and follows
-`BOOT -> SAFE -> DETUMBLE -> SUN_ACQUISITION -> SUN_POINTING`. The detumble
-step is used only while rate is above its entry threshold. A critical sensor,
-attitude, rate, or actuator fault forces `SAFE`.
-
-## Estimation and guidance
-
-The sensor task uses the shared IMU, magnetometer, and Sun-sensor contracts;
-the simulation driver in `src/drivers/sim_adcs_drivers.c` maps those calls to
-the deterministic simulator. The control task uses the shared magnetorquer
-contract in the same way. No function uses `_mock` in its name: these are the
-simulation implementations of the hardware-shaped boundary.
-
-Reference generation provides low-order Sun, magnetic-field, and nadir ECI
-vectors from simulation time and orbit position. Two non-collinear measured
-vectors seed attitude with TRIAD. A lightweight multiplicative filter then
-propagates with gyro rate and applies bounded Sun/magnetic vector corrections.
-It carries an explicit gyro-bias state, seeded at zero in this MVP, and tracks
-estimate confidence. This is sufficient for the software-in-the-loop starting
-point, but it is not a full flight MEKF or an on-orbit gyro-bias calibration.
-
-Built-in Sun and Earth modes turn an inertial direction plus a body pointing
-axis into an ECI-to-body target `versor`. Explicit commands can instead supply
-a target `versor` or an inertial direction/body-axis pair.
-
-## Control and actuators
-
-All active modes use magnetorquers. `DETUMBLE` uses B-dot control; Sun
-acquisition and the quaternion-based pointing modes calculate a requested
-body torque and pass it through the magnetic allocator. The allocator applies
-`torque = dipole x magnetic_field`, reports the achievable torque, and enforces
-per-axis dipole limits. Magnetic control cannot produce torque parallel to the
-local field, so precise three-axis pointing is inherently limited and requires
-mission-specific validation.
-
-Sun hold, Earth hold, commanded slew, target hold, and science modes use a
-quaternion-to-rate outer loop and three rate PID controllers before magnetic
-allocation. Integral anti-windup, rate and dipole limits, shortest-path
-quaternion errors, and settle thresholds are represented.
-
-The simulator integrates diagonal-inertia Euler rigid-body dynamics. It also
-advances a circular inclined orbit, calculates simple Sun and tilted-dipole
-magnetic references, adds deterministic sensor bias/noise, and supports sensor
-and actuator fault injection. The model is deterministic so simulation runs
-are repeatable.
-
-## File map
-
-- `include/communication/message.h`: all task messages, modes, current/target
-  state, actuator outputs, health, and command types.
-- `src/simulation/`: sensor/actuator boundary plus orbit and rigid-body plant.
-- `src/estimation/`: reference vectors, TRIAD initialization, gyro propagation,
-  and vector corrections.
-- `src/guidance/`: attitude and vector target generation.
-- `src/control/`: reusable math, B-dot, Sun pointing, quaternion PID, magnetic
-  allocation, and mode dispatcher.
-- `src/manager/`: canonical state/context, transition logic, health, faults,
-  and watchdog behavior.
-- `src/tasks/`: periodic acquisition, estimation, control, telemetry,
-  housekeeping, and command execution.
-- `src/communication/`: CSP command decoding and explicit big-endian telemetry
-  encoding.
-- `src/main.c`: standalone and CSP-connected startup paths.
-
-## Command and telemetry boundary
-
-The existing repository commands for position, reset, shutdown, Sun pointing,
-and time sync remain supported. ADCS-local command IDs add mode selection,
-target attitude, target vector, estimator reset, actuator inhibit, and simulator
-fault injection. The legacy integer position command maps degrees about body Z
-to a real target quaternion so existing integration tests still exercise the
-new controller path.
-
-Telemetry format version 3 starts with `ADCS`, then carries mode, state flags,
-sequence, timestamp, sensor validity/fault masks, current and target
-quaternions, rates, bias, sensors, requested/achievable control, actuator
-flags, and health counters in explicit big-endian form. The state flags include
-attitude validity. Native C struct padding is never transmitted by the
-telemetry encoder.
-
-## Before connecting hardware
-
-The simulation is a reasonable interface and control starting point. Hardware
-work should replace the simulation driver implementations behind those
-contracts without changing the manager messages. Before flight or high-fidelity
-HIL testing:
-
-- Measure inertia, sensor alignment, actuator polarity, dipole limits, noise,
-  bias stability, and timing; then retune every control/estimator parameter.
-- Replace the circular orbit, low-order Sun model, and dipole magnetic model
-  with mission time/orbit services and validated reference models.
-- Add eclipse handling and magnetometer quiet sampling around rod actuation.
-- Decide whether the mission accuracy requires a full MEKF and higher-order
-  environment/actuator dynamics.
-- Define and version an explicitly encoded command wire format, as telemetry
-  already does, instead of depending on native command-struct layout.
-- Run unit, software-in-the-loop, processor-in-the-loop, HIL, fault-injection,
-  Monte Carlo, and mission-scenario tests before treating outputs as safe.
+CubeMX regeneration must preserve `adcs_application_start()` in the main user
+block and the FreeRTOS includes/SysTick call in the interrupt user blocks.
+It may recreate the empty SVC/PendSV handlers: keep their `ADCS_STM32` guards,
+because the Cortex-M4F port supplies those symbols. Review the linker reservations
+and CubeIDE source entries after regeneration before rebuilding.
