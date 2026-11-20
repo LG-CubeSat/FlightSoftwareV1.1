@@ -67,6 +67,9 @@ void estimation_task(void *pvParameters)
         local_estimation_data = get_eps_estimation_data();
 
         //time calculations
+
+        float elapsed_hours = 0.0f;
+
         if (!has_previous_sensor_sample) {
 
             previous_sensor_timestamp_ms = local_sensor_data.timestamp_ms;
@@ -164,9 +167,52 @@ void estimation_task(void *pvParameters)
             local_estimation_data.estimated_power_balance_w = NAN;
             local_estimation_data.valid_estimation_mask &= ~ ESTIMATED_POWER_BALANCE;
         }
-
         
+        //eps_battery_energy_in_wh calculation
+        if (local_estimation_data.state_of_flow == 1 /*charging*/ 
+            && local_estimation_data.valid_estimation_mask & STATE_OF_FLOW
+            && local_estimation_data.valid_estimation_mask & BATTERY_POWER_W) {
 
+            if (local_estimation_data.valid_estimation_mask & BATTERY_ENERGY_IN_WH) {
+
+            if(isfinite(local_estimation_data.battery_energy_in_wh += calculateEnergy(local_estimation_data.battery_power_w,elapsed_hours))) {
+                local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_IN_WH;
+            } else {
+                local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_IN_WH;
+            }
+            } else {
+                if(isfinite(local_estimation_data.battery_energy_in_wh = calculateEnergy(local_estimation_data.battery_power_w,elapsed_hours))) {
+                    local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_IN_WH;
+                } else {
+                    local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_IN_WH;
+                }
+            }
+        } 
+
+        //eps_battery_energy_out_wh calculation
+        if (local_estimation_data.state_of_flow == -1 /*discharging*/
+            && local_estimation_data.valid_estimation_mask & STATE_OF_FLOW
+            && local_estimation_data.valid_estimation_mask & BATTERY_POWER_W) {
+                
+            if (local_estimation_data.valid_estimation_mask & BATTERY_ENERGY_OUT_WH) {
+
+                if(isfinite(local_estimation_data.battery_energy_out_wh += calculateEnergy(-local_estimation_data.battery_power_w,elapsed_hours))) {
+
+                    local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_OUT_WH;
+                } else {
+                    local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_OUT_WH;
+                }
+
+            } else {
+
+                is(isfinite(local_estimation_data.battery_energy_in_wh = calculateEnergy(-local_estimation_data.battery_power_w,elapsed_hours))){
+
+                    local_estimation-data.valid_estimation_mask |= BATTERY_ENERGY_OUT_WH;
+                } else {
+                    local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_OUT_WH;
+                }
+
+            }
         /*
 
         to-do: implement calculations for:
