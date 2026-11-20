@@ -79,12 +79,11 @@ void estimation_task(void *pvParameters)
         else if (local_sensor_data.sequence != previous_sensor_sequence) {
 
             uint32_t elapsed_ms = local_sensor_data.timestamp_ms - previous_sensor_timestamp_ms;
-            float elapsed_hours = (float)elapsed_ms / 3600000.0f;
+            elapsed_hours = elapsed_ms / 3600000.0f;
 
             previous_sensor_timestamp_ms = local_sensor_data.timestamp_ms;
             previous_sensor_sequence = local_sensor_data.sequence;
 
-            (void)elapsed_hours;
         }
 
         /*
@@ -205,14 +204,15 @@ void estimation_task(void *pvParameters)
 
             } else {
 
-                is(isfinite(local_estimation_data.battery_energy_in_wh = calculateEnergy(-local_estimation_data.battery_power_w,elapsed_hours))){
+                if (isfinite(local_estimation_data.battery_energy_out_wh = calculateEnergy(-local_estimation_data.battery_power_w,elapsed_hours))){
 
-                    local_estimation-data.valid_estimation_mask |= BATTERY_ENERGY_OUT_WH;
+                    local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_OUT_WH;
                 } else {
                     local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_OUT_WH;
                 }
 
             }
+        }
         /*
 
         to-do: implement calculations for:
