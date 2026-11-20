@@ -6,7 +6,6 @@
 #include "task.h"
 
 #include "eps_data.h"
-#include "sensors/eps_sensor_reader.h"
 
 #include <math.h>
 #include <stdio.h>
