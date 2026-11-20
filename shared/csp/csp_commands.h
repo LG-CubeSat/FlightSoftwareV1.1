@@ -8,6 +8,7 @@ ADCS telemetry = 20).
 #define CSP_COMMANDS_H
 
 #include <stdint.h>
+#include <stddef.h>
 
 #define OBC_ADDRESS      1
 #define ADCS_ADDRESS     2
@@ -76,8 +77,13 @@ typedef enum {
 typedef struct {
     uint8_t ack_command_id;
     uint32_t ack_seq;
-    command_ack_status_t status;
+    uint8_t status; /* One wire byte; enum width differs between Pi and STM32. */
 } command_ack_t;
+
+_Static_assert(offsetof(command_ack_t, ack_seq) == 4 &&
+               offsetof(command_ack_t, status) == 8 &&
+               sizeof(command_ack_t) == 12,
+               "ADCS command ACK layout must match the existing 12-byte wire format");
 
 /* OBC -> ADCS, port ADCS_CMD_PORT */
 typedef struct {
