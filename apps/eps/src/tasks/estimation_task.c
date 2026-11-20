@@ -11,6 +11,7 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 
 #include "eps_data.h"
 #include "powerCalculations.h"
+#include "pthread.h"
 
 #include <stdio.h>
 #include <stdint.h>
@@ -89,16 +90,19 @@ void estimation_task(void *pvParameters)
         line, in fault handler there will be a section that can check all the valid masks and will deal with not being able to get data
         */
         if ((local_sensor_data.valid_sensor_mask & EPS_SOLAR_VOLTAGE) && (local_sensor_data.valid_sensor_mask & EPS_SOLAR_CURRENT)) {
-
+            pthread_mutex_lock(&eps_data_lock);
             local_estimation_data.solar_power_w = calculateWatts(local_sensor_data.solar_voltage_reading,local_sensor_data.solar_current_reading);
+            pthread_mutex_unlock(&eps_data_lock);
         } 
         if ((local_sensor_data.valid_sensor_mask & EPS_BATTERY_VOLTAGE) && (local_sensor_data.valid_sensor_mask & EPS_BATTERY_CURRENT)) {
-
+            pthread_mutex_lock(&eps_data_lock);
             local_estimation_data.battery_power_w = calculateWatts(local_sensor_data.battery_voltage_reading,local_sensor_data.battery_current_reading);
+            pthread_mutex_unlock(&eps_data_lock);
         }
         if ((local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) && (local_estimation_data.valid_estimation_mask & BATTERY_POWER_W)) {
-
+            pthread_mutex_lock(&eps_data_lock);
             local_estimation_data.estimated_power_balance_w = local_estimation_data.solar_power_w - local_estimation_data.battery_power_w;
+            pthread_mutex_unlock(&eps_data_lock);
         }
 
         /*

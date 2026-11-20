@@ -2,7 +2,9 @@
 #define EPS_DATA
 
 #include <stdint.h>
-#include <stdbool.h>
+#include <pthread.h>
+
+static pthread_mutex_t eps_data_lock = PTHREAD_MUTEX_INITIALIZER;
 
 typedef enum {
 
