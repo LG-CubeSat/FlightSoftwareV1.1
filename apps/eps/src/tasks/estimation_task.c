@@ -126,12 +126,23 @@ void estimation_task(void *pvParameters)
         }
 
 
+        //eps_battery_power_balance calculation
+        if ((local_estimation_data.valid_estimation_mask & SOLAR_POWER_W)
+        && (local_estimation_data.valid_estimation_mask & BATTERY_POWER_W)
+        && (isfinite(local_estimation_data.solar_power_w))
+        && (isfinite(local_estimation_data.battery_power_w))) {
 
-        if ((local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) && (local_estimation_data.valid_estimation_mask & BATTERY_POWER_W)) {
             pthread_mutex_lock(&eps_data_lock);
             local_estimation_data.estimated_power_balance_w = local_estimation_data.solar_power_w - local_estimation_data.battery_power_w;
+            local_estimation_data.valid_estimation_mask |= ESTIMATED_POWER_BALANCE;
             pthread_mutex_unlock(&eps_data_lock);
+        } else {
+
+            local_estimation_data.estimated_power_balance_w = NAN;
+            local_estimation_data.valid_estimation_mask &= ~ ESTIMATED_POWER_BALANCE;
         }
+
+        
 
         /*
 
