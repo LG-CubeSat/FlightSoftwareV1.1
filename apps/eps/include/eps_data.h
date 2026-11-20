@@ -20,16 +20,18 @@ typedef enum {
     BATTERY_SHUNT_VOLTAGE           =1u << 6,
 
     //Estimation masks
-    SOLAR_POWER_W                   =1u << 5,
-    BATTERY_POWER_W                 =1u << 6,
-    ESTIMATED_POWER_BALANCE         =1u << 7,
-    BATTERY_ENERGY_IN_WH            =1u << 8,
-    BATTERY_ENERGY_OUT_WH           =1u << 9,
-    ESTIMATED_STATE_OF_CHARGE_PCT   =1u << 10,
-    AVERAGE_SOLAR_POWER_W           =1u << 11,
-    AVERAGE_BATTERY_CURRENT_A       =1u << 12,
-    ESTIMATED_TIME_TO_FULL_H        =1u << 13,
-    ESTIAMTED_TIME_TO_EMPTY_H       =1u << 14
+    SOLAR_POWER_W                   =1u << 7,
+    BATTERY_POWER_W                 =1u << 8,
+    ESTIMATED_POWER_BALANCE         =1u << 9,
+    BATTERY_ENERGY_IN_WH            =1u << 10,
+    BATTERY_ENERGY_OUT_WH           =1u << 11,
+    ESTIMATED_STATE_OF_CHARGE_PCT   =1u << 12,
+    AVERAGE_SOLAR_POWER_W           =1u << 13,
+    AVERAGE_BATTERY_CURRENT_A       =1u << 14,
+    ESTIMATED_TIME_TO_FULL_H        =1u << 15,
+    ESTIAMTED_TIME_TO_EMPTY_H       =1u << 16,
+    STATE_OF_FLOW                   =1u << 17
+
 
     
 
@@ -75,6 +77,8 @@ typedef struct {
 
     //Binary mask; used to detemine which data is valid
     uint32_t valid_estimation_mask;
+    //State of energy, discharging or charging used for power in/out calculations
+    int8_t state_of_flow; //1 for charging, -1 for discarhging, 0 for NaN/NA, 2 for idle
     //Calculated solar power; used to measure solar generation
     float solar_power_w;
     //Calculated battery power; used to determine charging or discharging
@@ -88,6 +92,7 @@ typedef struct {
     float battery_energy_out_wh;
     //Estimated battery fullness; used for low-power decisions (measured in %)
     float estimated_state_of_charge_pct;
+
 
     //Smoothed solar-power average; used to predict charging availability
     float average_solar_power_w;

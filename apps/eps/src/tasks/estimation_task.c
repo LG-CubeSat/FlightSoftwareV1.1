@@ -131,6 +131,19 @@ void estimation_task(void *pvParameters)
             local_estimation_data.valid_estimation_mask &= ~BATTERY_POWER_W;
         }
 
+        //eps_state_of_flow calculation
+        if (local_estimation_data.battery_power_w > 0.00f) {
+            local_estimation_data.state_of_flow = 1; //charging
+            local_estimation_data.valid_estimation_mask |= STATE_OF_FLOW; //valid data
+        } else if (local_estimation_data.battery_power_w < 0.00f) {
+            local_estimation_data.state_of_flow = -1; //discharging
+            local_estimation_data.valid_estimation_mask |= STATE_OF_FLOW; //valid data
+        } else if (local_estimation_data.battery_power_w == 0.00f) {
+            local_estimation_data.state_of_flow = -1; //idle
+            local_estimation_data.valid_estimation_mask |= STATE_OF_FLOW; //valid data
+        } else {
+            local_estimation_data.valid_estimation_mask &= ~STATE_OF_FLOW; //data invalid
+        }
 
         //eps_battery_power_balance calculation
         if ((local_estimation_data.valid_estimation_mask & SOLAR_POWER_W)
@@ -150,6 +163,17 @@ void estimation_task(void *pvParameters)
 
             local_estimation_data.estimated_power_balance_w = NAN;
             local_estimation_data.valid_estimation_mask &= ~ ESTIMATED_POWER_BALANCE;
+        }
+
+        /*
+        for eps_battery_energy_in/out_wh calculations the data will be set to NaN if the other one is returning something
+        for example: battery is discharging then battery_energy_in will be set to NaN and vice versa
+        */
+
+        //eps_battery_energy_in_wh calculation
+        if ((local_estimation_data.valid_estimation_mask & EPS_BATTERY_VOLTAGE) 
+        && (local_estimation_data.valid_estimation_mask & EPS_BATTERY_CURRENT)) {
+
         }
 
 
