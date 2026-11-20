@@ -21,9 +21,6 @@ static StaticTask_t xSensorTaskBuffer;
 
 TaskHandle_t xSensorHandle = NULL;
 
-eps_sensor_data_t local_sensor_data;
-eps_estimation_data_t local_estimation_data;
-
 
 void sensor_task_init(void)
 {
@@ -49,6 +46,9 @@ void sensor_task(void *pvParameters)
     (void) pvParameters;
 
     TickType_t lastWakeTime = xTaskGetTickCount();
+
+    eps_sensor_data_t local_sensor_data;
+    eps_estimation_data_t local_estimation_data;
 
     for (;;)
     {

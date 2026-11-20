@@ -13,6 +13,7 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 #include "powerCalculations.h"
 #include "pthread.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -29,9 +30,6 @@ static StackType_t xEstimationTaskStack[ESTIMATION_TASK_STACK_SIZE];
 static StaticTask_t xEstimationTaskBuffer;
 
 TaskHandle_t xEstimationHandle = NULL;
-
-eps_sensor_data_t local_sensor_data;
-eps_estimation_data_t local_estimation_data;
 
 void estimation_task_init(void)
 {
@@ -57,6 +55,9 @@ void estimation_task(void *pvParameters)
     (void) pvParameters;
 
     TickType_t lastWakeTime = xTaskGetTickCount();
+
+    eps_sensor_data_t local_sensor_data;
+    eps_estimation_data_t local_estimation_data;
 
     for (;;)
     {
@@ -89,16 +90,43 @@ void estimation_task(void *pvParameters)
         note there are no else statements that print the errors as this is a VERY frequent task therefore it would flood the command
         line, in fault handler there will be a section that can check all the valid masks and will deal with not being able to get data
         */
-        if ((local_sensor_data.valid_sensor_mask & EPS_SOLAR_VOLTAGE) && (local_sensor_data.valid_sensor_mask & EPS_SOLAR_CURRENT)) {
+
+        //eps_solar_power calculation
+        if (((local_sensor_data.valid_sensor_mask & EPS_SOLAR_VOLTAGE) != 0u) 
+        && ((local_sensor_data.valid_sensor_mask & EPS_SOLAR_CURRENT) != 0u) 
+        && (isfinite(local_sensor_data.solar_voltage_reading)) 
+        && (isfinite(local_sensor_data.solar_current_reading))) {
+
             pthread_mutex_lock(&eps_data_lock);
             local_estimation_data.solar_power_w = calculateWatts(local_sensor_data.solar_voltage_reading,local_sensor_data.solar_current_reading);
+            local_estimation_data.valid_estimation_mask |= SOLAR_POWER_W;
             pthread_mutex_unlock(&eps_data_lock);
-        } 
-        if ((local_sensor_data.valid_sensor_mask & EPS_BATTERY_VOLTAGE) && (local_sensor_data.valid_sensor_mask & EPS_BATTERY_CURRENT)) {
+
+        } else {
+
+            local_estimation_data.solar_power_w = NAN;
+            local_estimation_data.valid_estimation_mask &= ~SOLAR_POWER_W;
+        }
+
+        //eps_battery_power calculation
+        if ((local_sensor_data.valid_sensor_mask & EPS_BATTERY_VOLTAGE) 
+        && (local_sensor_data.valid_sensor_mask & EPS_BATTERY_CURRENT)
+        && (isfinite(local_sensor_data.battery_current_reading))
+        && (isfinite(local_sensor_data.battery_voltage_reading))) {
+
             pthread_mutex_lock(&eps_data_lock);
             local_estimation_data.battery_power_w = calculateWatts(local_sensor_data.battery_voltage_reading,local_sensor_data.battery_current_reading);
+            local_estimation_data.valid_estimation_mask |= BATTERY_POWER_W;
             pthread_mutex_unlock(&eps_data_lock);
+
+        } else {
+
+            local_estimation_data.battery_power_w = NAN;
+            local_estimation_data.valid_estimation_mask &= ~BATTERY_POWER_W;
         }
+
+
+
         if ((local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) && (local_estimation_data.valid_estimation_mask & BATTERY_POWER_W)) {
             pthread_mutex_lock(&eps_data_lock);
             local_estimation_data.estimated_power_balance_w = local_estimation_data.solar_power_w - local_estimation_data.battery_power_w;

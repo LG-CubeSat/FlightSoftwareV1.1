@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <pthread.h>
+#include <math.h>
 
 extern pthread_mutex_t eps_data_lock;
 
