@@ -165,6 +165,7 @@ void estimation_task(void *pvParameters)
             local_estimation_data.valid_estimation_mask &= ~ ESTIMATED_POWER_BALANCE;
         }
 
+        
 
         /*
 
