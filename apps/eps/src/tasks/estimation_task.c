@@ -63,8 +63,10 @@ void estimation_task(void *pvParameters)
     {
 
         //read data
+        pthread_mutex_lock(&eps_data_lock);
         local_sensor_data = get_eps_sensor_data();
         local_estimation_data = get_eps_estimation_data();
+        pthread_mutex_unlock(&eps_data_lock);
 
         //time calculations
         if (!has_previous_sensor_sample) {
@@ -97,10 +99,13 @@ void estimation_task(void *pvParameters)
         && (isfinite(local_sensor_data.solar_voltage_reading)) 
         && (isfinite(local_sensor_data.solar_current_reading))) {
 
-            pthread_mutex_lock(&eps_data_lock);
-            local_estimation_data.solar_power_w = calculateWatts(local_sensor_data.solar_voltage_reading,local_sensor_data.solar_current_reading);
-            local_estimation_data.valid_estimation_mask |= SOLAR_POWER_W;
-            pthread_mutex_unlock(&eps_data_lock);
+            if (isfinite(local_estimation_data.solar_power_w = calculateWatts(local_sensor_data.solar_voltage_reading,local_sensor_data.solar_current_reading))) {
+                local_estimation_data.valid_estimation_mask |= SOLAR_POWER_W;
+            }  else {
+
+            local_estimation_data.solar_power_w = NAN;
+            local_estimation_data.valid_estimation_mask &= ~SOLAR_POWER_W;
+        }
 
         } else {
 
@@ -114,10 +119,13 @@ void estimation_task(void *pvParameters)
         && (isfinite(local_sensor_data.battery_current_reading))
         && (isfinite(local_sensor_data.battery_voltage_reading))) {
 
-            pthread_mutex_lock(&eps_data_lock);
-            local_estimation_data.battery_power_w = calculateWatts(local_sensor_data.battery_voltage_reading,local_sensor_data.battery_current_reading);
-            local_estimation_data.valid_estimation_mask |= BATTERY_POWER_W;
-            pthread_mutex_unlock(&eps_data_lock);
+            if (isfinite(local_estimation_data.battery_power_w = calculateWatts(local_sensor_data.battery_voltage_reading,local_sensor_data.battery_current_reading))) {
+                local_estimation_data.valid_estimation_mask |= BATTERY_POWER_W;
+            }  else {
+
+            local_estimation_data.battery_power_w = NAN;
+            local_estimation_data.valid_estimation_mask &= ~BATTERY_POWER_W;
+        }
 
         } else {
 
@@ -132,17 +140,21 @@ void estimation_task(void *pvParameters)
         && (isfinite(local_estimation_data.solar_power_w))
         && (isfinite(local_estimation_data.battery_power_w))) {
 
-            pthread_mutex_lock(&eps_data_lock);
-            local_estimation_data.estimated_power_balance_w = local_estimation_data.solar_power_w - local_estimation_data.battery_power_w;
-            local_estimation_data.valid_estimation_mask |= ESTIMATED_POWER_BALANCE;
-            pthread_mutex_unlock(&eps_data_lock);
+            if (isfinite(local_estimation_data.estimated_power_balance_w = local_estimation_data.solar_power_w - local_estimation_data.battery_power_w)) {
+                local_estimation_data.valid_estimation_mask |= ESTIMATED_POWER_BALANCE;
+            }  else {
+
+            local_estimation_data.estimated_power_balance_w = NAN;
+            local_estimation_data.valid_estimation_mask &= ~ ESTIMATED_POWER_BALANCE;
+        }
+
         } else {
 
             local_estimation_data.estimated_power_balance_w = NAN;
             local_estimation_data.valid_estimation_mask &= ~ ESTIMATED_POWER_BALANCE;
         }
 
-        
+
 
         /*
 
@@ -159,7 +171,9 @@ void estimation_task(void *pvParameters)
         */
 
         //set data
+        pthread_mutex_lock(&eps_data_lock);
         set_eps_estimation_data(local_estimation_data);
+        pthread_mutex_unlock(&eps_data_lock);
 
         uint32_t notified_value;
         if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
