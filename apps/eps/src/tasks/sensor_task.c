@@ -21,6 +21,9 @@ static StaticTask_t xSensorTaskBuffer;
 
 TaskHandle_t xSensorHandle = NULL;
 
+eps_sensor_data_t local_sensor_data;
+eps_estimation_data_t local_estimation_data;
+
 
 void sensor_task_init(void)
 {
@@ -49,43 +52,24 @@ void sensor_task(void *pvParameters)
 
     for (;;)
     {
-        eps_sensor_data_t sample = {0};
-        float reading;
+        
+        //read data
+        local_sensor_data = get_eps_sensor_data();
+        local_estimation_data = get_eps_estimation_data();
 
-        /* A field becomes valid only after a successful, finite reading. */
-        if (eps_read_solar_voltage_v(&reading) && isfinite(reading) && reading >= 0.0f) {
-            sample.solar_voltage_reading = reading;
-            sample.valid_sensor_mask |= EPS_SOLAR_VOLTAGE;
-        }
-        if (eps_read_solar_current_a(&reading) && isfinite(reading)) {
-            sample.solar_current_reading = reading;
-            sample.valid_sensor_mask |= EPS_SOLAR_CURRENT;
-        }
-        if (eps_read_solar_shunt_voltage_mv(&reading) && isfinite(reading)) {
-            sample.solar_shunt_voltage_reading = reading;
-            sample.valid_sensor_mask |= SOLAR_SHUNT_VOLTAGE;
-        }
-        if (eps_read_battery_voltage_v(&reading) && isfinite(reading) && reading >= 0.0f) {
-            sample.battery_voltage_reading = reading;
-            sample.valid_sensor_mask |= EPS_BATTERY_VOLTAGE;
-        }
-        if (eps_read_battery_current_a(&reading) && isfinite(reading)) {
-            sample.battery_current_reading = reading;
-            sample.valid_sensor_mask |= EPS_BATTERY_CURRENT;
-        }
-        if (eps_read_battery_shunt_voltage_mv(&reading) && isfinite(reading)) {
-            sample.battery_shunt_voltage_reading = reading;
-            sample.valid_sensor_mask |= BATTERY_SHUNT_VOLTAGE;
-        }
-        if (eps_read_battery_temperature_c(&reading) && isfinite(reading)) {
-            sample.battery_temperature_reading = reading;
-            sample.valid_sensor_mask |= EPS_BATTERY_TEMPERATURE;
-        }
+        //set all validity bits to 0, this way if a reading was once successful but is now not, it needs to repetitevly make sure data is valid each iteration
+        local_sensor_data.valid_sensor_mask = 0;
 
-        /* Publish this acquisition attempt even if every read failed. */
-        sample.timestamp_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
-        sample.sequence = ++sensor_sequence;
-        set_eps_sensor_data(sample);
+
+        //time shit
+        TickType_t now_ticks = xTaskGetTickCount();
+        local_sensor_data.timestamp_ms = (uint32_t)pdTICKS_TO_MS(now_ticks);
+        local_sensor_data.sequence = ++sensor_sequence;
+
+        //set data
+        set_eps_sensor_data(local_sensor_data);
+
+    
 
         xTaskDelayUntil(
             &lastWakeTime,

@@ -3,7 +3,7 @@
 #include "eps_data.h"
 #include <math.h>
 
-
+pthread_mutex_t eps_data_lock = PTHREAD_MUTEX_INITIALIZER;
 
 //sensor_data definitions in eps_data.h
 static eps_sensor_data_t eps_sensor_data = {

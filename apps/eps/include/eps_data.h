@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <pthread.h>
 
-static pthread_mutex_t eps_data_lock = PTHREAD_MUTEX_INITIALIZER;
+extern pthread_mutex_t eps_data_lock;
 
 typedef enum {
 
