@@ -163,6 +163,19 @@ static int send_raw_and_get_ack(const void * payload, uint16_t length, uint32_t 
 int main(void) {
     alarm(TEST_TIMEOUT_SEC);
 
+    /* Captured from the physical STM32: success in byte 8, with 0xA5
+       padding that must never be interpreted as part of the status. */
+    const uint8_t board_ack[12] = {
+        0x40, 0xA5, 0xA5, 0xA5, 0xD3, 0xAE, 0xCE, 0x9F,
+        0x00, 0xA5, 0xA5, 0xA5
+    };
+    command_ack_t captured_ack;
+    memcpy(&captured_ack, board_ack, sizeof(captured_ack));
+    check_true("physical ADCS ACK status ignores padding",
+               captured_ack.ack_command_id == 64 &&
+               captured_ack.ack_seq == UINT32_C(0x9FCEAED3) &&
+               captured_ack.status == ACK);
+
     /* Same hardcoded /tmp/comms_i2c.sock as production code -- don't run
      * this test at the same time as a real obc_supervisor/adcs_sim, or as
      * position_command_test. */

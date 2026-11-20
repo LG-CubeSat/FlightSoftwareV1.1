@@ -191,7 +191,7 @@ static void *command_handler_rx_loop(void *parameter) {
             if (csp_conn_dport(connection) == ADCS_CMD_PORT &&
                 packet->length >= sizeof(command_envelope_t)) {
                 command_envelope_t envelope;
-                command_ack_t acknowledgement;
+                command_ack_t acknowledgement = {0};
                 command_action_t action = COMMAND_ACTION_NONE;
 
                 memcpy(&envelope, packet->data, sizeof(envelope));
