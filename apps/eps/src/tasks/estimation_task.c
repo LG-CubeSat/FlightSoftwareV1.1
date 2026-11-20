@@ -63,10 +63,8 @@ void estimation_task(void *pvParameters)
     {
 
         //read data
-        pthread_mutex_lock(&eps_data_lock);
         local_sensor_data = get_eps_sensor_data();
         local_estimation_data = get_eps_estimation_data();
-        pthread_mutex_unlock(&eps_data_lock);
 
         //time calculations
         if (!has_previous_sensor_sample) {
@@ -171,9 +169,7 @@ void estimation_task(void *pvParameters)
         */
 
         //set data
-        pthread_mutex_lock(&eps_data_lock);
         set_eps_estimation_data(local_estimation_data);
-        pthread_mutex_unlock(&eps_data_lock);
 
         uint32_t notified_value;
         if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
