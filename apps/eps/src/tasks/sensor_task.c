@@ -1,17 +1,13 @@
-/*
-Sensor Task
-fastest task of all (100-200hz)
-Loops
-Read battery state, and current flow (if possible), and then give estimation task that info or sum.
-*/
+/* Collect one EPS sensor snapshot every 100 ms (10 Hz). */
 
-#include "../../include/tasks/sensor_task.h"
+#include "tasks/sensor_task.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
 
 #include "eps_data.h"
 
+#include <math.h>
 #include <stdio.h>
 
 #define SENSOR_TASK_PRIORITY (3)
@@ -19,9 +15,6 @@ Read battery state, and current flow (if possible), and then give estimation tas
 #define SENSOR_TASK_PERIOD_MS (100)
 
 static uint32_t sensor_sequence = 0U;
-
-eps_sensor_data_t local_sensor_data;
-eps_estimation_data_t local_estimation_data;
 
 static StackType_t xSensorTaskStack[SENSOR_TASK_STACK_SIZE];
 static StaticTask_t xSensorTaskBuffer;
@@ -56,16 +49,43 @@ void sensor_task(void *pvParameters)
 
     for (;;)
     {
-        // do stuff
+        eps_sensor_data_t sample = {0};
+        float reading;
 
-        local_sensor_data = get_eps_sensor_data();
-        local_estimation_data = get_eps_estimation_data();
+        /* A field becomes valid only after a successful, finite reading. */
+        if (eps_read_solar_voltage_v(&reading) && isfinite(reading) && reading >= 0.0f) {
+            sample.solar_voltage_reading = reading;
+            sample.valid_sensor_mask |= EPS_SOLAR_VOLTAGE;
+        }
+        if (eps_read_solar_current_a(&reading) && isfinite(reading)) {
+            sample.solar_current_reading = reading;
+            sample.valid_sensor_mask |= EPS_SOLAR_CURRENT;
+        }
+        if (eps_read_solar_shunt_voltage_mv(&reading) && isfinite(reading)) {
+            sample.solar_shunt_voltage_reading = reading;
+            sample.valid_sensor_mask |= SOLAR_SHUNT_VOLTAGE;
+        }
+        if (eps_read_battery_voltage_v(&reading) && isfinite(reading) && reading >= 0.0f) {
+            sample.battery_voltage_reading = reading;
+            sample.valid_sensor_mask |= EPS_BATTERY_VOLTAGE;
+        }
+        if (eps_read_battery_current_a(&reading) && isfinite(reading)) {
+            sample.battery_current_reading = reading;
+            sample.valid_sensor_mask |= EPS_BATTERY_CURRENT;
+        }
+        if (eps_read_battery_shunt_voltage_mv(&reading) && isfinite(reading)) {
+            sample.battery_shunt_voltage_reading = reading;
+            sample.valid_sensor_mask |= BATTERY_SHUNT_VOLTAGE;
+        }
+        if (eps_read_battery_temperature_c(&reading) && isfinite(reading)) {
+            sample.battery_temperature_reading = reading;
+            sample.valid_sensor_mask |= EPS_BATTERY_TEMPERATURE;
+        }
 
-
-        local_sensor_data.timestamp_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
-        local_sensor_data.sequence = ++sensor_sequence;
-
-        set_eps_sensor_data(local_sensor_data);
+        /* Publish this acquisition attempt even if every read failed. */
+        sample.timestamp_ms = (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+        sample.sequence = ++sensor_sequence;
+        set_eps_sensor_data(sample);
 
         xTaskDelayUntil(
             &lastWakeTime,
