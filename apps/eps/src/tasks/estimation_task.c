@@ -165,18 +165,6 @@ void estimation_task(void *pvParameters)
             local_estimation_data.valid_estimation_mask &= ~ ESTIMATED_POWER_BALANCE;
         }
 
-        /*
-        for eps_battery_energy_in/out_wh calculations the data will be set to NaN if the other one is returning something
-        for example: battery is discharging then battery_energy_in will be set to NaN and vice versa
-        */
-
-        //eps_battery_energy_in_wh calculation
-        if ((local_estimation_data.valid_estimation_mask & EPS_BATTERY_VOLTAGE) 
-        && (local_estimation_data.valid_estimation_mask & EPS_BATTERY_CURRENT)) {
-
-        }
-
-
 
         /*
 
