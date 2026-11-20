@@ -4,6 +4,9 @@
 #include <math.h>
 
 
+static pthread_mutex_t eps_sensor_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t eps_estimation_lock = PTHREAD_MUTEX_INITIALIZER;
+
 
 //sensor_data definitions in eps_data.h
 static eps_sensor_data_t eps_sensor_data = {
@@ -46,9 +49,9 @@ static eps_estimation_data_t eps_estimation_data = {
 eps_sensor_data_t get_eps_sensor_data(void) {
 
     eps_sensor_data_t snapshot;
-    pthread_mutex_lock(&eps_data_lock);
+    pthread_mutex_lock(&eps_sensor_lock);
     snapshot = eps_sensor_data;
-    pthread_mutex_unlock(&eps_data_lock);
+    pthread_mutex_unlock(&eps_sensor_lock);
 
     return snapshot;
 
@@ -57,9 +60,9 @@ eps_sensor_data_t get_eps_sensor_data(void) {
 eps_estimation_data_t get_eps_estimation_data(void) {
 
     eps_estimation_data_t snapshot;
-    pthread_mutex_lock(&eps_data_lock);
+    pthread_mutex_lock(&eps_estimation_lock);
     snapshot = eps_estimation_data;
-    pthread_mutex_unlock(&eps_data_lock);
+    pthread_mutex_unlock(&eps_estimation_lock);
 
     return snapshot;
 
@@ -67,18 +70,18 @@ eps_estimation_data_t get_eps_estimation_data(void) {
 
 void set_eps_sensor_data(eps_sensor_data_t newdata) {
 
-    pthread_mutex_lock(&eps_data_lock);
+    pthread_mutex_lock(&eps_sensor_lock);
     eps_sensor_data = newdata;
-    pthread_mutex_unlock(&eps_data_lock);
+    pthread_mutex_unlock(&eps_sensor_lock);
     
 
 }
 
 void set_eps_estimation_data(eps_estimation_data_t newdata) {
 
-    pthread_mutex_lock(&eps_data_lock);
+    pthread_mutex_lock(&eps_estimation_lock);
     eps_estimation_data = newdata;
-    pthread_mutex_unlock(&eps_data_lock);
+    pthread_mutex_unlock(&eps_estimation_lock);
     
 
 }
