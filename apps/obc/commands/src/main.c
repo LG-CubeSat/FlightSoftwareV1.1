@@ -113,11 +113,29 @@ void commands_handle_radio_uplink(const uint8_t *buffer, int length) {
                     result = ack.status == ACK ? GROUND_ACK_ACCEPTED : GROUND_ACK_REJECTED;
                 } else {
                     result = GROUND_ACK_ROUTE_ERROR;
+                    fprintf(stderr,
+                            "[OBC RADIO RX] Invalid ADCS ACK: length=%u id=%u seq=%u status=%d; expected id=%u seq=%u\n",
+                            reply->length, ack.ack_command_id, ack.ack_seq, (int)ack.status,
+                            envelope.command_id, envelope.seq);
                 }
             } else {
                 result = GROUND_ACK_ROUTE_ERROR;
+                fprintf(stderr,
+                        "[OBC RADIO RX] Short ADCS ACK: length=%u expected=%zu\n",
+                        reply->length, sizeof(ack));
+            }
+            if (result == GROUND_ACK_ROUTE_ERROR) {
+                fprintf(stderr, "[OBC RADIO RX] ADCS reply bytes:");
+                for (size_t i = 0; i < reply->length && i < 32; ++i) {
+                    fprintf(stderr, " %02x", reply->data[i]);
+                }
+                fputc('\n', stderr);
             }
             csp_buffer_free(reply);
+        } else {
+            fprintf(stderr,
+                    "[OBC RADIO RX] ADCS ACK timed out for id=%u seq=%u\n",
+                    envelope.command_id, envelope.seq);
         }
         csp_close(conn);
 
