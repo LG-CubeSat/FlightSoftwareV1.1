@@ -78,7 +78,7 @@ typedef struct {
     //Binary mask; used to detemine which data is valid
     uint32_t valid_estimation_mask;
     //State of energy, discharging or charging used for power in/out calculations
-    int8_t state_of_flow; //1 for charging, -1 for discarhging, 0 for NaN/NA, 2 for idle
+    int8_t state_of_flow; //1 for charging, -1 for discarhging, 0 for idle, 2 for NaN/Na
     //Calculated solar power; used to measure solar generation
     float solar_power_w;
     //Calculated battery power; used to determine charging or discharging
