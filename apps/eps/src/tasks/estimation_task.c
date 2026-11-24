@@ -29,6 +29,7 @@ static uint32_t previous_sensor_timestamp_ms = 0U;
 static uint32_t previous_sensor_sequence = 0U;
 static bool has_previous_sensor_sample = false;
 
+
 static StackType_t xEstimationTaskStack[ESTIMATION_TASK_STACK_SIZE];
 static StaticTask_t xEstimationTaskBuffer;
 
@@ -65,12 +66,17 @@ void estimation_task(void *pvParameters)
     bool previous_battery_power_valid = false;
     bool battery_energy_history_complete = true;
 
+    float solar_energy_for_average_wh = 0.0f;
+    float solar_average_duration_h = 0.0f;
+    bool previous_solar_power_valid = false;
+
     for (;;)
     {
 
         //read data
         local_sensor_data = get_eps_sensor_data();
         local_estimation_data = get_eps_estimation_data();
+
 
         bool new_sensor_sample =
         (!has_previous_sensor_sample && local_sensor_data.sequence != 0U) ||
@@ -129,6 +135,7 @@ void estimation_task(void *pvParameters)
 
             if (isfinite(local_estimation_data.solar_power_w = calculateWatts(local_sensor_data.solar_voltage_reading,local_sensor_data.solar_current_reading))) {
                 local_estimation_data.valid_estimation_mask |= SOLAR_POWER_W;
+
             }  else {
 
             local_estimation_data.solar_power_w = NAN;
@@ -260,9 +267,56 @@ void estimation_task(void *pvParameters)
                     local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_OUT_WH;
                 }
         }
+
+        // average_solar_power_w calculation
+        if (new_sensor_sample &&
+            sensor_data_fresh &&
+            previous_solar_power_valid &&
+            (local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) != 0U &&
+            elapsed_hours > 0.0f) {
+
+            float next_solar_energy_wh = solar_energy_for_average_wh + local_estimation_data.solar_power_w * elapsed_hours;
+
+            float next_solar_duration_h = solar_average_duration_h + elapsed_hours;
+
+            if (isfinite(next_solar_energy_wh) &&
+                isfinite(next_solar_duration_h) &&
+                next_solar_duration_h > 0.0f) {
+
+                float next_average_w =
+                    next_solar_energy_wh / next_solar_duration_h;
+
+                if (isfinite(next_average_w)) {
+                    // Save all three results only after checks pass.
+                    solar_energy_for_average_wh = next_solar_energy_wh;
+                    solar_average_duration_h = next_solar_duration_h;
+
+                    local_estimation_data.average_solar_power_w = next_average_w;
+                    local_estimation_data.valid_estimation_mask |=
+                        AVERAGE_SOLAR_POWER_W;
+                } else {
+                    local_estimation_data.average_solar_power_w = NAN;
+                    local_estimation_data.valid_estimation_mask &=
+                        ~AVERAGE_SOLAR_POWER_W;
+                }
+            } else {
+                local_estimation_data.average_solar_power_w = NAN;
+                local_estimation_data.valid_estimation_mask &=
+                    ~AVERAGE_SOLAR_POWER_W;
+            }
+        }
+
+        if (!sensor_data_fresh || (local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) == 0U) {
+
+        local_estimation_data.average_solar_power_w = NAN;
+        local_estimation_data.valid_estimation_mask &= ~AVERAGE_SOLAR_POWER_W;
+        }
         
         if (new_sensor_sample || !sensor_data_fresh) {
+
         previous_battery_power_valid = current_battery_power_valid;
+        previous_solar_power_valid = (local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) != 0U;
+
         }
 
 
