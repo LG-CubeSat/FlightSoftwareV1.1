@@ -11,6 +11,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "powerCalculations.h"
+#include "conversions.h"
+
 #define SENSOR_TASK_PRIORITY (3)
 #define SENSOR_TASK_STACK_SIZE (1024)
 #define SENSOR_TASK_PERIOD_MS (100)
@@ -75,4 +78,74 @@ void sensor_task(void *pvParameters)
             pdMS_TO_TICKS(SENSOR_TASK_PERIOD_MS)
         );
     }
+}
+
+    /*
+    example implentation
+    
+    if (read data from hw driver is successful) {
+    
+    update data;
+    return true;
+    } else {
+     
+    report to OBC or smth
+    return false; *data will be updated to NaN in the loop, doesn't need to be here
+    }
+     
+    */
+bool read_solar_voltage(float *solar_voltage) {
+
+    //placeholder reading, to be implemented w/ hw
+    *solar_voltage = 7.4f;
+    return true;
+
+}
+
+bool read_solar_current(float *solar_current){
+
+    //placeholder reading, to be implemented w/ hw
+    *solar_current = .3f;
+    return true;
+
+}
+
+bool read_solar_shunt_voltage(float *solar_shunt_voltage){
+
+    //placeholder reading, to be implemented w/ hw
+    *solar_shunt_voltage = millivolts_to_volts(10);
+    return true;
+
+}
+
+bool read_battery_voltage(float *battery_voltage){
+
+    //placeholder reading, to be implemented w/ hw
+    *battery_voltage = 10.0f;
+    return true;
+
+}
+
+bool read_battery_current(float *battery_current){
+
+    //placeholder reading, to be implemented w/ hw
+    *battery_current = 1.5f;
+    return true;
+
+}
+
+bool read_battery_shunt_voltage(float *battery_shunt_voltage){
+
+    //placeholder reading, to be implemented w/ hw
+    *battery_shunt_voltage = millivolts_to_volts(20);
+    return true;
+
+}
+
+bool read_battery_temperature(float *battery_temperature) {
+
+    //placeholder reading, to be implemented w/ hw
+    *battery_temperature = fahrenheit_to_celsius(80);
+    return true;
+
 }

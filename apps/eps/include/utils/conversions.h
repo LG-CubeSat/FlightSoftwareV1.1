@@ -339,7 +339,12 @@ float watt_hours_to_micro_watt_hours(float watt_hours) {
 float micro_watt_hours_to_watt_hours(float micro_watt_hours) {
     return micro_watt_hours / 1000000.0f;
 }
-
+float fahrenheit_to_celsius(float fahrenheit) {
+    return (fahrenheit-32) * 5/9;
+}
+float celsius_to_fahrenheit(float celsius) {
+    return (celsius*9/5) + 32;
+}
 
 #endif //CONVERSION_H
 
