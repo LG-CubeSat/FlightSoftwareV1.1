@@ -77,6 +77,8 @@ void estimation_task(void *pvParameters)
         (has_previous_sensor_sample &&
         local_sensor_data.sequence != previous_sensor_sequence);
 
+        bool interval_expected = has_previous_sensor_sample && new_sensor_sample;
+
         //time calculations
 
         float elapsed_hours = 0.0f;
@@ -168,6 +170,14 @@ void estimation_task(void *pvParameters)
         previous_battery_power_valid &&
         current_battery_power_valid &&
         elapsed_hours > 0.0f;
+
+        if (interval_expected && !battery_interval_valid) {
+            battery_energy_history_complete = false;
+            }
+
+        if (has_previous_sensor_sample && !sensor_data_fresh) {
+             battery_energy_history_complete = false;
+            }
 
 
         //eps_state_of_flow calculation
