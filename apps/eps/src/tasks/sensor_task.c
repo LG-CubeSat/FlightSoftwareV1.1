@@ -156,10 +156,21 @@ void sensor_task(void *pvParameters)
             local_sensor_data.valid_sensor_mask &= ~(BATTERY_SHUNT_VOLTAGE);
             local_sensor_data.battery_shunt_voltage_reading = NAN;
         }
-        
-        
 
+        //battery_temperature
+        if (read_battery_temperature(&battery_temp) 
+            && isfinite(battery_temp)) {
 
+            local_sensor_data.valid_sensor_mask |= EPS_BATTERY_TEMPERATURE;
+            local_sensor_data.battery_temperature_reading = battery_temp;
+
+        } else {
+
+            local_sensor_data.valid_sensor_mask &= ~(EPS_BATTERY_TEMPERATURE);
+            local_sensor_data.battery_temperature_reading = NAN;
+        }
+
+    
 
         //time shit
         TickType_t now_ticks = xTaskGetTickCount();
