@@ -70,6 +70,10 @@ void estimation_task(void *pvParameters)
     float solar_average_duration_h = 0.0f;
     bool previous_solar_power_valid = false;
 
+    float battery_current_time_ah = 0.0f;
+    float battery_current_average_duration_h = 0.0f;
+    bool previous_battery_current_valid = false;
+
     for (;;)
     {
 
@@ -121,7 +125,7 @@ void estimation_task(void *pvParameters)
 
         /*
         calculations (each has to check if data is valid using valid mask in sensor data), if data it's trying to access
-        is n/a (a.k.a. invalid) it will return NAN along with printing the error
+        is n/a (a.k.a. invalid) it will return NAN
         note there are no else statements that print the errors as this is a VERY frequent task therefore it would flood the command
         line, in fault handler there will be a section that can check all the valid masks and will deal with not being able to get data
         */
@@ -312,11 +316,65 @@ void estimation_task(void *pvParameters)
         local_estimation_data.valid_estimation_mask &= ~AVERAGE_SOLAR_POWER_W;
         }
         
+        // average_battery_current_a calculation
+        bool current_battery_current_valid =
+        sensor_data_fresh &&
+        (local_sensor_data.valid_sensor_mask & EPS_BATTERY_CURRENT) != 0U &&
+        isfinite(local_sensor_data.battery_current_reading);
+
+        if (new_sensor_sample &&
+            previous_battery_current_valid &&
+            current_battery_current_valid &&
+            elapsed_hours > 0.0f) {
+
+            float next_current_time_ah =
+                battery_current_time_ah
+                + local_sensor_data.battery_current_reading * elapsed_hours;
+
+            float next_duration_h =
+                battery_current_average_duration_h + elapsed_hours;
+
+            if (isfinite(next_current_time_ah) &&
+                isfinite(next_duration_h) &&
+                next_duration_h > 0.0f) {
+
+                float next_average_a = next_current_time_ah / next_duration_h;
+
+                if (isfinite(next_average_a)) {
+                    battery_current_time_ah = next_current_time_ah;
+                    battery_current_average_duration_h = next_duration_h;
+
+                    local_estimation_data.average_battery_current_a =
+                        next_average_a;
+
+                    local_estimation_data.valid_estimation_mask |=
+                        AVERAGE_BATTERY_CURRENT_A;
+                } else {
+                    local_estimation_data.average_battery_current_a = NAN;
+                    local_estimation_data.valid_estimation_mask &=
+                        ~AVERAGE_BATTERY_CURRENT_A;
+                }
+            } else {
+                local_estimation_data.average_battery_current_a = NAN;
+                local_estimation_data.valid_estimation_mask &=
+                    ~AVERAGE_BATTERY_CURRENT_A;
+            }
+        }
+
+        if (!current_battery_current_valid) {
+            local_estimation_data.average_battery_current_a = NAN;
+            local_estimation_data.valid_estimation_mask &=
+                ~AVERAGE_BATTERY_CURRENT_A;
+        }
+
+        // Save previous-reading validity after all interval calculations.
         if (new_sensor_sample || !sensor_data_fresh) {
+            previous_battery_power_valid = current_battery_power_valid;
 
-        previous_battery_power_valid = current_battery_power_valid;
-        previous_solar_power_valid = (local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) != 0U;
+            previous_solar_power_valid =
+                (local_estimation_data.valid_estimation_mask & SOLAR_POWER_W) != 0U;
 
+            previous_battery_current_valid = current_battery_current_valid;
         }
 
 
