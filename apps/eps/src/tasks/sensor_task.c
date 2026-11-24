@@ -49,7 +49,6 @@ void sensor_task(void *pvParameters)
     TickType_t lastWakeTime = xTaskGetTickCount();
 
     eps_sensor_data_t local_sensor_data;
-    eps_estimation_data_t local_estimation_data;
 
     for (;;)
     {
