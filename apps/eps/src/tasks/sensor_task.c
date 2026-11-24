@@ -53,6 +53,17 @@ void sensor_task(void *pvParameters)
 
     eps_sensor_data_t local_sensor_data;
 
+    //placeholder data before setting actual data
+    float solar_voltage;
+    float solar_current;
+    float solar_shunt_voltage;
+
+    float battery_voltage;
+    float battery_current;
+    float battery_shunt_voltage;
+
+    float battery_temp;
+
     for (;;)
     {
         
@@ -61,6 +72,23 @@ void sensor_task(void *pvParameters)
 
         //set all validity bits to 0, this way if a reading was once successful but is now not, it needs to repetitevly make sure data is valid each iteration
         local_sensor_data.valid_sensor_mask = 0;
+
+        //read and set data/validity
+
+        //solar_voltage
+        if (read_solar_voltage(&solar_voltage) 
+            && isfinite(battery_voltage)
+            && battery_voltage >=0.00f) {
+
+            local_sensor_data.valid_sensor_mask |= EPS_SOLAR_VOLTAGE;
+            local_sensor_data.battery_voltage_reading = solar_voltage;
+
+        } else {
+
+            local_sensor_data.valid_sensor_mask &= ~(EPS_SOLAR_VOLTAGE);
+            local_sensor_data.battery_voltage_reading = NAN;
+        }
+
 
 
         //time shit
@@ -89,7 +117,7 @@ void sensor_task(void *pvParameters)
     return true;
     } else {
      
-    report to OBC or smth
+    hw driver will report to obc
     return false; *data will be updated to NaN in the loop, doesn't need to be here
     }
      
