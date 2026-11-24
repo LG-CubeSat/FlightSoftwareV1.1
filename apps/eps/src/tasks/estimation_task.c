@@ -25,6 +25,10 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 #define ESTIMATION_TASK_STACK_SIZE (1024)
 #define ESTIMATION_TASK_PERIOD_MS (100)
 
+// Unknown until configured or established from a trusted estimate.
+#define BATTERY_USABLE_CAPACITY_WH NAN
+#define BATTERY_INITIAL_ENERGY_WH  NAN
+
 static uint32_t previous_sensor_timestamp_ms = 0U;
 static uint32_t previous_sensor_sequence = 0U;
 static bool has_previous_sensor_sample = false;
@@ -382,6 +386,45 @@ void estimation_task(void *pvParameters)
         local_estimation_data.valid_estimation_mask &= ~(BATTERY_ENERGY_IN_WH | BATTERY_ENERGY_OUT_WH); 
         }
 
+        // Default to invalid unless all SOC checks pass.
+        local_estimation_data.estimated_state_of_charge_pct = NAN;
+        local_estimation_data.valid_estimation_mask &=
+            ~ESTIMATED_STATE_OF_CHARGE_PCT;
+
+        //estimated_state_of_charge_pct
+        if (isfinite(BATTERY_USABLE_CAPACITY_WH) &&
+            isfinite(BATTERY_INITIAL_ENERGY_WH) &&
+            BATTERY_USABLE_CAPACITY_WH > 0.0f &&
+            BATTERY_INITIAL_ENERGY_WH >= 0.0f &&
+            BATTERY_INITIAL_ENERGY_WH <= BATTERY_USABLE_CAPACITY_WH &&
+            battery_energy_history_complete &&
+            has_previous_sensor_sample &&
+            current_battery_power_valid) {
+
+            float remaining_energy_wh =
+                BATTERY_INITIAL_ENERGY_WH
+                + local_estimation_data.battery_energy_in_wh
+                - local_estimation_data.battery_energy_out_wh;
+
+            if (isfinite(remaining_energy_wh) &&
+                remaining_energy_wh >= 0.0f &&
+                remaining_energy_wh <= BATTERY_USABLE_CAPACITY_WH) {
+
+                float next_soc_pct =
+                    100.0f * (remaining_energy_wh / BATTERY_USABLE_CAPACITY_WH);
+
+                if (isfinite(next_soc_pct)) {
+                    local_estimation_data.estimated_state_of_charge_pct =
+                        next_soc_pct;
+
+                    local_estimation_data.valid_estimation_mask |=
+                        ESTIMATED_STATE_OF_CHARGE_PCT;
+                }
+            }
+        }
+
+
+        
         //set data
         set_eps_estimation_data(local_estimation_data);
 
