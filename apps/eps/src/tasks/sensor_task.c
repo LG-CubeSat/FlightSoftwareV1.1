@@ -81,12 +81,12 @@ void sensor_task(void *pvParameters)
             && solar_voltage >=0.00f) {
 
             local_sensor_data.valid_sensor_mask |= EPS_SOLAR_VOLTAGE;
-            local_sensor_data.battery_voltage_reading = solar_voltage;
+            local_sensor_data.solar_voltage_reading = solar_voltage;
 
         } else {
 
             local_sensor_data.valid_sensor_mask &= ~(EPS_SOLAR_VOLTAGE);
-            local_sensor_data.battery_voltage_reading = NAN;
+            local_sensor_data.solar_voltage_reading = NAN;
         }
 
         //battery_voltage
@@ -94,14 +94,16 @@ void sensor_task(void *pvParameters)
             && isfinite(battery_voltage)
             && battery_voltage >=0.00f) {
 
-            local_sensor_data.valid_sensor_mask |= EPS_SOLAR_VOLTAGE;
-            local_sensor_data.battery_voltage_reading = solar_voltage;
+            local_sensor_data.valid_sensor_mask |= EPS_BATTERY_VOLTAGE;
+            local_sensor_data.battery_voltage_reading = battery_voltage;
 
         } else {
 
-            local_sensor_data.valid_sensor_mask &= ~(EPS_SOLAR_VOLTAGE);
+            local_sensor_data.valid_sensor_mask &= ~(EPS_BATTERY_VOLTAGE);
             local_sensor_data.battery_voltage_reading = NAN;
         }
+
+        
 
 
 
