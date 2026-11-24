@@ -320,18 +320,6 @@ void estimation_task(void *pvParameters)
         }
 
 
-        /*
-
-        to-do: implement calculations for:
-
-        estimated_state_of_charge_pct;
-        average_solar_power_w;
-        average_battery_current_a;
-        estimated_time_to_empty_h;
-        estimated_time_to_full_h;
-    
-        */
-
         if (!battery_energy_history_complete) {
         local_estimation_data.valid_estimation_mask &= ~(BATTERY_ENERGY_IN_WH | BATTERY_ENERGY_OUT_WH); 
         }
