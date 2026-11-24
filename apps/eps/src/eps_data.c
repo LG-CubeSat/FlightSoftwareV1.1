@@ -20,7 +20,8 @@ static eps_sensor_data_t eps_sensor_data = {
     //battery readings
     .battery_voltage_reading = 0.00f,
     .battery_current_reading = 0.00f, 
-    .battery_shunt_voltage_reading = 0.00f
+    .battery_shunt_voltage_reading = 0.00f,
+    .battery_temperature_reading = 0.00f
 };
 
 //estimation_data definitions in eps_data.h

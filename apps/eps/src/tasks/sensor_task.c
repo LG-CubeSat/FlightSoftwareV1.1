@@ -8,6 +8,7 @@
 #include "eps_data.h"
 
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 
 #define SENSOR_TASK_PRIORITY (3)
@@ -55,7 +56,6 @@ void sensor_task(void *pvParameters)
         
         //read data
         local_sensor_data = get_eps_sensor_data();
-        local_estimation_data = get_eps_estimation_data();
 
         //set all validity bits to 0, this way if a reading was once successful but is now not, it needs to repetitevly make sure data is valid each iteration
         local_sensor_data.valid_sensor_mask = 0;
