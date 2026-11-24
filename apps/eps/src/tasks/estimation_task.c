@@ -63,6 +63,7 @@ void estimation_task(void *pvParameters)
     eps_estimation_data_t local_estimation_data;
     
     bool previous_battery_power_valid = false;
+    bool battery_energy_history_complete = true;
 
     for (;;)
     {
@@ -219,19 +220,16 @@ void estimation_task(void *pvParameters)
             && local_estimation_data.valid_estimation_mask & BATTERY_POWER_W
             && elapsed_hours > 0.00f) {
 
-            float next_energy_in = local_estimation_data.battery_energy_out_wh + calculateEnergy(local_estimation_data.battery_power_w,elapsed_hours);
-                
+            float next_energy_in = local_estimation_data.battery_energy_in_wh + calculateEnergy(local_estimation_data.battery_power_w,elapsed_hours);   
 
             if(isfinite(next_energy_in)) {
                 local_estimation_data.battery_energy_in_wh = next_energy_in;
                 local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_IN_WH;
             } else {
+                battery_energy_history_complete = false;
                 local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_IN_WH;
             }
         } 
-        if (new_sensor_sample || !sensor_data_fresh) {
-        previous_battery_power_valid = current_battery_power_valid;
-        }
 
         //eps_battery_energy_out_wh calculation
         if (battery_interval_valid
@@ -248,6 +246,7 @@ void estimation_task(void *pvParameters)
                     local_estimation_data.battery_energy_out_wh = next_energy_out;
                     local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_OUT_WH;
                 } else {
+                    battery_energy_history_complete = false;
                     local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_OUT_WH;
                 }
         }
@@ -268,6 +267,10 @@ void estimation_task(void *pvParameters)
         estimated_time_to_full_h;
     
         */
+
+        if (!battery_energy_history_complete) {
+        local_estimation_data.valid_estimation_mask &= ~(BATTERY_ENERGY_IN_WH | BATTERY_ENERGY_OUT_WH); 
+        }
 
         //set data
         set_eps_estimation_data(local_estimation_data);
