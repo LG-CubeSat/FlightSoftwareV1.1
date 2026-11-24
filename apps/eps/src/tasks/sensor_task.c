@@ -130,6 +130,18 @@ void sensor_task(void *pvParameters)
             local_sensor_data.valid_sensor_mask &= ~(EPS_BATTERY_CURRENT);
             local_sensor_data.battery_current_reading = NAN;
         }
+        //solar_shunt_voltage
+        if (read_solar_shunt_voltage(&solar_shunt_voltage) 
+            && isfinite(solar_shunt_voltage)) {
+
+            local_sensor_data.valid_sensor_mask |= SOLAR_SHUNT_VOLTAGE;
+            local_sensor_data.solar_shunt_voltage_reading = solar_shunt_voltage;
+
+        } else {
+
+            local_sensor_data.valid_sensor_mask &= ~(SOLAR_SHUNT_VOLTAGE);
+            local_sensor_data.solar_shunt_voltage_reading = NAN;
+        }
         
 
 
