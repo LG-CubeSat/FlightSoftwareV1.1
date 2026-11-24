@@ -219,7 +219,11 @@ void estimation_task(void *pvParameters)
             && local_estimation_data.valid_estimation_mask & BATTERY_POWER_W
             && elapsed_hours > 0.00f) {
 
-            if(isfinite(local_estimation_data.battery_energy_in_wh += calculateEnergy(local_estimation_data.battery_power_w,elapsed_hours))) {
+            float next_energy_in = local_estimation_data.battery_energy_out_wh + calculateEnergy(local_estimation_data.battery_power_w,elapsed_hours);
+                
+
+            if(isfinite(next_energy_in)) {
+                local_estimation_data.battery_energy_in_wh = next_energy_in;
                 local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_IN_WH;
             } else {
                 local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_IN_WH;
@@ -236,8 +240,12 @@ void estimation_task(void *pvParameters)
             && local_estimation_data.valid_estimation_mask & BATTERY_POWER_W
             && elapsed_hours > 0.00f) {
                 
-                if(isfinite(local_estimation_data.battery_energy_out_wh += calculateEnergy(-local_estimation_data.battery_power_w,elapsed_hours))) {
+                float next_energy_out = local_estimation_data.battery_energy_out_wh + calculateEnergy(-local_estimation_data.battery_power_w,elapsed_hours);
+                
 
+                if(isfinite(next_energy_out)) {
+
+                    local_estimation_data.battery_energy_out_wh = next_energy_out;
                     local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_OUT_WH;
                 } else {
                     local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_OUT_WH;
