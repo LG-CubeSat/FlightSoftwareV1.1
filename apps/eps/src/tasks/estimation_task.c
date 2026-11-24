@@ -29,6 +29,8 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 #define BATTERY_USABLE_CAPACITY_WH NAN
 #define BATTERY_INITIAL_ENERGY_WH  NAN
 
+#define MIN_DISCHARGE_POWER_W (0.1f)
+
 static uint32_t previous_sensor_timestamp_ms = 0U;
 static uint32_t previous_sensor_sequence = 0U;
 static bool has_previous_sensor_sample = false;
@@ -388,8 +390,10 @@ void estimation_task(void *pvParameters)
 
         // Default to invalid unless all SOC checks pass.
         local_estimation_data.estimated_state_of_charge_pct = NAN;
-        local_estimation_data.valid_estimation_mask &=
-            ~ESTIMATED_STATE_OF_CHARGE_PCT;
+        local_estimation_data.valid_estimation_mask &= ~ESTIMATED_STATE_OF_CHARGE_PCT;
+
+        local_estimation_data.estimated_time_to_empty_h = NAN;
+        local_estimation_data.valid_estimation_mask &= ~ESTIAMTED_TIME_TO_EMPTY_H;
 
         //estimated_state_of_charge_pct
         if (isfinite(BATTERY_USABLE_CAPACITY_WH) &&
@@ -419,12 +423,24 @@ void estimation_task(void *pvParameters)
 
                     local_estimation_data.valid_estimation_mask |=
                         ESTIMATED_STATE_OF_CHARGE_PCT;
+
+                    if (local_estimation_data.battery_power_w < -MIN_DISCHARGE_POWER_W) {
+
+                    float next_time_to_empty_h = remaining_energy_wh / -local_estimation_data.battery_power_w;
+
+                    if (isfinite(next_time_to_empty_h) && next_time_to_empty_h >= 0.0f) {
+
+                        local_estimation_data.estimated_time_to_empty_h = next_time_to_empty_h;
+                        local_estimation_data.valid_estimation_mask |= ESTIAMTED_TIME_TO_EMPTY_H;
+                        
+    }
+}
                 }
             }
         }
 
 
-        
+
         //set data
         set_eps_estimation_data(local_estimation_data);
 
