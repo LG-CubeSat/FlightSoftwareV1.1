@@ -103,7 +103,19 @@ void sensor_task(void *pvParameters)
             local_sensor_data.battery_voltage_reading = NAN;
         }
 
-        
+        //solar_current
+        if (read_solar_current(&solar_current) 
+            && isfinite(solar_current)
+            && solar_current >=0.00f) {
+
+            local_sensor_data.valid_sensor_mask |= EPS_SOLAR_CURRENT;
+            local_sensor_data.solar_current_reading = solar_current;
+
+        } else {
+
+            local_sensor_data.valid_sensor_mask &= ~(EPS_SOLAR_CURRENT);
+            local_sensor_data.solar_current_reading = NAN;
+        }
 
 
 
