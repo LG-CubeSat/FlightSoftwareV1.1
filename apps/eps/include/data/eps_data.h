@@ -31,7 +31,8 @@ typedef enum {
     AVERAGE_BATTERY_CURRENT_A       =1u << 14,
     ESTIMATED_TIME_TO_FULL_H        =1u << 15,
     ESTIAMTED_TIME_TO_EMPTY_H       =1u << 16,
-    STATE_OF_FLOW                   =1u << 17
+    STATE_OF_FLOW                   =1u << 17,
+    UPTIME_MIN                      =1u << 18
 
 
     
@@ -70,6 +71,12 @@ typedef struct {
     float battery_shunt_voltage_reading;
     //temperature reading from battery; used to check for overheating
     float battery_temperature_reading;
+    //total valid sensor data points
+    uint8_t valid_sensor_points;
+    //total invalid estimation data points
+    uint8_t invalid_sensor_points;
+    //percentage of valid points
+    float valid_sensor_points_pct;
 
 
 } eps_sensor_data_t;
@@ -103,6 +110,15 @@ typedef struct {
     float estimated_time_to_empty_h;
     //Predicted time until full; used to track charging progress
     float estimated_time_to_full_h;
+    //total eps uptime
+    float uptime_min;
+    //total valid estimation data points
+    uint8_t valid_estimation_points;
+    //total invalid estimation data points
+    uint8_t invalid_estimation_points;
+    //percentage of valid points
+    float valid_estimation_points_pct;
+
 
 } eps_estimation_data_t;
 

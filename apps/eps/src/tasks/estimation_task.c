@@ -467,7 +467,31 @@ void estimation_task(void *pvParameters)
             }
         }
 
+        // Uptime in decimal minutes since RTOS startup.
+        uint32_t uptime_ms =
+            (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
 
+        local_estimation_data.uptime_min =
+            (float)uptime_ms / 60000.0f;
+
+        local_estimation_data.valid_estimation_mask |= UPTIME_MIN;
+
+        // Count valid estimation fields, including uptime.
+        local_estimation_data.valid_estimation_points = 0U;
+
+        for (uint32_t bit = 7U; bit < 19U; ++bit) {
+            if ((local_estimation_data.valid_estimation_mask &
+                (1U << bit)) != 0U) {
+                ++local_estimation_data.valid_estimation_points;
+            }
+        }
+
+        local_estimation_data.invalid_estimation_points =
+            12U - local_estimation_data.valid_estimation_points;
+
+        local_estimation_data.valid_estimation_points_pct =
+            ((float)local_estimation_data.valid_estimation_points / 12.0f)
+            * 100.0f;
 
         //set data
         set_eps_estimation_data(local_estimation_data);
@@ -476,69 +500,112 @@ void estimation_task(void *pvParameters)
         if (++debug_counter >= 50U) {
             debug_counter = 0U;
 
-            printf(
-            "\n** [EPS DATA] **\n"
-            "-------------------\n"
-            "    SENSOR DATA\n"
-            "-------------------\n"
-            "Solar Voltage: %.3f V\n"
-            "Solar Shunt Voltage: %.3f V\n"
-            "Solar Current: %.3f A\n"
-            "Battery Voltage: %.3f V\n"
-            "Battery Shunt Voltage: %.3f V\n"
-            "Battery Current: %.3f A\n"
-            "Battery Temperature: %.2f °C\n"
-            "Valid Sensor Mask: %" PRIu32 "\n"
-            "Timestamp: %" PRIu32 " ms\n"
-            "Sequence: %" PRIu32 "\n"
-            "-------------------\n"
-            "  ESTIMATION DATA\n"
-            "-------------------\n"
-            "Solar Power: %.3f W\n"
-            "Battery Power: %.3f W\n"
-            "Estimated Power Balance: %.3f W\n"
-            "Battery Energy In: %.6f Wh\n"
-            "Battery Energy Out: %.6f Wh\n"
-            "Estimated State of Charge: %.3f %%\n"
-            "Average Solar Power: %.3f W\n"
-            "Average Battery Current: %.3f A\n"
-            "Estimated Time to Empty: %.0f h %.0f min %.0f s\n"
-            "Estimated Time to Full: %.0f h %.0f min %.0f s\n"
-            "State of Flow: %" PRId8
-            " (1=charging, -1=discharging, 0=idle, 2=invalid)\n"
-            "Valid Estimation Mask: %" PRIu32 "\n"
-            "-------------------\n",
+              printf(
+                "\n** [EPS DATA] **\n"
+                "-------------------\n"
+                "   SYSTEM STATUS\n"
+                "-------------------\n"
+                "Uptime: %.0f h %.0f min %.0f s\n"
+                "Valid Data Points: %u / 19\n"
+                "Invalid Data Points: %u / 19\n"
+                "-------------------\n"
+                "    SENSOR DATA\n"
+                "-------------------\n"
+                "Solar Voltage: %.3f V\n"
+                "Solar Shunt Voltage: %.3f V\n"
+                "Solar Current: %.3f A\n"
+                "Battery Voltage: %.3f V\n"
+                "Battery Shunt Voltage: %.3f V\n"
+                "Battery Current: %.3f A\n"
+                "Battery Temperature: %.2f °C\n"
+                "Valid Sensor Points: %u / 7\n"
+                "Invalid Sensor Points: %u / 7\n"
+                "Valid Sensor Percentage: %.2f %%\n"
+                "Valid Sensor Mask: %" PRIu32 "\n"
+                "Timestamp: %" PRIu32 " ms\n"
+                "Sequence: %" PRIu32 "\n"
+                "-------------------\n"
+                "  ESTIMATION DATA\n"
+                "-------------------\n"
+                "Solar Power: %.3f W\n"
+                "Battery Power: %.3f W\n"
+                "Estimated Power Balance: %.3f W\n"
+                "Battery Energy In: %.6f Wh\n"
+                "Battery Energy Out: %.6f Wh\n"
+                "Estimated State of Charge: %.3f %%\n"
+                "Average Solar Power: %.3f W\n"
+                "Average Battery Current: %.3f A\n"
+                "Estimated Time to Empty: %.0f h %.0f min %.0f s\n"
+                "Estimated Time to Full: %.0f h %.0f min %.0f s\n"
+                "State of Flow: %" PRId8
+                " (1=charging, -1=discharging, 0=idle, 2=invalid)\n"
+                "Valid Estimation Points: %u / 12\n"
+                "Invalid Estimation Points: %u / 12\n"
+                "Valid Estimation Percentage: %.2f %%\n"
+                "Valid Estimation Mask: %" PRIu32 "\n"
+                "-------------------\n",
 
-            local_sensor_data.solar_voltage_reading,
-            local_sensor_data.solar_shunt_voltage_reading,
-            local_sensor_data.solar_current_reading,
-            local_sensor_data.battery_voltage_reading,
-            local_sensor_data.battery_shunt_voltage_reading,
-            local_sensor_data.battery_current_reading,
-            local_sensor_data.battery_temperature_reading,
-            local_sensor_data.valid_sensor_mask,
-            local_sensor_data.timestamp_ms,
-            local_sensor_data.sequence,
+                // System status.
+                floor((double)local_estimation_data.uptime_min / 60.0),
+                floor(fmod(
+                    (double)local_estimation_data.uptime_min, 60.0)),
+                floor(fmod(
+                    (double)local_estimation_data.uptime_min * 60.0, 60.0)),
 
-            local_estimation_data.solar_power_w,
-            local_estimation_data.battery_power_w,
-            local_estimation_data.estimated_power_balance_w,
-            local_estimation_data.battery_energy_in_wh,
-            local_estimation_data.battery_energy_out_wh,
-            local_estimation_data.estimated_state_of_charge_pct,
-            local_estimation_data.average_solar_power_w,
-            local_estimation_data.average_battery_current_a,
-            floor(local_estimation_data.estimated_time_to_empty_h),
-            floor(fmod((double)local_estimation_data.estimated_time_to_empty_h * 60.0, 60.0)),
-            floor(fmod((double)local_estimation_data.estimated_time_to_empty_h * 3600.0, 60.0)),
-            floor(local_estimation_data.estimated_time_to_full_h),
-            floor(fmod((double)local_estimation_data.estimated_time_to_full_h * 60.0, 60.0)),
-            floor(fmod((double)local_estimation_data.estimated_time_to_full_h * 3600.0, 60.0)),
-            local_estimation_data.state_of_flow,
-            local_estimation_data.valid_estimation_mask
-        );
+                (unsigned)local_sensor_data.valid_sensor_points
+                    + (unsigned)local_estimation_data.valid_estimation_points,
+                (unsigned)local_sensor_data.invalid_sensor_points
+                    + (unsigned)local_estimation_data.invalid_estimation_points,
 
-        fflush(stdout);
+                // Sensor data.
+                local_sensor_data.solar_voltage_reading,
+                local_sensor_data.solar_shunt_voltage_reading,
+                local_sensor_data.solar_current_reading,
+                local_sensor_data.battery_voltage_reading,
+                local_sensor_data.battery_shunt_voltage_reading,
+                local_sensor_data.battery_current_reading,
+                local_sensor_data.battery_temperature_reading,
+                (unsigned)local_sensor_data.valid_sensor_points,
+                (unsigned)local_sensor_data.invalid_sensor_points,
+                local_sensor_data.valid_sensor_points_pct,
+                (uint32_t)local_sensor_data.valid_sensor_mask,
+                local_sensor_data.timestamp_ms,
+                local_sensor_data.sequence,
+
+                // Estimation data.
+                local_estimation_data.solar_power_w,
+                local_estimation_data.battery_power_w,
+                local_estimation_data.estimated_power_balance_w,
+                local_estimation_data.battery_energy_in_wh,
+                local_estimation_data.battery_energy_out_wh,
+                local_estimation_data.estimated_state_of_charge_pct,
+                local_estimation_data.average_solar_power_w,
+                local_estimation_data.average_battery_current_a,
+
+                floor(local_estimation_data.estimated_time_to_empty_h),
+                floor(fmod(
+                    (double)local_estimation_data.estimated_time_to_empty_h
+                    * 60.0, 60.0)),
+                floor(fmod(
+                    (double)local_estimation_data.estimated_time_to_empty_h
+                    * 3600.0, 60.0)),
+
+                floor(local_estimation_data.estimated_time_to_full_h),
+                floor(fmod(
+                    (double)local_estimation_data.estimated_time_to_full_h
+                    * 60.0, 60.0)),
+                floor(fmod(
+                    (double)local_estimation_data.estimated_time_to_full_h
+                    * 3600.0, 60.0)),
+
+                local_estimation_data.state_of_flow,
+                (unsigned)local_estimation_data.valid_estimation_points,
+                (unsigned)local_estimation_data.invalid_estimation_points,
+                local_estimation_data.valid_estimation_points_pct,
+                local_estimation_data.valid_estimation_mask
+            );
+
+            fflush(stdout);
         }
 #endif
 

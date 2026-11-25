@@ -13,6 +13,10 @@ static eps_sensor_data_t eps_sensor_data = {
     .sequence = 0u, //to be implemented
     .valid_sensor_mask = 0u << 0, //initial mask
 
+    .valid_sensor_points = 0U,
+    .invalid_sensor_points = 7U,
+    .valid_sensor_points_pct = 0.0f,
+
     //solar readings
     .solar_voltage_reading = 0.00f,
     .solar_current_reading = 0.00f,
@@ -29,6 +33,11 @@ static eps_sensor_data_t eps_sensor_data = {
 static eps_estimation_data_t eps_estimation_data = {
 
     .valid_estimation_mask = 0u << 0,
+
+    .uptime_min = 0.0f,
+    .valid_estimation_points = 0U,
+    .invalid_estimation_points = 12U,
+    .valid_estimation_points_pct = 0.0f,
 
     .solar_power_w = 0.00f,
     .battery_power_w =0.00f,

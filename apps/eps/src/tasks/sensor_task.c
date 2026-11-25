@@ -179,6 +179,21 @@ void sensor_task(void *pvParameters)
         local_sensor_data.timestamp_ms = (uint32_t)pdTICKS_TO_MS(now_ticks);
         local_sensor_data.sequence = ++sensor_sequence;
 
+        // Count valid sensor readings in this snapshot.
+        local_sensor_data.valid_sensor_points = 0U;
+
+        for (uint32_t bit = 0U; bit < 7U; ++bit) {
+            if ((local_sensor_data.valid_sensor_mask & (1U << bit)) != 0U) {
+                ++local_sensor_data.valid_sensor_points;
+            }
+        }
+
+        local_sensor_data.invalid_sensor_points =
+            7U - local_sensor_data.valid_sensor_points;
+
+        local_sensor_data.valid_sensor_points_pct =
+            ((float)local_sensor_data.valid_sensor_points / 7.0f) * 100.0f;
+
         //set data
         set_eps_sensor_data(local_sensor_data);
 
