@@ -4,6 +4,7 @@
 #include <math.h>
 
 pthread_mutex_t eps_data_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t eps_fault_data_lock = PTHREAD_MUTEX_INITIALIZER;
 
 //sensor_data definitions in eps_data.h
 static eps_sensor_data_t eps_sensor_data = {
@@ -44,6 +45,27 @@ static eps_estimation_data_t eps_estimation_data = {
     
 };
 
+static eps_fault_data_t eps_fault_data = {
+
+    .current_state = EPS_STATE_NA,
+    .previous_state = EPS_STATE_NA,
+
+    .active_errors = 0U << 0U,
+
+    .time_spent_in_current_state_ms = 0u
+
+};
+
+eps_fault_data_t get_eps_fault_data(void) {
+
+    eps_fault_data_t snapshot;
+    pthread_mutex_lock(&eps_fault_data_lock);
+    snapshot = eps_fault_data;
+    pthread_mutex_unlock(&eps_fault_data_lock);
+
+    return snapshot;
+}
+
 eps_sensor_data_t get_eps_sensor_data(void) {
 
     eps_sensor_data_t snapshot;
@@ -81,5 +103,13 @@ void set_eps_estimation_data(eps_estimation_data_t newdata) {
     eps_estimation_data = newdata;
     pthread_mutex_unlock(&eps_data_lock);
     
+
+}
+
+void set_eps_fault_data(eps_fault_data_t newdata) {
+
+    pthread_mutex_lock(&eps_fault_data_lock);
+    eps_fault_data = newdata;
+    pthread_mutex_unlock(&eps_fault_data_lock);
 
 }

@@ -6,6 +6,7 @@
 #include <math.h>
 
 extern pthread_mutex_t eps_data_lock;
+extern pthread_mutex_t eps_fault_data_lock;
 
 typedef enum {
 
@@ -105,6 +106,40 @@ typedef struct {
 
 } eps_estimation_data_t;
 
+enum eps_state {
+
+    EPS_STATE_SAFE, //defaults to 0
+    EPS_STATE_WARNING, //defaults to 1
+    EPS_STATE_CRITICAL, // defaults to 2
+    EPS_STATE_IDLE, // defaults to 3
+    EPS_STATE_ECLIPSE, //defaults to 4
+    EPS_STATE_NOMINAL, //defaults to 5
+    EPS_STATE_NA //defaults to 6
+
+};
+
+typedef struct {
+
+    enum eps_state current_state;
+    enum eps_state previous_state;
+
+    uint8_t active_errors; //active fault bitmask (not for validity)
+    // 1u << 0u = High Voltage
+    // 1u << 1u = High Current
+    // 1u << 2u = Low Voltage
+    // 1u << 3u = Low Current
+    // 1u << 4u = High Temp
+    // 1u << 5u = Low Temp
+
+    uint32_t time_spent_in_current_state_ms;
+    
+
+
+} eps_fault_data_t;
+
+
+eps_fault_data_t get_eps_fault_data(void);
+
 eps_sensor_data_t get_eps_sensor_data(void);
 
 eps_estimation_data_t get_eps_estimation_data(void);
@@ -114,6 +149,7 @@ void set_eps_sensor_data(eps_sensor_data_t newdata);
 
 void set_eps_estimation_data(eps_estimation_data_t newdata);
 
+void set_eps_fault_data(eps_fault_data_t newdata);
 
 
 #endif //EPS_DATA

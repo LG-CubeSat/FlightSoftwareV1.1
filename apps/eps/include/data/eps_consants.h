@@ -35,5 +35,10 @@ we will add more constants and more stuff to fault manager to prevent critical f
 #define WARNING_BATTERY_CURRENT_HIGH 25U //Send OBC & Fault Manager Warning for High Current
 #define CRITICAL_BATTERY_CURRENT_HIGH 30U //Do Something About Battery Current (CRITICAL)
 
+#define WARNING_BATTERY_VOLTAGE_LOW 5U //Send OBC & Fault Manager Warning for High Voltage
+#define CRITICAL_BATTERY_VOLTAGE_LOW 3U //Do Something About Battery Voltage (CRITICAL)
+#define WARNING_BATTERY_CURRENT_LOW 0.25U //Send OBC & Fault Manager Warning for High Current
+#define CRITICAL_BATTERY_CURRENT_LOW 0.1U //Do Something About Battery Current (CRITICAL)
+
 
 #endif //EPS CONSTNATS
