@@ -9,6 +9,8 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include <inttypes.h>
+
 #include "eps_data.h"
 #include "powerCalculations.h"
 #include "pthread.h"
@@ -473,26 +475,68 @@ void estimation_task(void *pvParameters)
         //set data
         set_eps_estimation_data(local_estimation_data);
 
-        if (++debug_counter >= 10U) {
+        if (++debug_counter >= 250U) {
             debug_counter = 0U;
 
             printf(
-                "[EPS TEST] solar=%.3f W battery=%.3f W "
-                "flow=%d in=%.6f Wh out=%.6f Wh "
-                "avg_solar=%.3f W avg_current=%.3f A "
-                "sensor_mask=0x%lX estimate_mask=0x%lX\n",
-                local_estimation_data.solar_power_w,
-                local_estimation_data.battery_power_w,
-                (int)local_estimation_data.state_of_flow,
-                local_estimation_data.battery_energy_in_wh,
-                local_estimation_data.battery_energy_out_wh,
-                local_estimation_data.average_solar_power_w,
-                local_estimation_data.average_battery_current_a,
-                (unsigned long)local_sensor_data.valid_sensor_mask,
-                (unsigned long)local_estimation_data.valid_estimation_mask
-            );
+            "\n** [EPS TEST] **\n"
+            "-------------------\n"
+            "    SENSOR DATA\n"
+            "-------------------\n"
+            "Solar Voltage: %.3f V\n"
+            "Solar Shunt Voltage: %.3f V\n"
+            "Solar Current: %.3f A\n"
+            "Battery Voltage: %.3f V\n"
+            "Battery Shunt Voltage: %.3f V\n"
+            "Battery Current: %.3f A\n"
+            "Battery Temperature: %.2f °C\n"
+            "Valid Sensor Mask: %" PRIu32 "\n"
+            "Timestamp: %" PRIu32 " ms\n"
+            "Sequence: %" PRIu32 "\n"
+            "-------------------\n"
+            "  ESTIMATION DATA\n"
+            "-------------------\n"
+            "Solar Power: %.3f W\n"
+            "Battery Power: %.3f W\n"
+            "Estimated Power Balance: %.3f W\n"
+            "Battery Energy In: %.6f Wh\n"
+            "Battery Energy Out: %.6f Wh\n"
+            "Estimated State of Charge: %.3f %%\n"
+            "Average Solar Power: %.3f W\n"
+            "Average Battery Current: %.3f A\n"
+            "Estimated Time to Empty: %.2f h\n"
+            "Estimated Time to Full: %.2f h\n"
+            "State of Flow: %" PRId8
+            " (1=charging, -1=discharging, 0=idle, 2=invalid)\n"
+            "Valid Estimation Mask: %" PRIu32 "\n"
+            "-------------------\n",
 
-            fflush(stdout);
+            local_sensor_data.solar_voltage_reading,
+            local_sensor_data.solar_shunt_voltage_reading,
+            local_sensor_data.solar_current_reading,
+            local_sensor_data.battery_voltage_reading,
+            local_sensor_data.battery_shunt_voltage_reading,
+            local_sensor_data.battery_current_reading,
+            local_sensor_data.battery_temperature_reading,
+            local_sensor_data.valid_sensor_mask,
+            local_sensor_data.timestamp_ms,
+            local_sensor_data.sequence,
+
+            local_estimation_data.solar_power_w,
+            local_estimation_data.battery_power_w,
+            local_estimation_data.estimated_power_balance_w,
+            local_estimation_data.battery_energy_in_wh,
+            local_estimation_data.battery_energy_out_wh,
+            local_estimation_data.estimated_state_of_charge_pct,
+            local_estimation_data.average_solar_power_w,
+            local_estimation_data.average_battery_current_a,
+            local_estimation_data.estimated_time_to_empty_h,
+            local_estimation_data.estimated_time_to_full_h,
+            local_estimation_data.state_of_flow,
+            local_estimation_data.valid_estimation_mask
+        );
+
+        fflush(stdout);
         }
 
         uint32_t notified_value;

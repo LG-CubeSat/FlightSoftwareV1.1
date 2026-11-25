@@ -46,7 +46,7 @@ typedef struct {
     //New-sample counter; used to avoid processing a sample twice
     uint32_t sequence;
     //Binary mask; used to detemine which data is valid
-    uint32_t valid_sensor_mask;
+    uint8_t valid_sensor_mask;
 
 
     //solar readings
