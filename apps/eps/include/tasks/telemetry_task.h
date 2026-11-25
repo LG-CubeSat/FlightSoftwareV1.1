@@ -17,4 +17,6 @@ void telemetry_task_init(void);
 
 void telemetry_task(void *pvParamaters);
 
+void telemetry_request_send(void);
+
 #endif

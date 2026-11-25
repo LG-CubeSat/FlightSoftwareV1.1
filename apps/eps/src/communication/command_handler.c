@@ -7,8 +7,27 @@
 #include <csp/csp.h>
 #include "csp_commands.h"
 
+#include "tasks/telemetry_task.h"
+
 // Keep the socket alive for the lifetime of the program.
 static csp_socket_t command_socket = {0};
+
+static void send_command_ack(
+    csp_conn_t *connection,
+    const command_ack_t *ack)
+{
+    csp_packet_t *reply = csp_buffer_get(0);
+
+    if (reply == NULL) {
+        fprintf(stderr, "[EPS COMMAND] Failed to allocate ACK packet.\n");
+        return;
+    }
+
+    memcpy(reply->data, ack, sizeof(*ack));
+    reply->length = sizeof(*ack);
+
+    csp_send(connection, reply);
+}
 
 static void *command_receiver(void *argument)
 {
@@ -49,13 +68,23 @@ static void *command_receiver(void *argument)
                 command_envelope_t command;
                 memcpy(&command, packet->data, sizeof(command));
 
+                command_ack_t ack = {0};
+                ack.ack_command_id = command.command_id;
+                ack.ack_seq = command.seq;
+                ack.status = NACK;
+
                 switch (command.command_id) {
                     case EPS_WIRE_COMMAND_REQUEST_TELEMETRY:
-                        printf(
-                            "[EPS COMMAND] Telemetry requested; sequence=%lu.\n",
-                            (unsigned long)command.seq
-                        );
-                        fflush(stdout);
+                        if (xTelemetryHandle != NULL) {
+                            telemetry_request_send();
+                            ack.status = ACK;
+
+                            printf(
+                                "[EPS COMMAND] Telemetry requested; sequence=%lu.\n",
+                                (unsigned long)command.seq
+                            );
+                            fflush(stdout);
+                        }
                         break;
 
                     default:
@@ -66,6 +95,7 @@ static void *command_receiver(void *argument)
                         );
                         break;
                 }
+                send_command_ack(connection, &ack);
             }
 
             // Every received packet must be released.

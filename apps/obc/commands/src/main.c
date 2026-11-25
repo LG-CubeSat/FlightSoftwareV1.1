@@ -83,11 +83,41 @@ static void *radio_rx_thread(void *arg) {
 
         memcpy(csp_pkt->data, payload, payload_len);
         csp_pkt->length = payload_len;
-        csp_send(conn, csp_pkt);
-        csp_close(conn);
+        csp_send(connection, packet);
 
-        printf("[OBC RADIO RX] Forwarded successfully.\n");
-        fflush(stdout);
+csp_packet_t *reply = csp_read(connection, 1000);
+
+if (reply == NULL) {
+    fprintf(stderr, "[EPS TEST] No acknowledgment received within timeout.\n");
+}
+else {
+    if (reply->length != sizeof(command_ack_t)) {
+        fprintf(stderr, "[EPS TEST] Invalid acknowledgment size.\n");
+    }
+    else {
+        command_ack_t ack;
+        memcpy(&ack, reply->data, sizeof(ack));
+
+        if (ack.ack_command_id != command.command_id ||
+            ack.ack_seq != command.seq) {
+            fprintf(stderr, "[EPS TEST] Acknowledgment does not match request.\n");
+        }
+        else if (ack.status == ACK) {
+            printf("[EPS TEST] ACK: EPS accepted the telemetry request.\n");
+            fflush(stdout);
+        }
+        else if (ack.status == NACK) {
+            fprintf(stderr, "[EPS TEST] NACK: EPS rejected the request.\n");
+        }
+        else {
+            fprintf(stderr, "[EPS TEST] Invalid acknowledgment status.\n");
+        }
+    }
+
+    csp_buffer_free(reply);
+}
+
+csp_close(connection);
     }
     return NULL;
 }

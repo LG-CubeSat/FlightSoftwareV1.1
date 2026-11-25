@@ -13,6 +13,9 @@ Sends out data using CSP
 #include <stdio.h>
 #include <string.h>
 
+#include <stdbool.h>
+#include <stdatomic.h>
+
 #include "eps_data.h"
 
 #include <csp/csp.h>
@@ -22,11 +25,19 @@ Sends out data using CSP
 #define TELEMETRY_TASK_PRIORITY (1)
 #define TELEMETRY_TASK_STACK_SIZE (1024)
 #define TELEMETRY_TASK_PERIOD_MS (1000)
+#define TELEMETRY_REQUEST_POLL_MS (20)
+
+static atomic_bool telemetry_send_requested = false;
 
 static StackType_t xTelemetryTaskStack[TELEMETRY_TASK_STACK_SIZE];
 static StaticTask_t xTelemetryTaskBuffer;
 
 TaskHandle_t xTelemetryHandle = NULL;
+
+void telemetry_request_send(void)
+{
+    atomic_store(&telemetry_send_requested, true);
+}
 
 void telemetry_task_init(void)
 {
@@ -53,10 +64,33 @@ void telemetry_task(void *pvParameters)
 {
     (void) pvParameters;
 
-    TickType_t lastWakeTime = xTaskGetTickCount();
+    const TickType_t report_period =
+    pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS);
+
+    const TickType_t poll_period =
+    pdMS_TO_TICKS(TELEMETRY_REQUEST_POLL_MS);
+
+    TickType_t last_periodic_tick =
+    xTaskGetTickCount() - report_period;
 
     for (;;)
-    {
+{
+    TickType_t now = xTaskGetTickCount();
+
+    bool requested =
+        atomic_exchange(&telemetry_send_requested, false);
+
+    bool periodic_due =
+        (TickType_t)(now - last_periodic_tick) >= report_period;
+
+    if (!requested && !periodic_due) {
+        vTaskDelay(poll_period);
+        continue;
+    }
+
+    if (periodic_due) {
+        last_periodic_tick = now;
+    }
         // Get private snapshots.
         eps_sensor_data_t sensor = get_eps_sensor_data();
         eps_estimation_data_t estimate = get_eps_estimation_data();
@@ -126,9 +160,6 @@ void telemetry_task(void *pvParameters)
             csp_close(connection);
         }
 
-        xTaskDelayUntil(
-            &lastWakeTime,
-            pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS)
-        );
+        vTaskDelay(poll_period);
     }
 }
