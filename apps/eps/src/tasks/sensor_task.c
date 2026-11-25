@@ -11,7 +11,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "powerCalculations.h"
 #include "conversions.h"
 
 #define SENSOR_TASK_PRIORITY (3)
