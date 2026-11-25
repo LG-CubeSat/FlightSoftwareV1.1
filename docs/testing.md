@@ -1,5 +1,29 @@
 # Flight Software V1 — Testing
 
+## EPS communication tests
+
+The implemented EPS simulator and its command/report formats are described in
+[the EPS guide](../apps/eps/README.md). Build and run its focused checks from the repo root:
+
+```sh
+cmake -S . -B build-sim -DHW_MODE=OFF -DBUILD_TESTS=ON
+cmake --build build-sim --target eps_command_client_test eps_communications_test obc_telemetry_test data_telemetry_test
+ctest --test-dir build-sim -R '^(eps_command_client_test|eps_communications_test|obc_telemetry_test|data_telemetry_test)$' --output-on-failure
+```
+
+`eps_command_client_test` supplies mock CSP functions for deterministic reply validation
+and failure cases. `eps_communications_test` launches real OBC commands, EPS, and Data
+processes, checks command results through IPC and simulated radio, and decodes persisted
+telemetry. It also checks duplicate ACKs, sequence wrap, invalid lengths, unknown IDs, and
+an unresponsive EPS timeout. It verifies duplicate acknowledgment, not a one-report-per-command
+guarantee; requests intentionally coalesce into a Boolean flag.
+
+Stop manually running simulators first. The integration test skips with exit code 77 if
+its shared sockets are active, and prints the temporary directory containing its logs.
+CTest locks `comms_bus_socket` and `obc_ipc_sockets` for this test. It needs permission to
+bind local Unix sockets and loopback UDP; a sandbox denial is not a protocol test result.
+There is no Enter-triggered test path in the production binaries.
+
 ## Writing a new test
 
 This project does not require a separate C testing framework. A test is a normal C executable:
@@ -15,8 +39,8 @@ The portable tests are useful in both build modes:
 | `ssdv_roundtrip_test` | Production JPEG-to-SSDV wrapper plus SSDV decode | yes | yes |
 | `compute_async_test` | Data/compute process IPC, busy response, and cancellation | yes | yes |
 
-The remaining tests use the simulated communications bus or launch `adcs_sim`, so they stay
-inside `if (NOT HW_MODE)` in `tests/CMakeLists.txt`.
+Tests requiring simulated board executables or the simulated communications bus stay
+inside `if (NOT HW_MODE)` in `tests/CMakeLists.txt`, including the EPS communication tests.
 
 ### 1. Write the C test
 

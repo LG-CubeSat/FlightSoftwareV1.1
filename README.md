@@ -14,20 +14,22 @@ this file is the practical "clone it, build it, run it" reference for the softwa
 | OBC | No longer a single binary — split into 7 cooperating Linux processes (`supervisor`, `fdir`, `commands`, `compute`, `data`, `mission`, `time`) talking over local IPC, see `apps/obc/roles.md`. **All 7 are real now.** `mission` runs a one-shot scripted balloon timeline (ascent → photo → compress → downlink, against mock camera/radio) plus a recurring `autonomy` thread that periodically commands other subsystems (e.g. telling ADCS to point at the sun). `time` periodically pushes a `CMD_TIME_SYNC` to every known board and can also answer an on-demand sync request. `data` owns all filesystem access — `mission` no longer touches files directly; it asks `data` to stream them back over IPC instead. `compute` asynchronously repackages a photo (real JPEG bytes) into SSDV packets for RF downlink, with cancellation — see "OBC internal architecture" below. CCSDS 121.0 (ground-station packetization/link) is a separate, in-progress effort tracked outside this repo's `compute` process. |
 | Comms bus (I2C) | Shared-bus simulation with address-based framing (see below) — multiple nodes on one simulated bus, each filtering to its own traffic. **OBC's real backend now exists** (`platform/real/drivers/comms_i2c.c` — Linux `i2c-dev`/`ioctl`, round-robin polls known boards since real I2C can't do broadcast-and-listen like the SIM transport does), verified to compile against real Linux/i2c-dev headers, but only exercised via Docker so far — no physical bus yet. MCU-side (ADCS/Thermals real I2C slave) is still a stub, and the OBC/MCU split into separate real backends hasn't happened yet (see Known gaps). |
 | Thermals | CSP/FreeRTOS simulation scaffold builds successfully. Command handling, sensor collection, and on-demand telemetry are present; hardware drivers, closed-loop heater control, FDIR, and hardware testing remain. |
-| EPS | Not a CSP board at all — real hardware is a passive buck converter with no MCU. Address reserved in code in case future battery-monitoring hardware needs it. See `docs/satellite_architecture.md`. |
+| EPS | **Working SIM communication path** — sensor/estimation tasks, periodic and requested CSP telemetry, command validation, ACK/NACK, and OBC storage integration. Sensors are simulated; hardware integration, fault recovery, and power switching remain. See [EPS guide](apps/eps/README.md). |
 | Camera / Comms (radio) | Not CSP boards — both are OBC-local peripherals (Arducam OV5647 over CSI ribbon, E22 LoRa module over UART). Their *interfaces* exist as mock-only contracts for `mission` — see "OBC internal architecture" below; real backends aren't written yet. |
 
 ## Architecture at a glance
 
 Every board with its own MCU is a CSP node on a shared I2C bus (SPI and CAN were retired).
-That's OBC, ADCS, and Thermals only — see `docs/satellite_architecture.md` for the full
-physical picture (why EPS/Camera/Comms aren't in this table):
+The software currently supports OBC, ADCS, Thermals, and an EPS simulator. The EPS
+simulator does not establish a deployed EPS hardware design; see
+`docs/satellite_architecture.md` for that distinction. Camera and radio remain OBC-local
+peripherals, not CSP boards:
 
 | Node | CSP Addr | Cmd Port | Telem Port | Status |
 |---|---|---|---|---|
 | OBC | 1 | — | — | done (SIM) |
 | ADCS | 2 | 10 | 20 | **done** |
-| EPS | 3 | 11 | 21 | reserved — not a real board, see `docs/satellite_architecture.md` |
+| EPS | 3 | 11 | 21 | sensor/estimation and CSP communication implemented in SIM; hardware integration pending |
 | THERMALS | 4 | 12 | 22 | scaffolded (SIM) |
 
 **The bus contract** (`shared/interfaces/comms_bus.h`) is medium-agnostic: `initialize`,
@@ -88,8 +90,7 @@ responsive.
   `platform/CMakeLists.txt`'s `HW_MODE` branch, to avoid colliding with that work.
 
 - **`time`** keeps the boards' clocks aligned to the OBC's. Rather than a new CSP port, it
-  reuses the same command-envelope/ACK mechanism every board's `command_handler.c` already
-  implements: a `CMD_TIME_SYNC` command carrying a `time_sync_command_t` (envelope +
+  uses a `CMD_TIME_SYNC` command carrying a `time_sync_command_t` (envelope +
   `unix_time_sec`), sent to each board's own existing command port via `commands`' relay.
   A local `known_boards[]` table (address + cmd port) drives two threads: one broadcasts
   to every board on a timer (`time_sync_broadcast_thread`), the other answers an on-demand
@@ -103,7 +104,8 @@ responsive.
   Linux box's own system clock for now — no real RTC/GPS discipline yet, same "sim now,
   real later" honesty as `camera`/`radio`, and boards don't actually apply the synced time
   anywhere yet (`command_handler.c`'s `CMD_TIME_SYNC` case is an ACK+log placeholder, like
-  `CMD_POINT_TO_SUN`).
+  `CMD_POINT_TO_SUN`). EPS currently implements only command `90` (request telemetry),
+  not time synchronization; its telemetry timestamps are milliseconds since RTOS startup.
 
 - **`data`** owns filesystem access, per `roles.md`'s "every read/write goes through
   `data`, not another process touching the filesystem directly" — closing a real
@@ -284,21 +286,24 @@ ctest --test-dir build --output-on-failure
 cached `OFF` sticks around across plain re-runs of `cmake -S . -B build`), pass
 `-DBUILD_TESTS=ON` explicitly once to pick it back up.
 
-All six tests build and pass. `position_command_test` and `command_ack_test` *are* the
+The suite includes unit and integration tests. `position_command_test` and `command_ack_test` *are* the
 OBC's CSP node themselves (the same `csp_network_init(OBC_ADDRESS, 1)` call any real OBC
 role makes), talking to a real spawned `adcs_sim` — this tests ADCS's actual command/task
 pipeline over the real wire contract without depending on which internal OBC processes
-happen to exist. `full_constellation_test` is the one exception: it spawns the *real*
+happen to exist. Other integration tests launch real OBC processes too;
+`full_constellation_test` spawns the *real*
 `obc_supervisor`, which brings up the real 7-process constellation exactly like a real
 launch would, alongside a real `adcs_sim`:
 
 | Test | What it proves |
 |---|---|
+| `eps_command_client_test` | EPS ACK correlation, rejection, malformed replies, allocation/connection failures, and bounded reply waits using mocked CSP calls. |
+| `eps_communications_test` | Real `obc_commands`, `eps_sim`, and `obc_data`: periodic/requested reports reach storage; IPC and simulated radio commands get ACK/NACK; an unresponsive EPS times out. |
 | `comms_bus_test` | Two nodes (OBC + ADCS), addressed frames flow correctly both directions over the real (non-mocked) transport. |
 | `comms_bus_addressing_test` | Three nodes (OBC + two slaves) — a message addressed to one slave is *not* delivered to the other. This is the one that actually exercises the broadcast-and-filter design; two-node tests can't catch a misrouted message since there's nowhere else for it to go. |
 | `position_command_test` | Full-stack happy path: repeated `CMD_MOVE_TO_POSITION` commands get ACKed, activate every task the command should (Control, Estimation, Sensor, Telemetry — not Housekeeping), and get a matching telemetry report back, all repeated across multiple cycles so a "works once then hangs" regression can't slip through. |
 | `command_ack_test` | ACK/NACK protocol edge cases `position_command_test` doesn't cover: an unrecognized command_id gets NACKed, an undersized `CMD_MOVE_TO_POSITION` (missing its target) gets NACKed, and a valid command right after both still gets ACKed — proving bad input doesn't wedge the handler. |
-| `full_constellation_test` | The only test that checks the processes actually work *together*, not just individually: every real role comes up, `autonomy`'s sun-pointing and `time`'s sync both reach ADCS, `mission`'s full scripted timeline runs end to end (ascent → photo → real SSDV compression → `data` streams it back → downlink), and `supervisor` never falsely restarts a healthy process. `MISSION_ASCENT_WAIT_SEC` and `TIME_SYNC_INTERVAL_SEC` env vars let it run the real ~90 min / 5 min timers in seconds — production defaults are untouched unless the var is set. |
+| `full_constellation_test` | Launches the supervisor and its roles with ADCS: `autonomy`'s sun-pointing and `time`'s sync reach ADCS, `mission`'s scripted timeline runs end to end (ascent → photo → SSDV compression → file streaming → downlink), and healthy processes are not falsely restarted. EPS communication is covered separately by `eps_communications_test`. |
 | `compute_async_test` | The two behaviors that make `compute` different from every other request/reply role: a second concurrent compress request gets `COMPUTE_STATUS_BUSY` (not queued) while one is running, and an in-flight job can be cancelled mid-run. Forks two real requester processes with different roles against real `obc_data`/`obc_compute` binaries, compressing a real (tiny, embedded) JPEG — `COMPUTE_CHUNK_DELAY_MS` widens the job's runtime so both checks land reliably. |
 
 Building `full_constellation_test` caught a real bug: `autonomy_thread` marked an action
@@ -313,8 +318,11 @@ Sabotage-verified: temporarily forcing `command_handler.c`'s `default` case to `
 instead of `NACK` makes `command_ack_test` fail as expected — confirms it's actually
 exercising the NACK path, not passing vacuously.
 
-All fork real processes and talk over a real Unix socket at `/tmp/comms_i2c.sock` — don't
+Bus integration tests fork real processes and talk over a real Unix socket at `/tmp/comms_i2c.sock` — don't
 run them at the same time as each other or as a manually-launched binary using that socket.
+
+For EPS build/run commands, payload fields, command examples, and focused tests, see
+[apps/eps/README.md](apps/eps/README.md). There is no Enter-triggered test in normal startup.
 
 ## Known gaps
 
@@ -355,10 +363,13 @@ run them at the same time as each other or as a manually-launched binary using t
   sensor/actuator, an RTC) this session doesn't have yet.
 - **`time`'s sync source is the OBC Linux box's own system clock**, not a real RTC/GPS
   reference — fine for proving the sync mechanism works, not for real timekeeping.
-  `time_sync.c`'s `known_boards[]` table also includes EPS even though EPS has no
-  command handler and, per `docs/satellite_architecture.md`, isn't a real MCU board at
-  all — same intentional "free" scalability as `autonomy.c`'s table; the send just goes
-  nowhere.
+  `time_sync.c`'s target table also includes EPS, but EPS does not implement
+  `CMD_TIME_SYNC`. Its client currently rejects that larger payload locally as an invalid
+  request; adding EPS to the target table does not make its clock synchronized.
+- **EPS communication is SIM-only.** Command `90` is implemented, but reset, shutdown,
+  power switching, and time sync are not. Payloads still use native C struct layout;
+  hardware deployment needs explicit serialization and board-specific drivers. An ACK
+  confirms command acceptance, not telemetry delivery or persistence.
 - **`autonomy.c`'s action table has exactly one entry** (point ADCS to the sun). The
   table-driven shape is built to scale to other subsystems (e.g. telling a thermal board
   to heat the bio-chamber), but nothing else is wired in yet.
@@ -396,6 +407,7 @@ run them at the same time as each other or as a manually-launched binary using t
 
 ## Where to go for more
 
+- [apps/eps/README.md](apps/eps/README.md) — EPS communication flow, payloads, command API, build/run instructions, tests, and limitations
 - `docs/satellite_architecture.md` — the confirmed physical hardware (OBC, power, radio, camera, ADCS, Thermals), the CSP node/address table, and the Path to HW_MODE bring-up TODO
 - `docs/obc_i2c_bringup.md` — OS-level Raspberry Pi I2C setup/verification steps, and how to syntax-check real-backend code without Linux hardware (Docker)
 - `docs/api_contracts.md` — public API for every subsystem, built and planned

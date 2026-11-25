@@ -17,6 +17,13 @@ over `ipc`, and forwards outbound commands/telemetry from internal roles
 back out over the external bus. No other process talks to the external bus
 directly.
 
+For EPS, both the internal relay and radio path call `eps_command_send()` from
+`shared/csp/eps_command_client.c`. It waits for a matching ACK/NACK with a one-second
+reply timeout. An internal EPS relay request returns `eps_relay_reply_t` to the requesting
+role; the radio path logs the result but does not downlink that acknowledgment to ground.
+The `ingest` thread forwards EPS telemetry on port 21 to Data after checking source and
+payload size. See [EPS communication](../eps/README.md) for the command and report formats.
+
 ## Compute
 Does the heavy lifting the MCUs can't — image compression and any other
 compute-bound task. Dispatches work asynchronously so a long-running job
@@ -27,6 +34,10 @@ Manages the OBC's data storage and file system. Owns all filesystem access
 so two callers can never race on the same file; every read/write goes
 through `data` over `ipc` rather than another process touching the
 filesystem directly.
+
+EPS reports are wrapped in OBC telemetry records and appended to the binary telemetry
+log. In SIM the default is `/tmp/obc_telemetry.bin`; `OBC_TELEMETRY_LOG_PATH` overrides it.
+Command acceptance and successful forwarding are not storage acknowledgments.
 
 ## FDIR — Fault Detection, Isolation, and Recovery
 Detects anomalies (health, memory, load) and expects a heartbeat from every
@@ -46,6 +57,10 @@ state is pushed out to every other role that needs to know about it.
 Keeps synchronization and time across the OBC and the other boards —
 distributing a time sync on its own schedule, and answering on-demand sync
 requests from anyone who needs one immediately.
+
+EPS is currently listed as a time-sync target but does not implement `CMD_TIME_SYNC`;
+its report timestamp remains relative to RTOS startup. The EPS client rejects the
+time-sync payload size locally rather than applying it.
 
 ## IPC — Internal Process Communication
 Not a process — a shared library, linked by all 7 processes above. It is

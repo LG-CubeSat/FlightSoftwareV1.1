@@ -1,11 +1,13 @@
 # Flight Software V1 — Satellite Architecture
 
-**Status:** current as of 2026-09-13. This document replaces the earlier `roadmap.md`,
+**Status:** physical baseline recorded 2026-09-13; EPS software distinction updated 2026-11-24.
+This document replaces the earlier `roadmap.md`,
 `balloon_launch_plan.md`, `balloon_schedule.md`, `architecture.md`, `data_flow.md`,
 `command_flow.html`, `i2c_sim_transport_plan.md`, and `structure.md` — those described an
 earlier, unconfirmed hardware concept (a Zynq/FPGA/neuromorphic-accelerator OBC, a
 Zephyr/STM32H743 Comms board, EPS/Camera as their own CSP boards). None of that reflects the
-actual hardware. This document describes the **real, confirmed physical architecture** instead.
+original physical baseline. The EPS simulator described below is an implemented software
+node, not proof that a matching smart EPS board has been deployed.
 It is deliberately separate from `README.md` — README covers building/running/testing the
 software; this document covers what the satellite physically *is*.
 
@@ -38,9 +40,13 @@ Power comes from a **4S2P 21700 Li-ion battery pack** (4 cells in series × 2 in
 a **buck converter** that steps the pack voltage down to a clean, regulated **5V rail** for the
 Pi (and, presumably, anything else on the same rail — see Open Items).
 
-This is **not** a smart EPS board. There is no microcontroller, no telemetry, no commandable
-power-rail switching — it's passive power-conversion hardware. It has no CSP address and is not
-part of the bus software architecture (see §2's note on the reserved EPS address).
+That passive converter baseline is **not** a smart EPS board and does not itself implement
+telemetry or commandable switching. Separately, `apps/eps` now implements a CSP EPS simulator
+at address 3, with sensor/estimation tasks, telemetry, and command handling. Do not treat the
+earlier passive-converter description as a statement that EPS software is unused, or treat
+the simulator as a verified hardware design. Board selection/modifications, sensor mapping,
+and the actual MCU/backend integration must be confirmed before hardware deployment. See
+[the EPS guide](../apps/eps/README.md).
 
 ### ADCS — STM32 + RTOS board, I2C
 
@@ -51,7 +57,7 @@ over the shared **I2C** bus as a CSP node.
 ### Thermals — STM32 + RTOS board, I2C
 
 Same shape as ADCS: a separate **STM32 + RTOS** board on the same I2C bus, its own CSP node.
-Software for this board doesn't exist yet (see Open Items / follow-up work).
+Simulation software exists in `apps/thermals`; hardware integration remains separate.
 
 ### Camera — Arducam OV5647 over the CSI ribbon cable (not a separate board)
 
@@ -103,15 +109,16 @@ the specific E22 variant uses — transparent mode or its command-mode framing, 
 
 ## 2. CSP Bus / Software Architecture
 
-Only boards with their own MCU and firmware are CSP nodes. That's **OBC, ADCS, and Thermals** —
-three nodes on the shared I2C bus, OBC as master. EPS has no MCU (see §1) and is not a node;
-Camera and Comms are OBC-local peripherals (USB/UART), not I2C/CSP nodes.
+The physical baseline above has OBC, ADCS, and Thermals on the shared I2C bus, OBC as
+master. The software also has an implemented EPS simulation node at address 3; it is
+started separately and is not launched by the OBC supervisor. Its hardware deployment is
+pending. Camera and Comms remain OBC-local peripherals, not I2C/CSP nodes.
 
 | Node | CSP Addr | Cmd Port | Telem Port | Status |
 |---|---|---|---|---|
 | OBC | 1 | — | — | done (SIM); real I2C HAL still stale, see README's Known Gaps |
 | ADCS | 2 | 10 | 20 | **done** (reference implementation) |
-| EPS | 3 | 11 | 21 | **reserved, not a real board** — kept only in case future battery-monitoring hardware is added to that PCB; no software targets this today |
+| EPS | 3 | 11 | 21 | implemented SIM node; periodic/requested telemetry, ACK/NACK, and OBC storage; hardware integration pending |
 | THERMALS | 4 | 12 | 22 | scaffolded (SIM) — command handling, sensor collection, and on-demand telemetry are present; hardware drivers, closed-loop heater control, and FDIR remain |
 
 These addresses and ports match what's already defined in `shared/csp/csp_commands.h`
@@ -130,13 +137,12 @@ at a glance" section — this document doesn't repeat that.
 
 ## 3. Known Code/Doc Mismatches (flagged, not yet fixed)
 
-These are places where the current source code still assumes the old, incorrect topology. Not
-changed as part of this documentation pass — noted here so they aren't lost:
+These distinctions still matter when moving from simulation to hardware:
 
-- **`apps/eps/` scaffolds a CSP-node EPS** (a FreeRTOS app with command/telemetry tasks) that no
-  longer matches real hardware — EPS has no MCU at all. Whether to delete, repurpose (e.g. if a
-  battery-monitoring board does get added later), or leave as an unused reference is an open
-  decision for whenever EPS's actual future is confirmed.
+- **`apps/eps/` is implemented simulation software, not deployed power hardware.** Its sensor
+  readers use fake values, its command receiver is a POSIX thread, and its telemetry payload
+  uses native C struct layout. Hardware drivers, serialization, fault recovery, and power
+  switching remain. The earlier passive-converter topology does not settle the future EPS design.
 - **`shared/csp/csp_commands.h` still defines `CAMERA` (address 5) and `COMMS` (address 6)** as
   CSP addresses. Neither is a real bus node under the confirmed hardware — both are OBC-local
   peripherals (USB and UART respectively). These constants are currently unused but not removed.
@@ -249,9 +255,10 @@ boards (ADCS, Thermals) — each needing different real backends and different t
 
 ### F. Small code cleanup so the real bus doesn't carry dead traffic
 
-15. `time_sync.c`'s `known_boards[]` and `autonomy.c`'s target table still include EPS —
-    harmless today (fire-and-forget sends that just go nowhere), but worth pruning once real
-    boards are wired up so nothing periodically addresses a board that will never exist.
+15. `time_sync.c` includes EPS in its target table, but EPS currently supports only command
+    90, request telemetry. Its OBC client rejects the larger time-sync payload locally.
+    Implement a defined time-sync contract or remove EPS from sync targets; do not assume
+    its RTOS-relative timestamps are synchronized to OBC UTC.
 16. `csp_commands.h`'s unused `CAMERA`/`COMMS` address constants (see §3) — fine to leave for
     now, but worth removing once you're confident nothing will reference them, so a future
     contributor doesn't mistake them for real bus nodes.

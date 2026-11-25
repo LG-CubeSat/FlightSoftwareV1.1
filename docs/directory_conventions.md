@@ -135,7 +135,7 @@ To add a new SPI-attached sensor driver (e.g., `magnetometer`):
 ## CSP Port Assignment Convention
 
 See `satellite_architecture.md`'s CSP node/address table for the authoritative, current
-assignment (OBC=1, ADCS=2, EPS=3 [reserved, not a real board], THERMALS=4). Camera and
+assignment (OBC=1, ADCS=2, EPS=3 [implemented SIM node; hardware pending], THERMALS=4). Camera and
 Comms are OBC-local peripherals (USB/UART), not CSP nodes — see that document. The port
 pattern:
 
@@ -144,6 +144,11 @@ pattern:
 - **Ground link:** handled directly by the OBC's UART-attached radio, not a CSP port
 
 ## Queue & Handler File Placement
+
+EPS currently uses a POSIX command receiver in `apps/eps/src/communication/command_handler.c`
+and an atomic request flag owned by `apps/eps/src/tasks/telemetry_task.c`, not the planned
+`ipc_router.c` queues described below. See [the EPS guide](../apps/eps/README.md) for the
+implemented layout and the distinction between POSIX threads and FreeRTOS tasks.
 
 ### FreeRTOS Queues (MCU)
 Queue creation and management lives in the **IPC Router** module (to be

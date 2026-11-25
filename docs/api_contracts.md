@@ -2,6 +2,12 @@
 
 This document defines the public interface for each subsystem. Every module must adhere to these contracts. New subsystems implement the same interface patterns.
 
+Several older sections below are design proposals, not implemented APIs. In particular,
+the planned IPC-router queues do not describe the current EPS simulator. Section 8 and
+[the EPS guide](../apps/eps/README.md) describe its implemented communication contract;
+do not add the legacy `eps_task_entry`, `eps_get_state`, or `eps_command_queue` examples
+to current EPS code.
+
 All inter-processor communication uses **CSP (CubeSat Space Protocol)** with CRC-32 integrity checking.
 
 ---
@@ -399,78 +405,38 @@ void adcs_task_entry(void *pvParameters) {
 
 ---
 
-## 8. MCU — EPS Task
+## 8. EPS simulator communication
 
-**Location:** `firmware/adcs_stm32/Application/src/tasks/eps_task.c` (to be created)
+**Location:** `apps/eps/`. This is a simulation implementation, not MCU firmware bring-up.
 
-### Public API
-
-```c
-typedef struct {
-    float vbatt_v;
-    float solar_current_a;
-    float rail_3v3_v;
-    float rail_5v_v;
-    uint8_t pwr_rail_enabled;
-} eps_state_t;
-
-typedef enum {
-    EPS_OK = 0,
-    EPS_ERROR_LOW_VBAT = -1
-} eps_status_t;
-
-void eps_task_entry(void *pvParameters);
-eps_state_t eps_get_state(void);
-```
-
-### Contract
-
-| Function | Description |
+| API or type | Contract |
 |---|---|
-| `eps_task_entry` | FreeRTOS task entry point. Runs at 10Hz. Monitors mock battery and solar arrays. |
-| `eps_get_state` | Returns current power system state. |
+| `get_eps_sensor_data()` / `get_eps_estimation_data()` | Return individually mutex-protected snapshots; the two calls are not a combined atomic snapshot. |
+| `set_eps_sensor_data()` / `set_eps_estimation_data()` | Publish the corresponding snapshot under the data mutex. |
+| `telemetry_task_init()` | Creates the FreeRTOS task for periodic and requested reports. |
+| `bool telemetry_request_send(void)` | Thread-safe atomic request; false if telemetry was not initialized. True means pending, not sent. Requests can merge. |
+| `int eps_command_handler_init(void)` | Call once after network/telemetry initialization. Binds port 11 and starts a POSIX receiver; zero means startup succeeded. |
+| `eps_command_send(payload, length)` | OBC-side helper in `shared/csp/eps_command_client.h`; accepts exactly one `command_envelope_t`, sends to node 3/port 11, and checks the matching reply with a 1000 ms read timeout. |
+| `command_envelope_t` | Command ID and command sequence. Only EPS ID 90, request telemetry, is implemented. |
+| `command_ack_t` | Echoes command ID and sequence plus ACK/NACK. ACK means accepted, not report delivery/storage. |
+| `eps_telemetry_t` | Shared native-struct payload sent to OBC node 1/port 21, including sensor/estimation values and validity masks. |
+| `eps_relay_reply_t` | Internal OBC relay result with magic, command ID, sequence, and `eps_command_result_t` result. Defined in `obc_relay_protocol.h`. |
 
-### Queue & Handler Logic
+The telemetry task checks the request flag every 20 RTOS ms and attempts periodic reports
+approximately every 1000 RTOS ms. Connection/allocation failures retry at 200 RTOS ms
+intervals. A successful `csp_send()` handoff is not a delivery acknowledgment.
 
-The EPS task runs a 10Hz control loop and monitors power rails:
+EPS rejects non-OBC sources. Truncated envelopes are dropped; complete envelopes with extra
+bytes or unknown IDs are NACKed. The OBC helper rejects incorrect request lengths locally.
+The last 32 accepted command ID/sequence pairs are re-ACKed without repeating dispatch;
+this history is volatile and resets on EPS restart.
 
-```c
-void eps_task_entry(void *pvParameters) {
-    csp_packet_t cmd;
-    eps_state_t state;
-
-    while (1) {
-        // Non-blocking check for command from IPC Router
-        if (xQueueReceive(eps_command_queue, &cmd, pdMS_TO_TICKS(10)) == pdTRUE) {
-            handle_eps_command(cmd.payload);
-        }
-
-        // Read mock sensors
-        state.vbatt_v = mock_adc_read_battery();
-        state.solar_current_a = mock_adc_read_solar();
-        state.rail_3v3_v = mock_adc_read_3v3();
-        state.rail_5v_v = mock_adc_read_5v();
-
-        // Check for low battery — trigger autonomous safe mode if needed
-        if (state.vbatt_v < 6.5f) {
-            csp_packet_t alert = build_alert_packet(state);
-            xQueueSend(telemetry_queue, &alert, pdMS_TO_TICKS(10));
-        }
-
-        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(100)); // 10Hz
-    }
-}
-```
-
-**Key logic:**
-- Uses `xQueueReceive` with 10ms timeout so the task continues its 10Hz loop even without commands.
-- Low battery detection happens inside the EPS task. If `vbatt < 6.5V`, it sends an alert CSP packet to the `telemetry_queue`.
-- The OBC Limit Checker picks up this alert and autonomously dispatches `CMD_SAFE_MODE` via the TTS.
-
-### Dependencies
-- Consumes: Mock battery/solar data, commands from `eps_command_queue`
-- Produces: Housekeeping telemetry via `telemetry_queue` (picked up by comms_bus ISR handler)
-- Invokes: `mock_adc_read_*()` handlers, `crc32_compute()` for outgoing telemetry
+OBC ingest checks EPS source/size, adds receive metadata, and forwards reports to Data for
+storage. Field masks remain authoritative even if the payload contains `NAN` or old values.
+The current protocol uses C struct layout and needs explicit serialization before use across
+different architectures. Time synchronization, rail control, and fault recovery are not
+implemented by this command path. See [the EPS guide](../apps/eps/README.md) for fields,
+result codes, examples, build/run instructions, and tests.
 
 ---
 
