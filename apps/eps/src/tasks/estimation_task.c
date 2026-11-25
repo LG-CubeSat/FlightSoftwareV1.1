@@ -81,6 +81,8 @@ void estimation_task(void *pvParameters)
     float battery_current_average_duration_h = 0.0f;
     bool previous_battery_current_valid = false;
 
+    uint8_t debug_counter = 0;
+
     for (;;)
     {
 
@@ -470,6 +472,28 @@ void estimation_task(void *pvParameters)
 
         //set data
         set_eps_estimation_data(local_estimation_data);
+
+        if (++debug_counter >= 10U) {
+            debug_counter = 0U;
+
+            printf(
+                "[EPS TEST] solar=%.3f W battery=%.3f W "
+                "flow=%d in=%.6f Wh out=%.6f Wh "
+                "avg_solar=%.3f W avg_current=%.3f A "
+                "sensor_mask=0x%lX estimate_mask=0x%lX\n",
+                local_estimation_data.solar_power_w,
+                local_estimation_data.battery_power_w,
+                (int)local_estimation_data.state_of_flow,
+                local_estimation_data.battery_energy_in_wh,
+                local_estimation_data.battery_energy_out_wh,
+                local_estimation_data.average_solar_power_w,
+                local_estimation_data.average_battery_current_a,
+                (unsigned long)local_sensor_data.valid_sensor_mask,
+                (unsigned long)local_estimation_data.valid_estimation_mask
+            );
+
+            fflush(stdout);
+        }
 
         uint32_t notified_value;
         if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
