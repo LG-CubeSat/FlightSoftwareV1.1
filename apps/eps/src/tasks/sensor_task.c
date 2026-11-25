@@ -227,7 +227,7 @@ bool read_solar_shunt_voltage(float *solar_shunt_voltage){
 bool read_battery_voltage(float *battery_voltage){
 
     //placeholder reading, to be implemented w/ hw
-    *battery_voltage = 10.0f;
+    *battery_voltage = 7.5f;
     return true;
 
 }
@@ -235,7 +235,7 @@ bool read_battery_voltage(float *battery_voltage){
 bool read_battery_current(float *battery_current){
 
     //placeholder reading, to be implemented w/ hw
-    *battery_current = 1.5f;
+    *battery_current = 1.00f;
     return true;
 
 }
