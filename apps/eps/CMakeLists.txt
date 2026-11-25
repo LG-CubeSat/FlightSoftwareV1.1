@@ -1,7 +1,7 @@
 set(EPS_SIM_SOURCES
     src/main.c
     src/freertos_hooks.c
-    src/eps_data.c
+    src/data/eps_data.c
 
     src/communication/telemetry.c
 
@@ -22,6 +22,7 @@ target_include_directories(eps_sim PRIVATE
     ${CMAKE_SOURCE_DIR}/rtos/config
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/data
 )
 
 target_link_libraries(eps_sim PRIVATE freertos_kernel pthread platform csp_interface)
