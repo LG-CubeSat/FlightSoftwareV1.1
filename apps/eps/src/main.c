@@ -10,6 +10,7 @@
 
 #include "tasks/telemetry_task.h"
 #include "tasks/estimation_task.h"
+#include "tasks/fault_manager_task.h"
 
 #include "csp_network.h"
 #include "csp_commands.h"
@@ -30,6 +31,8 @@ int main(void)
     housekeeping_task_init();
 
     sensor_task_init();
+
+    fault_manager_task_init();
 
     telemetry_task_init();
 

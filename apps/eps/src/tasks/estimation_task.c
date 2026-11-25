@@ -13,7 +13,7 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 
 #include "eps_data.h"
 #include "powerCalculations.h"
-#include "eps_consants.h"
+#include "eps_constants.h"
 #include "pthread.h"
 
 #include <math.h>

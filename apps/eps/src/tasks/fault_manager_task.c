@@ -13,7 +13,7 @@
 
 /* Collect one EPS sensor snapshot every 100 ms (10 Hz). */
 
-#include "manager/fault_manager.h"
+#include "tasks/fault_manager_task.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -23,8 +23,6 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-#include "conversions.h"
 
 #include "eps_constants.h"
 
@@ -68,13 +66,43 @@ void fault_manager_task(void *pvParameters)
 
     TickType_t lastWakeTime = xTaskGetTickCount();
 
+    uint32_t state_started_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+
 
     for (;;)
     {
+
+        //get data
+        eps_estimation_data_t local_estimation_data = get_eps_estimation_data();
+        eps_sensor_data_t local_sensor_data = get_eps_sensor_data();
+        eps_fault_data_t local_fault_data = get_eps_fault_data();
+
+        uint32_t now_ms = (uint32_t)pdTICKS_TO_MS(xTaskGetTickCount());
+
+        enum eps_state state_before_checks = local_fault_data.current_state;
+
         
-        if ()
+        if (local_sensor_data.battery_voltage_reading < WARNING_BATTERY_VOLTAGE_LOW
+        ||  local_sensor_data.battery_voltage_reading > WARNING_BATTERY_VOLTAGE_HIGH
+        ||  local_sensor_data.battery_current_reading < WARNING_BATTERY_CURRENT_LOW
+        ||  local_sensor_data.battery_current_reading > WARNING_BATTERY_CURRENT_HIGH) {
+
+            local_fault_data.current_state = EPS_STATE_WARNING;
+
+        }
 
 
+
+        if (local_fault_data.current_state != state_before_checks) {
+
+            local_fault_data.previous_state = state_before_checks;
+            state_started_ms = now_ms;
+        }
+
+        local_fault_data.time_spent_in_current_state_ms = now_ms - state_started_ms;
+
+        //set data
+        set_eps_fault_data(local_fault_data);
 
         xTaskDelayUntil(
             &lastWakeTime,

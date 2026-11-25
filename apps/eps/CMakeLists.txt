@@ -3,7 +3,7 @@ set(EPS_SIM_SOURCES
     src/freertos_hooks.c
     src/data/eps_data.c
 
-    src/manager/fault_manager.c
+    src/tasks/fault_manager_task.c
 
     src/tasks/estimation_task.c
     src/tasks/housekeeping_task.c
