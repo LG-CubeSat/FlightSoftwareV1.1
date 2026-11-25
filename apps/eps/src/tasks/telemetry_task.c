@@ -41,6 +41,10 @@ void telemetry_task_init(void)
     if (xTelemetryHandle == NULL) {
         printf("[TELEMTRY] Failed to initialize.\n");
     }
+    else
+    {
+        printf("[TELEMETRY] Task created successfully.\n");
+    }
 }
 
 void telemetry_task(void *pvParameters)
