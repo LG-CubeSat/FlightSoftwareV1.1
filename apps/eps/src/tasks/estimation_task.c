@@ -75,7 +75,9 @@ void estimation_task(void *pvParameters)
     float battery_current_average_duration_h = 0.0f;
     bool previous_battery_current_valid = false;
 
+#if EPS_DEBUG_OUTPUT
     uint8_t debug_counter = 0;
+#endif
 
     for (;;)
     {
@@ -467,11 +469,12 @@ void estimation_task(void *pvParameters)
         //set data
         set_eps_estimation_data(local_estimation_data);
 
+#if EPS_DEBUG_OUTPUT
         if (++debug_counter >= 5U) {
             debug_counter = 0U;
 
             printf(
-            "\n** [EPS TEST] **\n"
+            "\n** [EPS DATA] **\n"
             "-------------------\n"
             "    SENSOR DATA\n"
             "-------------------\n"
@@ -534,14 +537,7 @@ void estimation_task(void *pvParameters)
 
         fflush(stdout);
         }
-
-        uint32_t notified_value;
-        if (xTaskNotifyWait(0, 0, &notified_value, 0) == pdTRUE)
-        {
-            int32_t target_position = (int32_t)notified_value;
-            printf("[ESTIMATION] Updating attitude estimate for target position: %d\n", target_position);
-            fflush(stdout);
-        }
+#endif
 
         xTaskDelayUntil(
             &lastWakeTime,

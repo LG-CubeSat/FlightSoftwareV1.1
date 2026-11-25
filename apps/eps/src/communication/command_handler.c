@@ -12,6 +12,34 @@
 // Keep the socket alive for the lifetime of the program.
 static csp_socket_t command_socket = {0};
 
+/* Recent accepted requests are idempotent within this EPS boot. */
+#define ACCEPTED_COMMAND_HISTORY (32U)
+static command_envelope_t accepted_commands[ACCEPTED_COMMAND_HISTORY];
+static size_t accepted_count;
+static size_t accepted_next;
+
+static command_ack_status_t accept_command(const command_envelope_t *command)
+{
+    if (command->command_id != EPS_WIRE_COMMAND_REQUEST_TELEMETRY) {
+        return NACK;
+    }
+    for (size_t i = 0; i < accepted_count; ++i) {
+        if (accepted_commands[i].command_id == command->command_id &&
+            accepted_commands[i].seq == command->seq) {
+            return ACK; /* A retry must not trigger the action again. */
+        }
+    }
+    if (!telemetry_request_send()) {
+        return NACK;
+    }
+    accepted_commands[accepted_next] = *command;
+    accepted_next = (accepted_next + 1U) % ACCEPTED_COMMAND_HISTORY;
+    if (accepted_count < ACCEPTED_COMMAND_HISTORY) {
+        ++accepted_count;
+    }
+    return ACK;
+}
+
 static void send_command_ack(
     csp_conn_t *connection,
     const command_ack_t *ack)
@@ -33,16 +61,6 @@ static void *command_receiver(void *argument)
 {
     (void)argument;
 
-    if (csp_bind(&command_socket, EPS_CMD_PORT) != CSP_ERR_NONE) {
-        fprintf(stderr, "[EPS COMMAND] Failed to bind command port.\n");
-        return NULL;
-    }
-
-    if (csp_listen(&command_socket, 5) != CSP_ERR_NONE) {
-        fprintf(stderr, "[EPS COMMAND] Failed to listen.\n");
-        return NULL;
-    }
-
     printf("[EPS COMMAND] Listening on port %u.\n",
            (unsigned)EPS_CMD_PORT);
     fflush(stdout);
@@ -57,11 +75,14 @@ static void *command_receiver(void *argument)
 
         csp_packet_t *packet;
 
-        while ((packet = csp_read(connection, 100)) != NULL) {
+        /* Bound how long one client can monopolize this receiver. */
+        unsigned packets_processed = 0;
+        while (packets_processed++ < 8U &&
+               (packet = csp_read(connection, 100)) != NULL) {
             if (csp_conn_src(connection) != OBC_ADDRESS) {
                 fprintf(stderr, "[EPS COMMAND] Rejected non-OBC source.\n");
             }
-            else if (packet->length != sizeof(command_envelope_t)) {
+            else if (packet->length < sizeof(command_envelope_t)) {
                 fprintf(stderr, "[EPS COMMAND] Invalid command size.\n");
             }
             else {
@@ -73,29 +94,14 @@ static void *command_receiver(void *argument)
                 ack.ack_seq = command.seq;
                 ack.status = NACK;
 
-                switch (command.command_id) {
-                    case EPS_WIRE_COMMAND_REQUEST_TELEMETRY:
-                        if (xTelemetryHandle != NULL) {
-                            telemetry_request_send();
-                            ack.status = ACK;
-
-                            printf(
-                                "[EPS COMMAND] Telemetry requested; sequence=%lu.\n",
-                                (unsigned long)command.seq
-                            );
-                            fflush(stdout);
-                        }
-                        break;
-
-                    default:
-                        fprintf(
-                            stderr,
-                            "[EPS COMMAND] Unknown command ID: %u.\n",
-                            (unsigned)command.command_id
-                        );
-                        break;
+                if (packet->length == sizeof(command)) {
+                    ack.status = accept_command(&command);
                 }
                 send_command_ack(connection, &ack);
+                printf("[EPS COMMAND] ID=%u sequence=%lu: %s\n",
+                       (unsigned)command.command_id, (unsigned long)command.seq,
+                       ack.status == ACK ? "ACK" : "NACK");
+                fflush(stdout);
             }
 
             // Every received packet must be released.
@@ -108,8 +114,13 @@ static void *command_receiver(void *argument)
     return NULL;
 }
 
-void eps_command_handler_init(void)
+int eps_command_handler_init(void)
 {
+    if (csp_bind(&command_socket, EPS_CMD_PORT) != CSP_ERR_NONE ||
+        csp_listen(&command_socket, 5) != CSP_ERR_NONE) {
+        fprintf(stderr, "[EPS COMMAND] Failed to bind/listen on command port.\n");
+        return -1;
+    }
     pthread_t receiver_thread;
 
     int result = pthread_create(
@@ -125,8 +136,9 @@ void eps_command_handler_init(void)
             "[EPS COMMAND] Failed to create receiver: %d.\n",
             result
         );
-        return;
+        return -1;
     }
 
     pthread_detach(receiver_thread);
+    return 0;
 }

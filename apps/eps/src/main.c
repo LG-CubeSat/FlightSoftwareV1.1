@@ -33,7 +33,10 @@ int main(void)
 
     telemetry_task_init();
 
-    eps_command_handler_init();
+    if (xTelemetryHandle == NULL || eps_command_handler_init() != 0) {
+        fprintf(stderr, "[EPS] Communication startup failed.\n");
+        return 1;
+    }
     
     printf("[EPS] Starting FreeRTOS scheduler...\n\n");
     fflush(stdout);

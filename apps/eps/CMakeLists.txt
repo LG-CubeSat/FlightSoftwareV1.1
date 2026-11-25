@@ -14,6 +14,11 @@ set(EPS_SIM_SOURCES
 
 add_executable(eps_sim ${EPS_SIM_SOURCES})
 
+option(EPS_DEBUG_OUTPUT "Print EPS sensor/estimation snapshots" OFF)
+target_compile_definitions(eps_sim PRIVATE
+    EPS_DEBUG_OUTPUT=$<BOOL:${EPS_DEBUG_OUTPUT}>
+)
+
 target_include_directories(eps_sim PRIVATE
     ${CMAKE_SOURCE_DIR}/rtos/kernels/include
     ${CMAKE_SOURCE_DIR}/rtos/ports/posix

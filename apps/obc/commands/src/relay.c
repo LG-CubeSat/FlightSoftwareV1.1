@@ -9,6 +9,7 @@
 #include "obc_ipc.h"
 #include "obc_relay_protocol.h"
 #include "commands_health.h"
+#include "eps_command_client.h"
 
 #define RELAY_POLL_TIMEOUT_MS 1000
 
@@ -54,6 +55,39 @@ void *relay_thread(void *arg)
         
         relay_request_t req;
         memcpy(&req, buf, sizeof(req));
+
+        if (req.dest_addr == EPS_ADDRESS && req.dest_port == EPS_CMD_PORT) {
+            eps_command_result_t result = EPS_COMMAND_INVALID_REQUEST;
+            if (req.length <= sizeof(req.payload)) {
+                result = eps_command_send(req.payload, req.length);
+            }
+            eps_relay_reply_t reply = {
+                .magic = EPS_RELAY_REPLY_MAGIC,
+                .result = (int8_t)result
+            };
+            if (req.length >= sizeof(command_envelope_t) &&
+                req.length <= sizeof(req.payload)) {
+                command_envelope_t command;
+                memcpy(&command, req.payload, sizeof(command));
+                reply.command_id = command.command_id;
+                reply.sequence = command.seq;
+            }
+            printf("[RELAY] EPS command=%u sequence=%lu: %s\n",
+                   (unsigned)reply.command_id, (unsigned long)reply.sequence,
+                   eps_command_result_name(result));
+            fflush(stdout);
+            if (IPC_send(src, (const uint8_t *)&reply, sizeof(reply)) < 0) {
+                fprintf(stderr, "[RELAY] Failed to return EPS result to role %d\n", src);
+            }
+            commands_health_relay_progress();
+            continue;
+        }
+
+        if (req.length > sizeof(req.payload) || req.length > CSP_BUFFER_SIZE) {
+            fprintf(stderr, "[RELAY] Oversized command rejected\n");
+            commands_health_relay_progress();
+            continue;
+        }
 
         printf("[RELAY] DEBUG: got request from role %d -> addr=%d port=%d length=%d\n",
                src, req.dest_addr, req.dest_port, req.length);

@@ -14,6 +14,7 @@
 #include "commands_health.h"
 #include "obc_log.h"
 #include "csp_commands.h"
+#include "eps_command_client.h"
 
 #define RADIO_RX_BUF_SIZE 256
 
@@ -53,13 +54,14 @@ static void *radio_rx_thread(void *arg) {
         // check if this command is intended for the OBC itself
         if (dest_addr == OBC_ADDRESS) {
             if (payload_len >= sizeof(command_envelope_t)) {
-                const command_envelope_t *env = (const command_envelope_t *)payload;
-                if (env->command_id == CMD_TAKE_PHOTO) {
+                command_envelope_t envelope;
+                memcpy(&envelope, payload, sizeof(envelope));
+                if (envelope.command_id == CMD_TAKE_PHOTO) {
                     printf("[OBC RADIO RX] Uplink CMD_TAKE_PHOTO -> Forwarding to ROLE_MISSION\n");
                     fflush(stdout);
                     IPC_send(ROLE_MISSION, payload, payload_len);
                 } else {
-                    fprintf(stderr, "[OBC RADIO RX] Unknown OBC command ID: %u\n", env->command_id);
+                    fprintf(stderr, "[OBC RADIO RX] Unknown OBC command ID: %u\n", envelope.command_id);
                 }
             } else {
                 fprintf(stderr, "[OBC RADIO RX] OBC command payload too short (%u bytes)\n", payload_len);
@@ -67,7 +69,20 @@ static void *radio_rx_thread(void *arg) {
             continue;
         }
 
-        // forward over CSP bus (I2C to ADCS)
+        if (dest_addr == EPS_ADDRESS && dest_port == EPS_CMD_PORT) {
+            eps_command_result_t result = eps_command_send(payload, payload_len);
+            printf("[OBC RADIO RX] EPS command: %s\n",
+                   eps_command_result_name(result));
+            fflush(stdout);
+            continue;
+        }
+
+        if (payload_len > CSP_BUFFER_SIZE) {
+            fprintf(stderr, "[OBC RADIO RX] Command exceeds CSP packet capacity\n");
+            continue;
+        }
+
+        // Forward other boards' commands using their existing path.
         csp_conn_t *conn = csp_connect(CSP_PRIO_NORM, dest_addr, dest_port, 1000, CSP_O_NONE);
         if (conn == NULL) {
             fprintf(stderr, "[OBC RADIO RX] Failed to connect to CSP node %u port %u\n", dest_addr, dest_port);
@@ -83,41 +98,8 @@ static void *radio_rx_thread(void *arg) {
 
         memcpy(csp_pkt->data, payload, payload_len);
         csp_pkt->length = payload_len;
-        csp_send(connection, packet);
-
-csp_packet_t *reply = csp_read(connection, 1000);
-
-if (reply == NULL) {
-    fprintf(stderr, "[EPS TEST] No acknowledgment received within timeout.\n");
-}
-else {
-    if (reply->length != sizeof(command_ack_t)) {
-        fprintf(stderr, "[EPS TEST] Invalid acknowledgment size.\n");
-    }
-    else {
-        command_ack_t ack;
-        memcpy(&ack, reply->data, sizeof(ack));
-
-        if (ack.ack_command_id != command.command_id ||
-            ack.ack_seq != command.seq) {
-            fprintf(stderr, "[EPS TEST] Acknowledgment does not match request.\n");
-        }
-        else if (ack.status == ACK) {
-            printf("[EPS TEST] ACK: EPS accepted the telemetry request.\n");
-            fflush(stdout);
-        }
-        else if (ack.status == NACK) {
-            fprintf(stderr, "[EPS TEST] NACK: EPS rejected the request.\n");
-        }
-        else {
-            fprintf(stderr, "[EPS TEST] Invalid acknowledgment status.\n");
-        }
-    }
-
-    csp_buffer_free(reply);
-}
-
-csp_close(connection);
+        csp_send(conn, csp_pkt);
+        csp_close(conn);
     }
     return NULL;
 }
@@ -125,43 +107,6 @@ csp_close(connection);
 static int start_radio_rx_thread(void) {
     pthread_t thread;
     return pthread_create(&thread, NULL, radio_rx_thread, NULL);
-}
-
-static void send_eps_telemetry_request(void)
-{
-    command_envelope_t command = {0};
-    command.command_id = EPS_WIRE_COMMAND_REQUEST_TELEMETRY;
-    command.seq = 1;
-
-    csp_conn_t *connection = csp_connect(
-        CSP_PRIO_NORM,
-        EPS_ADDRESS,
-        EPS_CMD_PORT,
-        1000,
-        CSP_O_NONE
-    );
-
-    if (connection == NULL) {
-        fprintf(stderr, "[EPS TEST] Failed to open connection.\n");
-        return;
-    }
-
-    csp_packet_t *packet = csp_buffer_get(0);
-
-    if (packet == NULL) {
-        fprintf(stderr, "[EPS TEST] Failed to allocate packet.\n");
-        csp_close(connection);
-        return;
-    }
-
-    memcpy(packet->data, &command, sizeof(command));
-    packet->length = sizeof(command);
-
-    csp_send(connection, packet);
-    csp_close(connection);
-
-    printf("[EPS TEST] Command 90, sequence 1 handed to CSP.\n");
-    fflush(stdout);
 }
 
 int main(void) {
@@ -199,15 +144,6 @@ int main(void) {
     if (heartbeat_thread_init() != 0) {
         fprintf(stderr, "[OBC COMMANDS] Failed to start heartbeat thread.\n");
         return 1;
-    }
-
-    printf("[EPS TEST] Start EPS, wait for its listener, then press Enter here.\n");
-    fflush(stdout);
-
-    char test_input[8];
-
-    if (fgets(test_input, sizeof(test_input), stdin) != NULL) {
-        send_eps_telemetry_request();
     }
 
     for (;;) { sleep(1); }

@@ -1,4 +1,36 @@
 if (NOT HW_MODE)
+    add_executable(eps_command_client_test
+        test_eps_command_client.c
+        ${CMAKE_SOURCE_DIR}/shared/csp/eps_command_client.c
+    )
+    target_include_directories(eps_command_client_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/shared/csp
+        $<TARGET_PROPERTY:csp,INTERFACE_INCLUDE_DIRECTORIES>
+    )
+    # Only inherit libcsp's headers/config: this test supplies mock functions.
+    add_dependencies(eps_command_client_test csp)
+    add_test(NAME eps_command_client_test COMMAND eps_command_client_test)
+    set_tests_properties(eps_command_client_test PROPERTIES TIMEOUT 5)
+
+    add_executable(eps_communications_test test_eps_communications.c)
+    target_include_directories(eps_communications_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/apps/obc/include
+        ${CMAKE_SOURCE_DIR}/shared/csp
+    )
+    target_link_libraries(eps_communications_test PRIVATE obc_ipc obc_telemetry platform)
+    target_compile_definitions(eps_communications_test PRIVATE
+        EPS_SIM_PATH="$<TARGET_FILE:eps_sim>"
+        OBC_COMMANDS_PATH="$<TARGET_FILE:obc_commands>"
+        OBC_DATA_PATH="$<TARGET_FILE:obc_data>"
+    )
+    add_dependencies(eps_communications_test eps_sim obc_commands obc_data)
+    add_test(NAME eps_communications_test COMMAND eps_communications_test)
+    set_tests_properties(eps_communications_test PROPERTIES
+        TIMEOUT 30
+        SKIP_RETURN_CODE 77
+        RESOURCE_LOCK "comms_bus_socket;obc_ipc_sockets"
+    )
+
     add_executable(adcs_estimator_test
         test_adcs_estimator.c
         ${CMAKE_SOURCE_DIR}/apps/adcs/Application/src/control/control_math.c

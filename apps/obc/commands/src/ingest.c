@@ -60,6 +60,13 @@ static int forward_telemetry(
     uint8_t destination_port,
     const csp_packet_t *packet
 ) {
+    /* Invalid field masks are legitimate telemetry; wrong source/size is not. */
+    if (destination_port == EPS_TELEM_PORT &&
+        (csp_conn_src(conn) != EPS_ADDRESS ||
+         packet->length != sizeof(eps_telemetry_t))) {
+        fprintf(stderr, "[INGEST] Rejected EPS telemetry source/size\n");
+        return -1;
+    }
     if (packet->length > OBC_TELEMETRY_MAX_PAYLOAD) {
         fprintf(
             stderr,

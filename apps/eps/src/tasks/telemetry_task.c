@@ -5,7 +5,7 @@ Collects everything
 Sends out data using CSP
 */
 
-#include "../../include/tasks/telemetry_task.h"
+#include "tasks/telemetry_task.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -26,17 +26,26 @@ Sends out data using CSP
 #define TELEMETRY_TASK_STACK_SIZE (1024)
 #define TELEMETRY_TASK_PERIOD_MS (1000)
 #define TELEMETRY_REQUEST_POLL_MS (20)
+#define TELEMETRY_RETRY_MS (200)
 
 static atomic_bool telemetry_send_requested = false;
+static atomic_bool telemetry_ready = false;
+
+_Static_assert(sizeof(eps_telemetry_t) <= CSP_BUFFER_SIZE,
+               "EPS telemetry exceeds CSP packet capacity");
 
 static StackType_t xTelemetryTaskStack[TELEMETRY_TASK_STACK_SIZE];
 static StaticTask_t xTelemetryTaskBuffer;
 
 TaskHandle_t xTelemetryHandle = NULL;
 
-void telemetry_request_send(void)
+bool telemetry_request_send(void)
 {
+    if (!atomic_load(&telemetry_ready)) {
+        return false;
+    }
     atomic_store(&telemetry_send_requested, true);
+    return true;
 }
 
 void telemetry_task_init(void)
@@ -52,10 +61,11 @@ void telemetry_task_init(void)
     );
 
     if (xTelemetryHandle == NULL) {
-        printf("[TELEMTRY] Failed to initialize.\n");
+        printf("[TELEMETRY] Failed to initialize.\n");
     }
     else
     {
+        atomic_store(&telemetry_ready, true);
         printf("[TELEMETRY] Task created successfully.\n");
     }
 }
@@ -65,32 +75,43 @@ void telemetry_task(void *pvParameters)
     (void) pvParameters;
 
     const TickType_t report_period =
-    pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS);
+        pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS);
 
     const TickType_t poll_period =
-    pdMS_TO_TICKS(TELEMETRY_REQUEST_POLL_MS);
+        pdMS_TO_TICKS(TELEMETRY_REQUEST_POLL_MS);
 
     TickType_t last_periodic_tick =
-    xTaskGetTickCount() - report_period;
+        xTaskGetTickCount() - report_period;
+    TickType_t last_attempt_tick = 0;
+    bool retry_pending = false;
 
     for (;;)
-{
-    TickType_t now = xTaskGetTickCount();
+    {
+        TickType_t now = xTaskGetTickCount();
 
-    bool requested =
-        atomic_exchange(&telemetry_send_requested, false);
+        if (retry_pending &&
+            (TickType_t)(now - last_attempt_tick) <
+                pdMS_TO_TICKS(TELEMETRY_RETRY_MS)) {
+            vTaskDelay(poll_period);
+            continue;
+        }
 
-    bool periodic_due =
-        (TickType_t)(now - last_periodic_tick) >= report_period;
+        bool requested =
+            atomic_exchange(&telemetry_send_requested, false);
 
-    if (!requested && !periodic_due) {
-        vTaskDelay(poll_period);
-        continue;
-    }
+        bool periodic_due =
+            (TickType_t)(now - last_periodic_tick) >= report_period;
 
-    if (periodic_due) {
-        last_periodic_tick = now;
-    }
+        if (!requested && !periodic_due && !retry_pending) {
+            vTaskDelay(poll_period);
+            continue;
+        }
+
+        if (periodic_due) {
+            last_periodic_tick = now;
+        }
+        last_attempt_tick = now;
+        bool handed_to_csp = false;
         // Get private snapshots.
         eps_sensor_data_t sensor = get_eps_sensor_data();
         eps_estimation_data_t estimate = get_eps_estimation_data();
@@ -150,16 +171,21 @@ void telemetry_task(void *pvParameters)
             if (packet != NULL) {
                 // Copy the completed report into the packet.
                 memcpy(packet->data, &telemetry, sizeof(telemetry));
-                packet->length = sizeof(telemetry);
+                packet->length = (uint16_t)sizeof(telemetry);
 
                 // Send it. CSP takes ownership of the packet.
                 csp_send(connection, packet);
+                handed_to_csp = true;
             }
 
             // Close the connection even if packet allocation failed.
             csp_close(connection);
         }
 
+        if (!handed_to_csp && !retry_pending) {
+            fprintf(stderr, "[TELEMETRY] Connection/buffer unavailable; retrying.\n");
+        }
+        retry_pending = !handed_to_csp;
         vTaskDelay(poll_period);
     }
 }

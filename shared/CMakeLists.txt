@@ -12,6 +12,7 @@ target_include_directories(frame_codec
 add_library(csp_interface STATIC
     csp/csp_if_comms_bus.c
     csp/csp_network.c
+    csp/eps_command_client.c
 )
 
 target_include_directories(csp_interface
