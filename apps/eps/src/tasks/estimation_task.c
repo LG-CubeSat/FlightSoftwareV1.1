@@ -51,6 +51,9 @@ void estimation_task_init(void)
     if (xEstimationHandle == NULL)
     {
         printf("[ESTIMATION] Failed to initialize.\n");
+    } else {
+        printf("[ESTIMATION] Successfully initialized\n");
+        fflush(stdout);
     }
 
 }

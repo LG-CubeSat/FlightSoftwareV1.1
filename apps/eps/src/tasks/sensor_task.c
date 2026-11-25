@@ -41,6 +41,11 @@ void sensor_task_init(void)
     if (xSensorHandle == NULL)
     {
         printf("[SENSOR] Failed to initialize\n");
+        fflush(stdout);
+    }
+    else {
+        printf("[SENSOR] Successfully initialized\n");
+        fflush(stdout);
     }
 }
 

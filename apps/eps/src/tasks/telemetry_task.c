@@ -66,7 +66,8 @@ void telemetry_task_init(void)
     else
     {
         atomic_store(&telemetry_ready, true);
-        printf("[TELEMETRY] Task created successfully.\n");
+        printf("[TELEMETRY] Successfully initialized\n");
+        fflush(stdout);
     }
 }
 
