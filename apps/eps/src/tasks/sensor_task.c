@@ -105,8 +105,7 @@ void sensor_task(void *pvParameters)
 
         //solar_current
         if (read_solar_current(&solar_current) 
-            && isfinite(solar_current)
-            && solar_current >=0.00f) {
+            && isfinite(solar_current)) {
 
             local_sensor_data.valid_sensor_mask |= EPS_SOLAR_CURRENT;
             local_sensor_data.solar_current_reading = solar_current;
@@ -119,8 +118,7 @@ void sensor_task(void *pvParameters)
 
         //battery_current
         if (read_battery_current(&battery_current) 
-            && isfinite(battery_current)
-            && battery_current >=0.00f) {
+            && isfinite(battery_current)) {
 
             local_sensor_data.valid_sensor_mask |= EPS_BATTERY_CURRENT;
             local_sensor_data.battery_current_reading = battery_current;
