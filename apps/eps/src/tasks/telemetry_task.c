@@ -100,6 +100,32 @@ void telemetry_task(void *pvParameters)
 
         telemetry.state_of_flow = estimate.state_of_flow;
 
+        // Open a connection to the OBC's EPS telemetry port.
+        csp_conn_t *connection = csp_connect(
+            CSP_PRIO_NORM,
+            OBC_ADDRESS,
+            EPS_TELEM_PORT,
+            100,
+            CSP_O_NONE
+        );
+
+        if (connection != NULL) {
+            // Request a packet from CSP's buffer pool.
+            csp_packet_t *packet = csp_buffer_get(0);
+
+            if (packet != NULL) {
+                // Copy the completed report into the packet.
+                memcpy(packet->data, &telemetry, sizeof(telemetry));
+                packet->length = sizeof(telemetry);
+
+                // Send it. CSP takes ownership of the packet.
+                csp_send(connection, packet);
+            }
+
+            // Close the connection even if packet allocation failed.
+            csp_close(connection);
+        }
+
         xTaskDelayUntil(
             &lastWakeTime,
             pdMS_TO_TICKS(TELEMETRY_TASK_PERIOD_MS)
