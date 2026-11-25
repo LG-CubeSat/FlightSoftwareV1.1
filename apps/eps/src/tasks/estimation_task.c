@@ -276,6 +276,7 @@ void estimation_task(void *pvParameters)
                     local_estimation_data.valid_estimation_mask |= BATTERY_ENERGY_OUT_WH;
                 } else {
                     battery_energy_history_complete = false;
+                    local_estimation_data.battery_energy_out_wh = NAN;
                     local_estimation_data.valid_estimation_mask &= ~BATTERY_ENERGY_OUT_WH;
                 }
         }
