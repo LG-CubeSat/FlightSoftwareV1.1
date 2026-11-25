@@ -496,7 +496,7 @@ void estimation_task(void *pvParameters)
             "Estimated State of Charge: %.3f %%\n"
             "Average Solar Power: %.3f W\n"
             "Average Battery Current: %.3f A\n"
-            "Estimated Time to Empty: %.2f h\n"
+            "Estimated Time to Empty: %.1fh %.1fm %.1fs h\n"
             "Estimated Time to Full: %.2f h\n"
             "State of Flow: %" PRId8
             " (1=charging, -1=discharging, 0=idle, 2=invalid)\n"
@@ -523,7 +523,11 @@ void estimation_task(void *pvParameters)
             local_estimation_data.average_solar_power_w,
             local_estimation_data.average_battery_current_a,
             local_estimation_data.estimated_time_to_empty_h,
+            local_estimation_data.estimated_time_to_empty_h / 60,
+            local_estimation_data.estimated_time_to_empty_h / 3600,
             local_estimation_data.estimated_time_to_full_h,
+            local_estimation_data.estimated_time_to_full_h / 60,
+            local_estimation_data.estimated_time_to_full_h / 3600,
             local_estimation_data.state_of_flow,
             local_estimation_data.valid_estimation_mask
         );

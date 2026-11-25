@@ -8,6 +8,13 @@ Sends out data using CSP
 #ifndef TELEMETRY_TASK_H
 #define TELEMETRY_TASK_H
 
+typedef struct {
+
+//to do
+
+
+} eps_telemetry_t;
+
 #include "FreeRTOS.h"
 #include "task.h"
 
