@@ -13,6 +13,7 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 
 #include "eps_data.h"
 #include "powerCalculations.h"
+#include "eps_consants.h"
 #include "pthread.h"
 
 #include <math.h>
@@ -20,19 +21,10 @@ I'm pretty sure the fault manager will handle what to do when there is a mistake
 #include <stdint.h>
 #include <stdbool.h>
 
-#define SENSOR_MAX_AGE_MS (200U)
-#define MAX_SAMPLE_INTERVAL_MS (300U)
 
 #define ESTIMATION_TASK_PRIORITY (3)
 #define ESTIMATION_TASK_STACK_SIZE (1024)
 #define ESTIMATION_TASK_PERIOD_MS (100)
-
-// Unknown until configured or established from a trusted estimate.
-#define BATTERY_USABLE_CAPACITY_WH NAN
-#define BATTERY_INITIAL_ENERGY_WH  NAN
-
-#define MIN_DISCHARGE_POWER_W (0.1f)
-#define MIN_CHARGE_POWER_W (0.1f)
 
 static uint32_t previous_sensor_timestamp_ms = 0U;
 static uint32_t previous_sensor_sequence = 0U;
