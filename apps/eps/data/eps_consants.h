@@ -12,7 +12,10 @@ we will add more constants and more stuff to fault manager to prevent critical f
 
 #include <math.h>
 
+
+/*--------------------------------------------------------------------*/
 //CONSTANTS (CAN BE TWEAKED, NOT HW RELATED)
+/*--------------------------------------------------------------------*/
 
 #define SENSOR_MAX_AGE_MS	200U	//Maximum age of a usable sensor snapshot
 #define MAX_SAMPLE_INTERVAL_MS	300U	//Maximum interval accepted for accumulation
@@ -20,10 +23,12 @@ we will add more constants and more stuff to fault manager to prevent critical f
 #define MIN_DISCHARGE_POWER_W	0.1f	//Minimum discharge power for time-to-empty
 #define MIN_CHARGE_POWER_W	0.1f	//Minimum charging power for time-to-full
 
+/*--------------------------------------------------------------------*/
 //TO BE IMPLEMENTED W/ HW (IF THERE IS A VALUE RN, IT IS FOR TETSING)
+/*--------------------------------------------------------------------*/
 
-#define BATTERY_USABLE_CAPACITY_WH	NAN	//Usable battery capacity
-#define BATTERY_INITIAL_ENERGY_WH	NAN	//Battery energy when tracking starts
+#define BATTERY_USABLE_CAPACITY_WH	20	//Usable battery capacity
+#define BATTERY_INITIAL_ENERGY_WH	10	//Battery energy when tracking starts
 
 #define WARNING_BATTERY_VOLTAGE_HIGH 25U //Send OBC & Fault Manager Warning for High Voltage
 #define CRITICAL_BATTERY_VOLTAGE_HIGH 30U //Do Something About Battery Voltage (CRITICAL)
