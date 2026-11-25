@@ -1,3 +1,0 @@
-/*
- * See: epsManager.c
-*/
