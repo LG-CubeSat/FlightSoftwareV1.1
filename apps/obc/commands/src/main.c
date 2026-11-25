@@ -97,6 +97,43 @@ static int start_radio_rx_thread(void) {
     return pthread_create(&thread, NULL, radio_rx_thread, NULL);
 }
 
+static void send_eps_telemetry_request(void)
+{
+    command_envelope_t command = {0};
+    command.command_id = EPS_WIRE_COMMAND_REQUEST_TELEMETRY;
+    command.seq = 1;
+
+    csp_conn_t *connection = csp_connect(
+        CSP_PRIO_NORM,
+        EPS_ADDRESS,
+        EPS_CMD_PORT,
+        1000,
+        CSP_O_NONE
+    );
+
+    if (connection == NULL) {
+        fprintf(stderr, "[EPS TEST] Failed to open connection.\n");
+        return;
+    }
+
+    csp_packet_t *packet = csp_buffer_get(0);
+
+    if (packet == NULL) {
+        fprintf(stderr, "[EPS TEST] Failed to allocate packet.\n");
+        csp_close(connection);
+        return;
+    }
+
+    memcpy(packet->data, &command, sizeof(command));
+    packet->length = sizeof(command);
+
+    csp_send(connection, packet);
+    csp_close(connection);
+
+    printf("[EPS TEST] Command 90, sequence 1 handed to CSP.\n");
+    fflush(stdout);
+}
+
 int main(void) {
     if (obc_log_init("command") != 0) {
         fprintf(stderr, "[OBC COMMAND] Failed to initialize logging.\n");
@@ -132,6 +169,15 @@ int main(void) {
     if (heartbeat_thread_init() != 0) {
         fprintf(stderr, "[OBC COMMANDS] Failed to start heartbeat thread.\n");
         return 1;
+    }
+
+    printf("[EPS TEST] Start EPS, wait for its listener, then press Enter here.\n");
+    fflush(stdout);
+
+    char test_input[8];
+
+    if (fgets(test_input, sizeof(test_input), stdin) != NULL) {
+        send_eps_telemetry_request();
     }
 
     for (;;) { sleep(1); }
