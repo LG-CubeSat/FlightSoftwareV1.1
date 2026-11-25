@@ -467,7 +467,7 @@ void estimation_task(void *pvParameters)
         //set data
         set_eps_estimation_data(local_estimation_data);
 
-        if (++debug_counter >= 250U) {
+        if (++debug_counter >= 25U) {
             debug_counter = 0U;
 
             printf(
