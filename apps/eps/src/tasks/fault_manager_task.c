@@ -26,6 +26,8 @@
 
 #include "conversions.h"
 
+#include "eps_constants.h"
+
 #define FAULT_MANAGER_TASK_PRIORITY (3)
 #define FAULT_MANAGER_TASK_STACK_SIZE (1024)
 #define FUALT_MANAGER_TASK_PERIOD_MS (300)
@@ -70,7 +72,7 @@ void fault_manager_task(void *pvParameters)
     for (;;)
     {
         
-        
+        if ()
 
 
 
