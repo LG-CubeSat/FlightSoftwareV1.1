@@ -53,6 +53,10 @@ typedef enum {
     THERMALS_WIRE_COMMAND_REQUEST_TELEMETRY = 81
 } thermals_wire_command_id_t;
 
+typedef enum {
+    EPS_WIRE_COMMAND_REQUEST_TELEMETRY = 90
+} eps_wire_command_id_t;
+
 // ------
 
 typedef enum {

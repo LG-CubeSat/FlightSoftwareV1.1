@@ -30,6 +30,8 @@ int main(void)
     sensor_task_init();
 
     telemetry_task_init();
+
+    eps_command_handler_init();
     
     printf("[EPS] Starting FreeRTOS scheduler...\n\n");
     fflush(stdout);

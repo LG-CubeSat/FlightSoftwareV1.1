@@ -9,6 +9,7 @@ set(EPS_SIM_SOURCES
     src/tasks/housekeeping_task.c
     src/tasks/sensor_task.c
     src/tasks/telemetry_task.c
+    src/communication/command_handler.c
 )
 
 add_executable(eps_sim ${EPS_SIM_SOURCES})
