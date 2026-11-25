@@ -467,7 +467,7 @@ void estimation_task(void *pvParameters)
         //set data
         set_eps_estimation_data(local_estimation_data);
 
-        if (++debug_counter >= 10U) {
+        if (++debug_counter >= 5U) {
             debug_counter = 0U;
 
             printf(
@@ -496,8 +496,8 @@ void estimation_task(void *pvParameters)
             "Estimated State of Charge: %.3f %%\n"
             "Average Solar Power: %.3f W\n"
             "Average Battery Current: %.3f A\n"
-            "Estimated Time to Empty: %.1fh %.1fm %.1fs h\n"
-            "Estimated Time to Full: %.2f h\n"
+            "Estimated Time to Empty: %.0f h %.0f min %.0f s\n"
+            "Estimated Time to Full: %.0f h %.0f min %.0f s\n"
             "State of Flow: %" PRId8
             " (1=charging, -1=discharging, 0=idle, 2=invalid)\n"
             "Valid Estimation Mask: %" PRIu32 "\n"
@@ -522,12 +522,12 @@ void estimation_task(void *pvParameters)
             local_estimation_data.estimated_state_of_charge_pct,
             local_estimation_data.average_solar_power_w,
             local_estimation_data.average_battery_current_a,
-            local_estimation_data.estimated_time_to_empty_h,
-            local_estimation_data.estimated_time_to_empty_h / 60,
-            local_estimation_data.estimated_time_to_empty_h / 3600,
-            local_estimation_data.estimated_time_to_full_h,
-            local_estimation_data.estimated_time_to_full_h / 60,
-            local_estimation_data.estimated_time_to_full_h / 3600,
+            floor(local_estimation_data.estimated_time_to_empty_h),
+            floor(fmod((double)local_estimation_data.estimated_time_to_empty_h * 60.0, 60.0)),
+            floor(fmod((double)local_estimation_data.estimated_time_to_empty_h * 3600.0, 60.0)),
+            floor(local_estimation_data.estimated_time_to_full_h),
+            floor(fmod((double)local_estimation_data.estimated_time_to_full_h * 60.0, 60.0)),
+            floor(fmod((double)local_estimation_data.estimated_time_to_full_h * 3600.0, 60.0)),
             local_estimation_data.state_of_flow,
             local_estimation_data.valid_estimation_mask
         );
