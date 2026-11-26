@@ -59,7 +59,8 @@ static eps_fault_data_t eps_fault_data = {
     .current_state = EPS_STATE_NA,
     .previous_state = EPS_STATE_NA,
 
-    .active_errors = 0U << 0U,
+    .active_faults = 0U << 0U,
+    .active_warnings = 0U << 0U,
 
     .time_spent_in_current_state_ms = 0u
 

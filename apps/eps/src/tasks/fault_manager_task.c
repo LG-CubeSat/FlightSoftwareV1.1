@@ -107,26 +107,53 @@ void fault_manager_task(void *pvParameters)
 
         enum eps_state state_before_checks = local_fault_data.current_state;
 
-        if (local_sensor_data.battery_voltage_reading >= CRITICAL_BATTERY_VOLTAGE_HIGH) {
+        if (isfinite(local_sensor_data.battery_voltage_reading) &&
+            local_sensor_data.valid_sensor_mask & EPS_BATTERY_VOLTAGE  ) {
 
-            local_fault_data.active_errors |= CRIT_HIGH_VOLTAGE;
-            local_fault_data.current_state = EPS_STATE_CRITICAL;
+            if (local_sensor_data.battery_voltage_reading > CRITICAL_BATTERY_VOLTAGE_HIGH) {
 
-        } else if (local_sensor_data.battery_voltage_reading >= WARNING_BATTERY_VOLTAGE_HIGH) {
+                local_fault_data.active_faults |= BATT_HIGH_VOLTAGE;
 
-            if (local_fault_data.current_state == EPS_STATE_IDLE ||
-                local_fault_data.current_state == EPS_STATE_NOMINAL ||
-                local_fault_data.current_state == EPS_STATE_NA      ||
-                local_fault_data.current_state == EPS_STATE_SAFE) {
+            } else {
 
-                    local_fault_data.current_state = EPS_STATE_WARNING;
+                local_fault_data.active_faults &= ~BATT_HIGH_VOLTAGE;
             }
 
-        } else {
+            if (local_sensor_data.battery_voltage_reading > WARNING_BATTERY_VOLTAGE_HIGH) {
 
-            //clear the error once it reaches nominal state again
-            local_fault_data.active_errors &= ~CRIT_HIGH_VOLTAGE;
-        }
+                local_fault_data.active_warnings |= BATT_HIGH_VOLTAGE;
+
+            } else {
+
+                local_fault_data.active_warnings &= ~BATT_HIGH_VOLTAGE;
+            } 
+
+            if (local_sensor_data.battery_voltage_reading < CRITICAL_BATTERY_VOLTAGE_LOW) {
+
+                local_fault_data.active_faults |= BATT_LOW_VOLTAGE;
+
+            } else {
+
+                local_fault_data.active_faults &= ~BATT_LOW_VOLTAGE;
+            }
+
+            if (local_sensor_data.battery_voltage_reading < WARNING_BATTERY_VOLTAGE_LOW) {
+
+                local_fault_data.active_warnings |= BATT_LOW_VOLTAGE;
+
+            } else {
+
+                local_fault_data.active_warnings &= ~BATT_LOW_VOLTAGE;
+            } 
+
+
+
+            }
+
+
+
+
+
 
         if (local_fault_data.current_state != state_before_checks) {
 

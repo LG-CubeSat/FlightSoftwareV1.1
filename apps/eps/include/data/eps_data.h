@@ -41,12 +41,13 @@ typedef enum {
 
 typedef enum {
 
-    CRIT_HIGH_VOLTAGE               =1u << 1,
-    CRIT_HIGH_CURRENT               =1u << 2,
-    CRIT_LOW_VOLTAGE                =1u << 3,
-    CRIT_LOW_CURRNET                =1u << 4,
-    CRIT_HIGH_TEMP                  =1u << 5,
-    CRIT_LOW_TEMP                   =1u << 6
+    BATT_HIGH_VOLTAGE               =1u << 1,
+    BATT_HIGH_CURRENT               =1u << 2,
+    BATT_LOW_VOLTAGE                =1u << 3,
+    BATT_LOW_CURRNET                =1u << 4,
+    BATT_HIGH_TEMP                  =1u << 5,
+    BATT_LOW_TEMP                   =1u << 6
+    //for warnings and critical masks
 
     
 } fault_masks_t;
@@ -136,6 +137,7 @@ typedef struct {
 
 enum eps_state {
 
+    EPS_STATE_ERR, //error determining state
     EPS_STATE_SAFE,
     EPS_STATE_WARNING,
     EPS_STATE_CRITICAL, 
@@ -155,8 +157,6 @@ enum eps_state {
     IDLE SATE
     N/A
     
-    
-    
     */
 
 };
@@ -167,12 +167,8 @@ typedef struct {
     enum eps_state previous_state;
 
 
-    /* 
-    represents critical errors only, see masks up top for specification
-    only switches on when a data point enters critical state but doesn't turn off until
-    it reaches nominal state
-    */
-    uint32_t active_errors; 
+    uint32_t active_warnings;
+    uint32_t active_faults; 
 
     uint32_t time_spent_in_current_state_ms;
     
