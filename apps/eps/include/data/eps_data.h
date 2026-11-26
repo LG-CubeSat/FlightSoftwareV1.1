@@ -33,18 +33,23 @@ typedef enum {
     ESTIAMTED_TIME_TO_EMPTY_H       =1u << 16,
     STATE_OF_FLOW                   =1u << 17,
     UPTIME_MIN                      =1u << 18,
-
-    //Fault masks
-
-    CRIT_HIGH_VOLTAGE               =1u << 19,
-    CRIT_HIGH_CURRENT               =1u << 20,
-    CRIT_LOW_VOLTAGE                =1u << 21,
-    CRIT_LOW_CURRNET                =1u << 22,
-    CRIT_HIGH_TEMP                  =1u << 23,
-    CRIT_LOW_TEMP                   =1u << 24
     
 
 } eps_valid_mask_t;
+
+//NOTE SENSOR AND ESTIMATION MASKS DO NOT MIX WITH FAULT MASKS
+
+typedef enum {
+
+    CRIT_HIGH_VOLTAGE               =1u << 1,
+    CRIT_HIGH_CURRENT               =1u << 2,
+    CRIT_LOW_VOLTAGE                =1u << 3,
+    CRIT_LOW_CURRNET                =1u << 4,
+    CRIT_HIGH_TEMP                  =1u << 5,
+    CRIT_LOW_TEMP                   =1u << 6
+
+    
+} fault_masks_t;
 
 typedef struct {
 
@@ -167,7 +172,7 @@ typedef struct {
     only switches on when a data point enters critical state but doesn't turn off until
     it reaches nominal state
     */
-    uint8_t active_errors; 
+    uint32_t active_errors; 
 
     uint32_t time_spent_in_current_state_ms;
     
