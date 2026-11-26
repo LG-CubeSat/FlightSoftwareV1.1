@@ -156,6 +156,14 @@ typedef struct {
 
     // 1=charging, -1=discharging, 0=idle, 2=invalid.
     int8_t state_of_flow;
+
+    // Estimation status metadata.
+    float uptime_min;
+    uint8_t valid_estimation_points;
+    uint8_t invalid_estimation_points;
+    float valid_estimation_points_pct;
+
+    
 } eps_telemetry_t;
 
 #endif

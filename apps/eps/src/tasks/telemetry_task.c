@@ -156,6 +156,11 @@ void telemetry_task(void *pvParameters)
 
         telemetry.state_of_flow = estimate.state_of_flow;
 
+        telemetry.uptime_min = estimate.uptime_min;
+        telemetry.valid_estimation_points = estimate.valid_estimation_points;
+        telemetry.invalid_estimation_points = estimate.invalid_estimation_points;
+        telemetry.valid_estimation_points_pct = estimate.valid_estimation_points_pct;
+
         // Open a connection to the OBC's EPS telemetry port.
         csp_conn_t *connection = csp_connect(
             CSP_PRIO_NORM,
