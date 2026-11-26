@@ -32,9 +32,16 @@ typedef enum {
     ESTIMATED_TIME_TO_FULL_H        =1u << 15,
     ESTIAMTED_TIME_TO_EMPTY_H       =1u << 16,
     STATE_OF_FLOW                   =1u << 17,
-    UPTIME_MIN                      =1u << 18
+    UPTIME_MIN                      =1u << 18,
 
+    //Fault masks
 
+    CRIT_HIGH_VOLTAGE               =1u << 19,
+    CRIT_HIGH_CURRENT               =1u << 20,
+    CRIT_LOW_VOLTAGE                =1u << 21,
+    CRIT_LOW_CURRNET                =1u << 22,
+    CRIT_HIGH_TEMP                  =1u << 23,
+    CRIT_LOW_TEMP                   =1u << 24
     
 
 } eps_valid_mask_t;
@@ -124,13 +131,28 @@ typedef struct {
 
 enum eps_state {
 
-    EPS_STATE_SAFE, //defaults to 0
-    EPS_STATE_WARNING, //defaults to 1
-    EPS_STATE_CRITICAL, // defaults to 2
-    EPS_STATE_IDLE, // defaults to 3
-    EPS_STATE_ECLIPSE, //defaults to 4
-    EPS_STATE_NOMINAL, //defaults to 5
-    EPS_STATE_NA //defaults to 6
+    EPS_STATE_SAFE,
+    EPS_STATE_WARNING,
+    EPS_STATE_CRITICAL, 
+    EPS_STATE_IDLE, 
+    EPS_STATE_ECLIPSE, 
+    EPS_STATE_NOMINAL,
+    EPS_STATE_NA 
+
+    /*
+    PRIORITY LADDER
+
+    CRITICAL STATE
+    ECLIPSE STATE
+    SAFE STATE
+    WARNING STATE 
+    NOMINAL STATE
+    IDLE SATE
+    N/A
+    
+    
+    
+    */
 
 };
 
@@ -139,13 +161,13 @@ typedef struct {
     enum eps_state current_state;
     enum eps_state previous_state;
 
-    uint8_t active_errors; //active fault bitmask (not for validity)
-    // 1u << 0u = High Voltage
-    // 1u << 1u = High Current
-    // 1u << 2u = Low Voltage
-    // 1u << 3u = Low Current
-    // 1u << 4u = High Temp
-    // 1u << 5u = Low Temp
+
+    /* 
+    represents critical errors only, see masks up top for specification
+    only switches on when a data point enters critical state but doesn't turn off until
+    it reaches nominal state
+    */
+    uint8_t active_errors; 
 
     uint32_t time_spent_in_current_state_ms;
     
