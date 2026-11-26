@@ -44,7 +44,7 @@ typedef enum {
     BATT_HIGH_VOLTAGE               =1u << 1,
     BATT_HIGH_CURRENT               =1u << 2,
     BATT_LOW_VOLTAGE                =1u << 3,
-    BATT_LOW_CURRNET                =1u << 4,
+    BATT_LOW_CURRENT                =1u << 4,
     BATT_HIGH_TEMP                  =1u << 5,
     BATT_LOW_TEMP                   =1u << 6
     //for warnings and critical masks

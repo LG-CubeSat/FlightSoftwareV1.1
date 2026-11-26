@@ -150,6 +150,47 @@ void fault_manager_task(void *pvParameters)
 
             }
 
+            if (isfinite(local_sensor_data.battery_current_reading) &&
+            local_sensor_data.valid_sensor_mask & EPS_BATTERY_CURRENT  ) {
+
+            if (local_sensor_data.battery_current_reading > CRITICAL_BATTERY_CURRENT_HIGH) {
+
+                local_fault_data.active_faults |= BATT_HIGH_CURRENT;
+
+            } else {
+
+                local_fault_data.active_faults &= ~BATT_HIGH_CURRENT;
+            }
+
+            if (local_sensor_data.battery_voltage_reading > WARNING_BATTERY_CURRENT_HIGH) {
+
+                local_fault_data.active_warnings |= BATT_HIGH_CURRENT;
+
+            } else {
+
+                local_fault_data.active_warnings &= ~BATT_HIGH_CURRENT;
+            } 
+
+            if (local_sensor_data.battery_current_reading < CRITICAL_BATTERY_CURRENT_LOW) {
+
+                local_fault_data.active_faults |= BATT_LOW_CURRENT;
+
+            } else {
+
+                local_fault_data.active_faults &= ~BATT_LOW_CURRENT;
+            }
+
+            if (local_sensor_data.battery_voltage_reading > WARNING_BATTERY_CURRENT_LOW) {
+
+                local_fault_data.active_warnings |= BATT_LOW_CURRENT;
+
+            } else {
+
+                local_fault_data.active_warnings &= ~BATT_LOW_CURRENT;
+            } 
+
+            }
+
 
 
 
